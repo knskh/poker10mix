@@ -106,6 +106,12 @@ class PokerUI {
             el.appendChild(btn);
         }
 
+        // Avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'seat-avatar';
+        avatar.textContent = (p.name || '?')[0].toUpperCase();
+        el.appendChild(avatar);
+
         // Name
         const nameDiv = document.createElement('div');
         nameDiv.className = 'seat-name';
@@ -115,7 +121,7 @@ class PokerUI {
         // Chips
         const chipsDiv = document.createElement('div');
         chipsDiv.className = 'seat-chips';
-        chipsDiv.textContent = `${p.chips}`;
+        chipsDiv.textContent = `${p.chips.toLocaleString()}`;
         el.appendChild(chipsDiv);
 
         // Cards in seat (mini)
