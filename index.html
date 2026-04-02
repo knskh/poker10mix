@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>10-Game Mix Poker</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <div id="app">
@@ -15,12 +14,31 @@
         <div id="login-screen">
             <h1>10-Game Mix Poker</h1>
             <div class="login-box">
-                <p class="login-hint">Googleアカウントでログイン</p>
-                <div id="google-signin-btn"></div>
-                <div class="login-divider"><span>または</span></div>
-                <p class="login-hint">ゲスト参加</p>
-                <input type="text" id="login-name" placeholder="名前" maxlength="20" autocomplete="off">
-                <button id="btn-enter" class="btn-primary">ゲストで入室</button>
+                <!-- Tab Switcher -->
+                <div class="login-tabs">
+                    <button id="tab-guest" class="login-tab active">ゲスト</button>
+                    <button id="tab-account" class="login-tab">アカウント</button>
+                </div>
+
+                <!-- Guest Login -->
+                <div id="login-guest-form">
+                    <p class="login-hint">名前を入力して参加</p>
+                    <input type="text" id="login-name" placeholder="名前" maxlength="20" autocomplete="off">
+                    <button id="btn-enter" class="btn-primary">ゲストで入室</button>
+                </div>
+
+                <!-- Account Login / Register -->
+                <div id="login-account-form" class="hidden">
+                    <div class="account-mode-tabs">
+                        <button id="tab-login" class="account-tab active">ログイン</button>
+                        <button id="tab-register" class="account-tab">新規登録</button>
+                    </div>
+                    <div id="login-error" class="login-error hidden"></div>
+                    <input type="text" id="account-name" placeholder="名前" maxlength="20" autocomplete="username">
+                    <input type="email" id="account-email" placeholder="メールアドレス" autocomplete="email">
+                    <input type="password" id="account-password" placeholder="パスワード" autocomplete="current-password">
+                    <button id="btn-account-submit" class="btn-primary">ログイン</button>
+                </div>
             </div>
         </div>
 

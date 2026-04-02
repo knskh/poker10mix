@@ -22,44 +22,35 @@ const { GAME_LIST, GameState } = require('./js/game');
 const { StatsTracker } = require('./js/stats');
 
 // ============================================
-// Google Token Verification
+// Account System (email/password)
 // ============================================
-const https = require('https');
+const crypto = require('crypto');
+const ACCOUNTS_FILE = path.join(__dirname, 'accounts.json');
 
-function verifyGoogleToken(token) {
-    // Decode JWT payload (base64url)
+// In-memory accounts store: { email: { name, email, passwordHash, salt } }
+let accounts = {};
+
+function loadAccounts() {
     try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-        // Check audience matches our client ID
-        if (payload.aud !== GOOGLE_CLIENT_ID) return null;
-        // Check issuer
-        if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') return null;
-        // Check expiration
-        if (payload.exp * 1000 < Date.now()) return null;
-        return payload;
-    } catch (e) {
-        return null;
-    }
+        if (fs.existsSync(ACCOUNTS_FILE)) {
+            accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+        }
+    } catch (e) { console.error('Failed to load accounts:', e.message); }
 }
 
-// Async full verification via Google's tokeninfo endpoint (called in background)
-function verifyGoogleTokenAsync(token) {
-    return new Promise((resolve) => {
-        https.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`, (res) => {
-            let data = '';
-            res.on('data', d => data += d);
-            res.on('end', () => {
-                try {
-                    const info = JSON.parse(data);
-                    if (info.aud === GOOGLE_CLIENT_ID) resolve(info);
-                    else resolve(null);
-                } catch (e) { resolve(null); }
-            });
-        }).on('error', () => resolve(null));
-    });
+function saveAccounts() {
+    try {
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2), 'utf8');
+    } catch (e) { console.error('Failed to save accounts:', e.message); }
 }
+
+function hashPassword(password, salt) {
+    if (!salt) salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return { hash, salt };
+}
+
+loadAccounts();
 
 // ============================================
 // HTTP Server
@@ -69,25 +60,9 @@ const MIME = {
     '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
 };
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-
 const httpServer = http.createServer((req, res) => {
     let url = req.url.split('?')[0];
     if (url === '/') url = '/index.html';
-
-    // Inject Google Client ID into index.html
-    if (url === '/index.html') {
-        const filePath = path.join(__dirname, 'index.html');
-        fs.readFile(filePath, 'utf8', (err, html) => {
-            if (err) { res.writeHead(404); res.end('Not found'); return; }
-            const inject = `<script>window.GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}";</script>`;
-            html = html.replace('</head>', inject + '\n</head>');
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(html);
-        });
-        return;
-    }
-
     const filePath = path.join(__dirname, url);
     fs.readFile(filePath, (err, data) => {
         if (err) { res.writeHead(404); res.end('Not found'); return; }
@@ -291,22 +266,47 @@ function handleMessage(ws, client, msg) {
             }
             break;
 
-        case 'google_auth': {
-            // Verify Google JWT token
-            if (!GOOGLE_CLIENT_ID || !msg.token) break;
-            try {
-                const payload = verifyGoogleToken(msg.token);
-                if (payload) {
-                    client.googleId = payload.sub;
-                    client.name = (payload.name || '').slice(0, 20) || 'Player' + client.id;
-                    client.email = payload.email;
-                    client.authenticated = true;
-                    send(ws, { type: 'name_set', name: client.name });
-                    console.log(`Google auth: ${client.name} (${client.email})`);
-                }
-            } catch (e) {
-                console.error('Google auth error:', e.message);
+        case 'register': {
+            const email = (msg.email || '').trim().toLowerCase();
+            const name = (msg.name || '').trim().slice(0, 20);
+            const password = msg.password || '';
+            if (!email || !name || password.length < 4) {
+                send(ws, { type: 'auth_result', success: false, message: '入力内容を確認してください' });
+                break;
             }
+            if (accounts[email]) {
+                send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
+                break;
+            }
+            const { hash, salt } = hashPassword(password);
+            accounts[email] = { name, email, passwordHash: hash, salt };
+            saveAccounts();
+            client.name = name;
+            client.email = email;
+            client.authenticated = true;
+            console.log(`Register: ${name} (${email})`);
+            send(ws, { type: 'auth_result', success: true, name, email });
+            break;
+        }
+
+        case 'login': {
+            const email = (msg.email || '').trim().toLowerCase();
+            const password = msg.password || '';
+            const account = accounts[email];
+            if (!account) {
+                send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+                break;
+            }
+            const { hash } = hashPassword(password, account.salt);
+            if (hash !== account.passwordHash) {
+                send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+                break;
+            }
+            client.name = account.name;
+            client.email = email;
+            client.authenticated = true;
+            console.log(`Login: ${account.name} (${email})`);
+            send(ws, { type: 'auth_result', success: true, name: account.name, email });
             break;
         }
 

@@ -6,14 +6,11 @@ let currentState = null;
 let turnTimer = null;
 let turnTimerStart = 0;
 let turnTimeLimit = 45;
-let googleUser = null; // { name, email, picture }
-
-// Google Client ID (set via GOOGLE_CLIENT_ID env or default)
-const GOOGLE_CLIENT_ID = window.GOOGLE_CLIENT_ID || '';
+let loggedInAccount = null; // { name, email }
 
 document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
-    setupGoogleSignIn();
+    setupAccountLogin();
     setupLobbyScreen();
     setupRoomScreen();
     setupGameScreen();
@@ -44,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('game_over', onGameOver);
     client.on('stats_data', renderStats);
     client.on('stats_update', onStatsUpdate);
+    client.on('auth_result', onAuthResult);
     client.on('error', (msg) => alert(msg));
 });
 
@@ -67,80 +65,125 @@ function setupLoginScreen() {
     document.getElementById('btn-enter').addEventListener('click', () => {
         const name = input.value.trim();
         if (!name || name.length < 1) { alert('名前を入力してください'); return; }
-        googleUser = null;
+        loggedInAccount = null;
         client.setName(name);
-        enterLobby(name, null);
+        enterLobby(name);
     });
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('btn-enter').click();
     });
+
+    // Tab switching: Guest / Account
+    document.getElementById('tab-guest').addEventListener('click', () => {
+        document.getElementById('tab-guest').classList.add('active');
+        document.getElementById('tab-account').classList.remove('active');
+        document.getElementById('login-guest-form').classList.remove('hidden');
+        document.getElementById('login-account-form').classList.add('hidden');
+    });
+    document.getElementById('tab-account').addEventListener('click', () => {
+        document.getElementById('tab-account').classList.add('active');
+        document.getElementById('tab-guest').classList.remove('active');
+        document.getElementById('login-account-form').classList.remove('hidden');
+        document.getElementById('login-guest-form').classList.add('hidden');
+    });
+
     // Logout
     document.getElementById('btn-logout').addEventListener('click', () => {
-        googleUser = null;
-        google.accounts.id.disableAutoSelect();
+        loggedInAccount = null;
         showScreen('login');
         document.getElementById('btn-logout').classList.add('hidden');
     });
 }
 
-function enterLobby(displayName, picture) {
+function enterLobby(displayName) {
     showScreen('lobby');
     const userEl = document.getElementById('lobby-username');
-    if (picture) {
-        userEl.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = picture; img.style.width = '24px'; img.style.height = '24px';
-        img.style.borderRadius = '50%'; img.style.verticalAlign = 'middle';
-        userEl.appendChild(img);
-        userEl.appendChild(document.createTextNode(' ' + displayName));
+    userEl.textContent = displayName;
+    if (loggedInAccount) {
         document.getElementById('btn-logout').classList.remove('hidden');
     } else {
-        userEl.textContent = displayName;
         document.getElementById('btn-logout').classList.add('hidden');
     }
 }
 
-function setupGoogleSignIn() {
-    if (!GOOGLE_CLIENT_ID) {
-        // No client ID configured, hide Google button area
-        const hint = document.querySelector('.login-hint');
-        if (hint) hint.style.display = 'none';
-        const divider = document.querySelector('.login-divider');
-        if (divider) divider.style.display = 'none';
-        const gBtn = document.getElementById('google-signin-btn');
-        if (gBtn) gBtn.style.display = 'none';
-        return;
-    }
-    // Wait for Google library to load
-    const initGoogle = () => {
-        if (typeof google === 'undefined' || !google.accounts) {
-            setTimeout(initGoogle, 200);
-            return;
+// ==========================================
+// Account Login / Register
+// ==========================================
+let accountMode = 'login'; // 'login' or 'register'
+
+function setupAccountLogin() {
+    const nameInput = document.getElementById('account-name');
+    const emailInput = document.getElementById('account-email');
+    const passInput = document.getElementById('account-password');
+    const submitBtn = document.getElementById('btn-account-submit');
+    const errorEl = document.getElementById('login-error');
+
+    // Login / Register tab switching
+    document.getElementById('tab-login').addEventListener('click', () => {
+        accountMode = 'login';
+        document.getElementById('tab-login').classList.add('active');
+        document.getElementById('tab-register').classList.remove('active');
+        nameInput.classList.add('hidden');
+        submitBtn.textContent = 'ログイン';
+        errorEl.classList.add('hidden');
+    });
+    document.getElementById('tab-register').addEventListener('click', () => {
+        accountMode = 'register';
+        document.getElementById('tab-register').classList.add('active');
+        document.getElementById('tab-login').classList.remove('active');
+        nameInput.classList.remove('hidden');
+        submitBtn.textContent = '新規登録';
+        errorEl.classList.add('hidden');
+    });
+
+    // Default: login mode hides name field
+    nameInput.classList.add('hidden');
+
+    // Submit
+    submitBtn.addEventListener('click', () => {
+        const email = emailInput.value.trim();
+        const password = passInput.value;
+        const name = nameInput.value.trim();
+
+        if (!email || !password) { showLoginError('メールアドレスとパスワードを入力してください'); return; }
+        if (accountMode === 'register' && !name) { showLoginError('名前を入力してください'); return; }
+        if (password.length < 4) { showLoginError('パスワードは4文字以上にしてください'); return; }
+
+        errorEl.classList.add('hidden');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '処理中...';
+
+        if (accountMode === 'register') {
+            client.send({ type: 'register', name, email, password });
+        } else {
+            client.send({ type: 'login', email, password });
         }
-        google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleGoogleCredential,
-        });
-        google.accounts.id.renderButton(
-            document.getElementById('google-signin-btn'),
-            { theme: 'outline', size: 'large', width: 280, text: 'signin_with', locale: 'ja' }
-        );
-    };
-    initGoogle();
+    });
+
+    // Enter key
+    passInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitBtn.click();
+    });
 }
 
-function handleGoogleCredential(response) {
-    // Decode JWT payload (no verification needed client-side; server will verify)
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    googleUser = {
-        name: payload.name,
-        email: payload.email,
-        picture: payload.picture,
-        token: response.credential,
-    };
-    client.setName(payload.name);
-    client.send({ type: 'google_auth', token: response.credential });
-    enterLobby(payload.name, payload.picture);
+function showLoginError(msg) {
+    const el = document.getElementById('login-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+
+function onAuthResult(data) {
+    const submitBtn = document.getElementById('btn-account-submit');
+    submitBtn.disabled = false;
+    submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+
+    if (data.success) {
+        loggedInAccount = { name: data.name, email: data.email };
+        client.setName(data.name);
+        enterLobby(data.name);
+    } else {
+        showLoginError(data.message || 'エラーが発生しました');
+    }
 }
 
 // ==========================================
