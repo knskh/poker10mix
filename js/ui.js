@@ -8,6 +8,28 @@ class PokerUI {
     constructor() {
         this.selectedCards = new Set();
         this.pendingDraw = false;
+        this._setupResize();
+    }
+
+    _setupResize() {
+        const resize = () => this.scaleTable();
+        window.addEventListener('resize', resize);
+        // Initial scale after DOM is ready
+        setTimeout(resize, 100);
+    }
+
+    scaleTable() {
+        const container = document.getElementById('table-container');
+        const area = document.getElementById('table-area');
+        if (!container || !area) return;
+        // Base size: table 700w + seat overflow ~80 = 780px wide
+        // Height: 50px top margin + 300px table + 10px gap + 76px hand + 50px seat bottom overflow = ~486px
+        const baseW = 780;
+        const baseH = 500;
+        const areaW = area.clientWidth;
+        const areaH = area.clientHeight;
+        const scale = Math.min(areaW / baseW, areaH / baseH, 1.15);
+        container.style.transform = `scale(${Math.max(scale, 0.5)})`;
     }
 
     // Render from server-provided state
@@ -48,6 +70,9 @@ class PokerUI {
 
         // Player hand (my cards, large)
         this.renderPlayerHand(s);
+
+        // Scale table to fit screen
+        this.scaleTable();
     }
 
     positionSeats(count, mySeat) {

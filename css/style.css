@@ -276,7 +276,8 @@ body {
    GAME SCREEN - PokerStars Style
    ============================================================ */
 #game-screen {
-    display: flex; flex-direction: column; height: 100vh;
+    display: flex; flex-direction: column;
+    height: 100vh;
     background: #1a1d24;
 }
 
@@ -309,8 +310,13 @@ body {
 /* === Table Area === */
 #table-area {
     flex: 1; display: flex; align-items: center; justify-content: center;
-    padding: 8px 16px 0; min-height: 0; overflow: visible;
+    padding: 0 16px; overflow: visible;
     background: radial-gradient(ellipse at center, #252830 0%, #1a1d24 70%);
+}
+
+#table-container {
+    display: flex; flex-direction: column; align-items: center;
+    transform-origin: center center;
 }
 
 #table-felt {
@@ -325,7 +331,7 @@ body {
         0 0 0 14px #1a1d24,
         inset 0 0 40px rgba(0,0,0,0.4),
         0 4px 24px rgba(0,0,0,0.5);
-    margin: 55px 0; flex-shrink: 0;
+    margin: 50px 0 10px; flex-shrink: 0;
 }
 
 /* Subtle felt texture */
@@ -451,7 +457,7 @@ body {
 .card.suit-c { background: #2e7d32; color: #fff; }
 
 /* Player hand (own cards, larger) */
-#player-hand { display: flex; justify-content: center; padding: 2px 0; min-height: 68px; flex-shrink: 0; }
+#player-hand { display: flex; justify-content: center; align-items: center; padding: 4px 0; height: 76px; flex-shrink: 0; }
 #player-cards { display: flex; gap: 6px; justify-content: center; }
 #player-cards .card { width: 50px; height: 68px; border-radius: 5px; }
 #player-cards .card-rank { font-size: 18px; }
