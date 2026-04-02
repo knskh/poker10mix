@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('chat', onChat);
     client.on('game_over', onGameOver);
     client.on('stats_data', renderStats);
+    client.on('stats_update', onStatsUpdate);
     client.on('error', (msg) => alert(msg));
 });
 
@@ -435,14 +436,43 @@ function onGameOver(data) {
 }
 
 // ==========================================
-// Stats Modal
+// Stats Modal & localStorage Persistence
 // ==========================================
+const STATS_STORAGE_KEY = 'poker10mix_stats';
+
+function loadSavedStats() {
+    try {
+        const raw = localStorage.getItem(STATS_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+}
+
+function saveSavedStats(stats) {
+    try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats)); } catch (e) {}
+}
+
+// Called when server sends stats_update after each hand (keyed by player name)
+function onStatsUpdate(data) {
+    if (!data.stats) return;
+    const saved = loadSavedStats();
+    for (const [name, calc] of Object.entries(data.stats)) {
+        saved[name] = calc;
+    }
+    saveSavedStats(saved);
+}
+
 function setupStatsModal() {
     document.getElementById('btn-stats-close').addEventListener('click', () => {
         document.getElementById('stats-modal').classList.add('hidden');
     });
+    // Lobby stats button
+    document.getElementById('btn-lobby-stats').addEventListener('click', () => {
+        renderStatsFromStorage();
+        document.getElementById('stats-modal').classList.remove('hidden');
+    });
 }
 
+// Render stats from server (in-game, keyed by seat index)
 function renderStats(data) {
     const container = document.getElementById('stats-table-container');
     if (!data.stats || Object.keys(data.stats).length === 0) {
@@ -453,24 +483,52 @@ function renderStats(data) {
     for (const [seatId, c] of Object.entries(data.stats)) {
         const pName = (currentState && currentState.players[seatId]) ? currentState.players[seatId].name : 'Player ' + seatId;
         const isMeClass = parseInt(seatId) === data.mySeat ? ' style="color:var(--gold)"' : '';
-        html += `<h3${isMeClass}>${pName} (${c.hands}ハンド)</h3>`;
-        if (c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p>'; continue; }
-        html += `<table class="stats-table"><tbody>
-            <tr><td class="stat-label">VPIP</td><td class="stat-value">${c.vpip}%</td>
-            <td class="stat-label">PFR</td><td class="stat-value">${c.pfr}%</td></tr>
-            <tr><td class="stat-label">3-Bet</td><td class="stat-value">${c.threeBet}%</td>
-            <td class="stat-label">4-Bet</td><td class="stat-value">${c.fourBet}%</td></tr>
-            <tr><td class="stat-label">Fold to 3Bet</td><td class="stat-value">${c.foldTo3Bet}%</td>
-            <td class="stat-label">All-in%</td><td class="stat-value">${c.allIn}%</td></tr>
-            <tr><td class="stat-label">Agg%</td><td class="stat-value">${c.postflopAgg}%</td>
-            <td class="stat-label">AF</td><td class="stat-value">${c.af}</td></tr>
-            <tr><td class="stat-label">WTSD%</td><td class="stat-value">${c.wtsd}%</td>
-            <td class="stat-label">W$SD</td><td class="stat-value">${c.wsd}%</td></tr>
-            <tr><td class="stat-label">Win Rate</td><td class="stat-value">${c.winRate}/100h</td>
-            <td class="stat-label">SD Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin}</td></tr>
-        </tbody></table>`;
+        html += renderStatsBlock(pName, c, isMeClass);
     }
     container.innerHTML = html;
+}
+
+// Render stats from localStorage (lobby view, keyed by player name)
+function renderStatsFromStorage() {
+    const container = document.getElementById('stats-table-container');
+    const saved = loadSavedStats();
+    const names = Object.keys(saved);
+    if (names.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim);padding:16px;">まだスタッツがありません。ゲームをプレイすると記録されます。</p>';
+        return;
+    }
+    let html = '<div style="text-align:right;padding:4px 8px;"><button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button></div>';
+    for (const [name, c] of Object.entries(saved)) {
+        const isMe = name === client.name ? ' style="color:var(--gold)"' : '';
+        html += renderStatsBlock(name, c, isMe);
+    }
+    container.innerHTML = html;
+    document.getElementById('btn-stats-clear').addEventListener('click', () => {
+        if (confirm('すべてのスタッツをリセットしますか？')) {
+            localStorage.removeItem(STATS_STORAGE_KEY);
+            renderStatsFromStorage();
+        }
+    });
+}
+
+function renderStatsBlock(pName, c, extraAttr) {
+    let html = `<h3${extraAttr}>${pName} (${c.hands}ハンド)</h3>`;
+    if (!c.hands || c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p>'; return html; }
+    html += `<table class="stats-table"><tbody>
+        <tr><td class="stat-label">VPIP</td><td class="stat-value">${c.vpip}%</td>
+        <td class="stat-label">PFR</td><td class="stat-value">${c.pfr}%</td></tr>
+        <tr><td class="stat-label">3-Bet</td><td class="stat-value">${c.threeBet}%</td>
+        <td class="stat-label">4-Bet</td><td class="stat-value">${c.fourBet}%</td></tr>
+        <tr><td class="stat-label">Fold to 3Bet</td><td class="stat-value">${c.foldTo3Bet}%</td>
+        <td class="stat-label">All-in%</td><td class="stat-value">${c.allIn}%</td></tr>
+        <tr><td class="stat-label">Agg%</td><td class="stat-value">${c.postflopAgg}%</td>
+        <td class="stat-label">AF</td><td class="stat-value">${c.af}</td></tr>
+        <tr><td class="stat-label">WTSD%</td><td class="stat-value">${c.wtsd}%</td>
+        <td class="stat-label">W$SD</td><td class="stat-value">${c.wsd}%</td></tr>
+        <tr><td class="stat-label">Win Rate</td><td class="stat-value">${c.winRate}/100h</td>
+        <td class="stat-label">SD Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin}</td></tr>
+    </tbody></table>`;
+    return html;
 }
 
 // ==========================================

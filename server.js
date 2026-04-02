@@ -191,6 +191,20 @@ function broadcastLog(room, msg, cls) {
 }
 
 // ============================================
+// Broadcast Stats Update (after each hand)
+// ============================================
+function broadcastStatsUpdate(room) {
+    if (!room.game || !room.stats) return;
+    const playerStats = {};
+    for (let i = 0; i < room.game.playerCount; i++) {
+        const raw = room.stats.getPlayer(i).total;
+        const calc = room.stats.calc(raw);
+        playerStats[room.game.players[i].name] = calc;
+    }
+    broadcastToRoom(room, { type: 'stats_update', stats: playerStats });
+}
+
+// ============================================
 // Game State Serialization (per-player view)
 // ============================================
 function getStateForPlayer(game, room, playerSeat) {
@@ -524,7 +538,11 @@ function startGame(room) {
     game.onFirstRoundEnd = () => room.stats.endFirstRound();
     game.onPlayerAction = (player, action, isBlinds) => room.stats.recordAction(player, action, isBlinds);
     game.onShowdown = (winnerIds) => room.stats.recordShowdown(winnerIds);
-    game.onHandEnd = (hadShowdown) => room.stats.endHand(game.players, hadShowdown);
+    game.onHandEnd = (hadShowdown) => {
+        room.stats.endHand(game.players, hadShowdown);
+        // Send stats to all clients after each hand for local storage
+        broadcastStatsUpdate(room);
+    };
 
     room.game = game;
     room.playing = true;

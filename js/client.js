@@ -93,6 +93,9 @@ class PokerClient {
             case 'stats_data':
                 this.emit('stats_data', msg);
                 break;
+            case 'stats_update':
+                this.emit('stats_update', msg);
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
