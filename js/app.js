@@ -6,9 +6,14 @@ let currentState = null;
 let turnTimer = null;
 let turnTimerStart = 0;
 let turnTimeLimit = 45;
+let googleUser = null; // { name, email, picture }
+
+// Google Client ID (set via GOOGLE_CLIENT_ID env or default)
+const GOOGLE_CLIENT_ID = window.GOOGLE_CLIENT_ID || '';
 
 document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
+    setupGoogleSignIn();
     setupLobbyScreen();
     setupRoomScreen();
     setupGameScreen();
@@ -57,16 +62,84 @@ function showScreen(name) {
 // ==========================================
 function setupLoginScreen() {
     const input = document.getElementById('login-name');
+    // Guest login
     document.getElementById('btn-enter').addEventListener('click', () => {
         const name = input.value.trim();
         if (!name || name.length < 1) { alert('名前を入力してください'); return; }
+        googleUser = null;
         client.setName(name);
-        showScreen('lobby');
-        document.getElementById('lobby-username').textContent = name;
+        enterLobby(name, null);
     });
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('btn-enter').click();
     });
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        googleUser = null;
+        google.accounts.id.disableAutoSelect();
+        showScreen('login');
+        document.getElementById('btn-logout').classList.add('hidden');
+    });
+}
+
+function enterLobby(displayName, picture) {
+    showScreen('lobby');
+    const userEl = document.getElementById('lobby-username');
+    if (picture) {
+        userEl.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = picture; img.style.width = '24px'; img.style.height = '24px';
+        img.style.borderRadius = '50%'; img.style.verticalAlign = 'middle';
+        userEl.appendChild(img);
+        userEl.appendChild(document.createTextNode(' ' + displayName));
+        document.getElementById('btn-logout').classList.remove('hidden');
+    } else {
+        userEl.textContent = displayName;
+        document.getElementById('btn-logout').classList.add('hidden');
+    }
+}
+
+function setupGoogleSignIn() {
+    if (!GOOGLE_CLIENT_ID) {
+        // No client ID configured, hide Google button area
+        const hint = document.querySelector('.login-hint');
+        if (hint) hint.style.display = 'none';
+        const divider = document.querySelector('.login-divider');
+        if (divider) divider.style.display = 'none';
+        const gBtn = document.getElementById('google-signin-btn');
+        if (gBtn) gBtn.style.display = 'none';
+        return;
+    }
+    // Wait for Google library to load
+    const initGoogle = () => {
+        if (typeof google === 'undefined' || !google.accounts) {
+            setTimeout(initGoogle, 200);
+            return;
+        }
+        google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredential,
+        });
+        google.accounts.id.renderButton(
+            document.getElementById('google-signin-btn'),
+            { theme: 'outline', size: 'large', width: 280, text: 'signin_with', locale: 'ja' }
+        );
+    };
+    initGoogle();
+}
+
+function handleGoogleCredential(response) {
+    // Decode JWT payload (no verification needed client-side; server will verify)
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    googleUser = {
+        name: payload.name,
+        email: payload.email,
+        picture: payload.picture,
+        token: response.credential,
+    };
+    client.setName(payload.name);
+    client.send({ type: 'google_auth', token: response.credential });
+    enterLobby(payload.name, payload.picture);
 }
 
 // ==========================================
@@ -378,7 +451,7 @@ function renderStats(data) {
     }
     let html = '';
     for (const [seatId, c] of Object.entries(data.stats)) {
-        const pName = currentState ? currentState.players[seatId].name : 'Player ' + seatId;
+        const pName = (currentState && currentState.players[seatId]) ? currentState.players[seatId].name : 'Player ' + seatId;
         const isMeClass = parseInt(seatId) === data.mySeat ? ' style="color:var(--gold)"' : '';
         html += `<h3${isMeClass}>${pName} (${c.hands}ハンド)</h3>`;
         if (c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p>'; continue; }

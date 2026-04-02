@@ -104,6 +104,34 @@ body {
 .login-box input:focus { border-color: var(--accent); }
 .login-box .btn-primary { width: 100%; }
 
+#google-signin-btn { display: flex; justify-content: center; margin: 8px 0; }
+
+.login-divider {
+    display: flex; align-items: center; margin: 16px 0 12px;
+    color: var(--text-dim); font-size: 12px;
+}
+.login-divider::before, .login-divider::after {
+    content: ''; flex: 1; border-top: 1px solid rgba(255,255,255,0.12);
+}
+.login-divider span { padding: 0 12px; }
+
+.google-user-info {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+}
+.google-user-info img {
+    width: 28px; height: 28px; border-radius: 50%;
+}
+.google-user-info span { font-size: 13px; color: var(--text); }
+
+#btn-logout {
+    background: none; border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text-dim); padding: 4px 10px; border-radius: 4px;
+    font-size: 11px; cursor: pointer; margin-left: 8px;
+}
+#btn-logout:hover { border-color: var(--accent); color: var(--text); }
+
 /* === Lobby Screen === */
 #lobby-screen { display: flex; flex-direction: column; height: 100vh; }
 
