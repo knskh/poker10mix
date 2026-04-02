@@ -5,37 +5,37 @@ const GAME_LIST = [
     {
         id: 'td', name: '2-7 トリプルドロー', shortName: 'TD',
         type: 'draw', betting: 'limit', drawCount: 3, handSize: 5, lowType: '27',
-        smallBet: 400, bigBet: 800, smallBlind: 200, bigBlind: 400,
+        smallBet: 200, bigBet: 400, smallBlind: 100, bigBlind: 200,
         rules: 'ルール：5枚のカードが配られ、3回の交換機会があります。\n2-7ローボール：最も弱い役が勝ち。\nエースはハイ、ストレート・フラッシュは役として数えます。\n最強ハンド：7-5-4-3-2（スートばらばら）'
     },
     {
         id: 'lhe', name: 'リミットホールデム', shortName: 'LHE',
         type: 'community', betting: 'limit', holeCards: 2, exactHole: false, hasLow: false,
-        smallBet: 400, bigBet: 800, smallBlind: 200, bigBlind: 400,
+        smallBet: 200, bigBet: 400, smallBlind: 100, bigBlind: 200,
         rules: 'ルール：2枚のホールカード＋5枚のコミュニティカード。\nベスト5枚の組み合わせで勝負。\nリミットベッティング（固定額）。'
     },
     {
         id: 'o8', name: 'オマハ Hi-Lo', shortName: 'O8',
         type: 'community', betting: 'limit', holeCards: 4, exactHole: true, hasLow: true, lowQualifier: 8,
-        smallBet: 400, bigBet: 800, smallBlind: 200, bigBlind: 400,
+        smallBet: 200, bigBet: 400, smallBlind: 100, bigBlind: 200,
         rules: 'ルール：4枚のホールカードから必ず2枚＋ボード3枚で役を作る。\nハイとロー（8以下で構成）でポットを分割。\nロー該当なしの場合はハイが総取り。'
     },
     {
         id: 'razz', name: 'ラズ', shortName: 'Razz',
         type: 'stud', betting: 'limit', hasLow: false, lowOnly: true,
-        smallBet: 400, bigBet: 800, ante: 60, bringIn: 100,
+        smallBet: 200, bigBet: 400, ante: 30, bringIn: 50,
         rules: 'ルール：7カードスタッドのローボール版。\n最も弱いハンドが勝ち（A-5ロー）。\nエースはロー。ストレート・フラッシュは無視。\n最強ハンド：A-2-3-4-5'
     },
     {
         id: 'stud', name: 'セブンカードスタッド', shortName: 'Stud',
         type: 'stud', betting: 'limit', hasLow: false,
-        smallBet: 400, bigBet: 800, ante: 60, bringIn: 100,
+        smallBet: 200, bigBet: 400, ante: 30, bringIn: 50,
         rules: 'ルール：7枚のカード（3枚裏＋4枚表）でベスト5枚。\n3rd Streetで最低カードがブリングイン。\n通常のハイハンドで勝負。'
     },
     {
         id: 'stud8', name: 'スタッド Hi-Lo', shortName: 'Stud8',
         type: 'stud', betting: 'limit', hasLow: true, lowQualifier: 8,
-        smallBet: 400, bigBet: 800, ante: 60, bringIn: 100,
+        smallBet: 200, bigBet: 400, ante: 30, bringIn: 50,
         rules: 'ルール：7カードスタッドのHi-Lo版。\nハイとロー（8以下）でポット分割。\nロー該当なしならハイ総取り。'
     },
     {
@@ -59,7 +59,7 @@ const GAME_LIST = [
     {
         id: 'badugi', name: 'バドゥーギ', shortName: 'Badugi',
         type: 'draw', betting: 'limit', drawCount: 3, handSize: 4, lowType: 'badugi',
-        smallBet: 400, bigBet: 800, smallBlind: 200, bigBlind: 400,
+        smallBet: 200, bigBet: 400, smallBlind: 100, bigBlind: 200,
         rules: 'ルール：4枚配られ、3回交換可能。\n4枚すべてスート・ランクが異なれば「バドゥーギ」。\nバドゥーギ同士ではローカードが勝ち。\nバドゥーギなしなら最多ユニーク枚数で比較。'
     },
 ];
