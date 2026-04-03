@@ -173,7 +173,6 @@ class Room {
         this.pending = null; // { type, playerId, resolve, timer }
         this.seatMap = {};   // clientId -> seatIndex
         this.stats = new StatsTracker();
-        this.zoom = false;   // Zoom mode flag
     }
 
     getMember(clientId) {
@@ -197,7 +196,6 @@ class Room {
             settings: this.settings,
             playing: this.playing,
             playerCount: this.members.length,
-            zoom: this.zoom,
         };
     }
 }
@@ -229,10 +227,9 @@ function broadcastRoomList() {
     const list = [...rooms.values()].map(r => ({
         id: r.id, hostName: r.members[0]?.name || '???',
         playerCount: r.members.length, playing: r.playing,
-        zoom: r.zoom || false,
     }));
     for (const [ws] of clients) {
-        send(ws, { type: 'room_list', rooms: list });
+        send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
     }
 }
 
@@ -290,7 +287,6 @@ function getStateForPlayer(game, room, playerSeat) {
         dealerSeat: game.dealerSeat,
         isShowdown: game.isShowdown,
         mySeatIndex: playerSeat,
-        zoom: room.zoom || false,
     };
 }
 
@@ -299,10 +295,6 @@ function broadcastGameState(room) {
     for (const m of room.members) {
         const seat = room.seatMap[m.clientId];
         if (seat !== undefined) {
-            // In zoom mode, skip updates for folded players (they see waiting screen)
-            // Exception: still send when hand is resetting (player not folded) or showdown
-            const player = room.game.players[seat];
-            if (room.zoom && player && player.folded && !room.game.isShowdown) continue;
             send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, seat) });
         }
     }
@@ -313,7 +305,7 @@ function broadcastGameState(room) {
 // ============================================
 wss.on('connection', (ws) => {
     const clientId = nextClientId++;
-    const client = { id: clientId, name: 'Player' + clientId, roomId: null, ws };
+    const client = { id: clientId, name: 'Player' + clientId, roomId: null, inZoom: false, ws };
     clients.set(ws, client);
 
     send(ws, { type: 'welcome', clientId });
@@ -362,12 +354,9 @@ function handleMessage(ws, client, msg) {
 
         case 'create_room': {
             if (client.roomId) leaveRoom(client);
+            if (client.inZoom) leaveZoom(client);
             const roomId = generateRoomId();
             const room = new Room(roomId, client.id, client.name);
-            if (msg.zoom) {
-                room.zoom = true;
-                room.settings.selectedGames = GAME_LIST.map((_, i) => i);
-            }
             room.members.push({ clientId: client.id, name: client.name, ws });
             rooms.set(roomId, room);
             client.roomId = roomId;
@@ -400,7 +389,7 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(client.roomId);
             if (!room || room.hostId !== client.id || room.playing) return;
             if (msg.settings) {
-                if (!room.zoom && msg.settings.selectedGames) room.settings.selectedGames = msg.settings.selectedGames;
+                if (msg.settings.selectedGames) room.settings.selectedGames = msg.settings.selectedGames;
                 if (msg.settings.startingChips) room.settings.startingChips = msg.settings.startingChips;
             }
             broadcastRoomUpdate(room);
@@ -411,13 +400,14 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(client.roomId);
             if (!room || room.hostId !== client.id) return;
             if (room.members.length < 2) { send(ws, { type: 'error', message: '2人以上必要です' }); return; }
-            if (!room.zoom && room.settings.selectedGames.length < 2) { send(ws, { type: 'error', message: '2つ以上のゲームを選択してください' }); return; }
+            if (room.settings.selectedGames.length < 2) { send(ws, { type: 'error', message: '2つ以上のゲームを選択してください' }); return; }
             if (room.playing) return;
             startGame(room);
             break;
         }
 
         case 'action': {
+            if (client.inZoom) { handleZoomAction(client, msg); break; }
             const room = rooms.get(client.roomId);
             if (!room || !room.pending) return;
             const seat = room.seatMap[client.id];
@@ -425,15 +415,12 @@ function handleMessage(ws, client, msg) {
             clearTimeout(room.pending.timer);
             const p = room.pending;
             room.pending = null;
-            // In zoom mode, notify the folding player immediately
-            if (room.zoom && msg.action && msg.action.type === 'fold') {
-                send(ws, { type: 'zoom_waiting' });
-            }
             p.resolve(msg.action);
             break;
         }
 
         case 'draw': {
+            if (client.inZoom) { handleZoomDraw(client, msg); break; }
             const room = rooms.get(client.roomId);
             if (!room || !room.pending) return;
             const seat = room.seatMap[client.id];
@@ -444,6 +431,14 @@ function handleMessage(ws, client, msg) {
             p.resolve(msg.discards || []);
             break;
         }
+
+        case 'join_zoom':
+            handleJoinZoom(ws, client);
+            break;
+
+        case 'leave_zoom':
+            handleLeaveZoom(ws, client);
+            break;
 
         case 'chat': {
             const room = rooms.get(client.roomId);
@@ -514,6 +509,7 @@ function leaveRoom(client) {
 }
 
 function handleDisconnect(client) {
+    if (client.inZoom) leaveZoom(client);
     if (client.roomId) leaveRoom(client);
 }
 
@@ -526,13 +522,7 @@ function startGame(room) {
 
     const game = new GameState(names, room.settings.startingChips);
     game.filteredGames = filteredGames;
-    game.zoomMode = room.zoom || false;
     game.delay = (ms) => new Promise(r => setTimeout(r, Math.min(ms, 800)));
-
-    // Zoom: start with a random game
-    if (room.zoom) {
-        game.currentGameIndex = Math.floor(Math.random() * filteredGames.length);
-    }
 
     // Seat map: member index = seat index
     room.seatMap = {};
@@ -630,7 +620,7 @@ async function runGameLoop(room) {
         }
 
         broadcastGameState(room);
-        await new Promise(r => setTimeout(r, room.zoom ? 500 : 2500));
+        await new Promise(r => setTimeout(r, 2500));
 
         // Reset actions
         for (const p of game.players) p.lastAction = '';
@@ -654,6 +644,293 @@ async function runGameLoop(room) {
         finalChips: game.players.map(p => ({ name: p.name, chips: p.chips })),
     });
     broadcastRoomList();
+}
+
+// ============================================
+// Zoom Pool System (concurrent tables)
+// ============================================
+const zoomPool = [];           // [{clientId, name, ws}] waiting for table
+const zoomTables = new Map();  // tableId -> ZoomTable
+const zoomPlayers = new Map(); // clientId -> {name, ws, tableId}
+let zoomNextTableId = 1;
+let zoomMatchTimer = null;
+
+function handleJoinZoom(ws, client) {
+    if (client.roomId) leaveRoom(client);
+    if (client.inZoom) return;
+
+    client.inZoom = true;
+    zoomPlayers.set(client.id, { name: client.name, ws, tableId: null });
+    send(ws, { type: 'zoom_joined' });
+    addToZoomPool(client.id);
+    broadcastRoomList();
+}
+
+function handleLeaveZoom(ws, client) {
+    if (!client.inZoom) return;
+    leaveZoom(client);
+    send(ws, { type: 'zoom_left' });
+    broadcastRoomList();
+}
+
+function leaveZoom(client) {
+    if (!client.inZoom) return;
+    client.inZoom = false;
+
+    // Remove from pool
+    const poolIdx = zoomPool.findIndex(p => p.clientId === client.id);
+    if (poolIdx >= 0) zoomPool.splice(poolIdx, 1);
+
+    // Remove from active table
+    const pd = zoomPlayers.get(client.id);
+    if (pd && pd.tableId) {
+        const table = zoomTables.get(pd.tableId);
+        if (table) foldZoomPlayer(table, client.id);
+    }
+
+    zoomPlayers.delete(client.id);
+}
+
+function addToZoomPool(clientId) {
+    const pd = zoomPlayers.get(clientId);
+    if (!pd || !pd.ws || pd.ws.readyState !== WebSocket.OPEN) return;
+
+    pd.tableId = null;
+
+    // Prevent duplicates
+    if (zoomPool.some(p => p.clientId === clientId)) return;
+
+    zoomPool.push({ clientId, name: pd.name, ws: pd.ws });
+    send(pd.ws, { type: 'zoom_waiting', poolSize: zoomPool.length });
+
+    zoomMatchmake();
+}
+
+function zoomMatchmake() {
+    // 6+ players ready: start immediately
+    while (zoomPool.length >= 6) {
+        const players = zoomPool.splice(0, 6);
+        createZoomTable(players);
+    }
+
+    // 4-5 players: wait 3 seconds for more to join
+    if (zoomPool.length >= 4 && !zoomMatchTimer) {
+        zoomMatchTimer = setTimeout(() => {
+            zoomMatchTimer = null;
+            if (zoomPool.length >= 4) {
+                const count = Math.min(zoomPool.length, 6);
+                const players = zoomPool.splice(0, count);
+                createZoomTable(players);
+            }
+            // Recurse if more players waiting
+            if (zoomPool.length >= 4) zoomMatchmake();
+        }, 3000);
+    }
+}
+
+function createZoomTable(members) {
+    const tableId = zoomNextTableId++;
+    const names = members.map(m => m.name);
+
+    const game = new GameState(names, 10000);
+    game.filteredGames = [...GAME_LIST];
+    game.zoomMode = true;
+    game.currentGameIndex = Math.floor(Math.random() * GAME_LIST.length);
+    game.delay = (ms) => new Promise(r => setTimeout(r, Math.min(ms, 500)));
+
+    const seatMap = {};
+    members.forEach((m, i) => {
+        seatMap[m.clientId] = i;
+        const pd = zoomPlayers.get(m.clientId);
+        if (pd) pd.tableId = tableId;
+    });
+
+    const table = {
+        id: tableId,
+        game,
+        members: [...members],
+        activeMemberIds: new Set(members.map(m => m.clientId)),
+        seatMap,
+        pending: null,
+    };
+
+    zoomTables.set(tableId, table);
+
+    // --- Callbacks ---
+    game.onUpdate = () => broadcastZoomTableState(table);
+    game.onLog = (msg, cls) => {
+        for (const m of table.members) {
+            if (table.activeMemberIds.has(m.clientId))
+                send(m.ws, { type: 'log', message: msg, cls });
+        }
+    };
+
+    game.onGetPlayerAction = (actions, player) => {
+        return new Promise((resolve) => {
+            const seatIdx = player.id;
+            const member = getZoomMemberBySeat(table, seatIdx);
+
+            broadcastZoomTableState(table);
+
+            if (!member || !member.ws || member.ws.readyState !== WebSocket.OPEN
+                || !table.activeMemberIds.has(member.clientId)) {
+                const auto = actions.find(a => a.type === 'check')
+                          || actions.find(a => a.type === 'fold') || actions[0];
+                resolve(auto);
+                return;
+            }
+
+            const timeLimit = table.game.isFirstRound ? 45 : 30;
+            send(member.ws, { type: 'your_turn', actions, timeLimit });
+
+            const timer = setTimeout(() => {
+                table.pending = null;
+                const auto = actions.find(a => a.type === 'check')
+                          || actions.find(a => a.type === 'fold') || actions[0];
+                for (const m2 of table.members) {
+                    if (table.activeMemberIds.has(m2.clientId))
+                        send(m2.ws, { type: 'log', message: `${player.name}: タイムアウト`, cls: 'action' });
+                }
+                resolve(auto);
+            }, timeLimit * 1000);
+
+            table.pending = { type: 'action', playerId: seatIdx, resolve, timer };
+        });
+    };
+
+    game.onGetPlayerDraw = (player) => {
+        return new Promise((resolve) => {
+            const seatIdx = player.id;
+            const member = getZoomMemberBySeat(table, seatIdx);
+
+            broadcastZoomTableState(table);
+
+            if (!member || !member.ws || member.ws.readyState !== WebSocket.OPEN
+                || !table.activeMemberIds.has(member.clientId)) {
+                resolve([]);
+                return;
+            }
+
+            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 30 });
+
+            const timer = setTimeout(() => {
+                table.pending = null;
+                resolve([]);
+            }, 30000);
+
+            table.pending = { type: 'draw', playerId: seatIdx, resolve, timer };
+        });
+    };
+
+    // When a player folds, return them to the pool immediately
+    game.onPlayerFold = (player) => {
+        const member = getZoomMemberBySeat(table, player.id);
+        if (!member) return;
+
+        table.activeMemberIds.delete(member.clientId);
+
+        setTimeout(() => {
+            const pd = zoomPlayers.get(member.clientId);
+            if (pd && pd.tableId === tableId) {
+                addToZoomPool(member.clientId);
+            }
+        }, 500);
+    };
+
+    // Notify all players
+    for (const m of members) {
+        send(m.ws, { type: 'game_started', zoom: true });
+    }
+
+    runZoomTable(table);
+}
+
+function getZoomMemberBySeat(table, seatIdx) {
+    for (const [cid, seat] of Object.entries(table.seatMap)) {
+        if (seat === seatIdx) {
+            return table.members.find(m => m.clientId === parseInt(cid));
+        }
+    }
+    return null;
+}
+
+function broadcastZoomTableState(table) {
+    if (!table.game) return;
+    for (const m of table.members) {
+        if (!table.activeMemberIds.has(m.clientId)) continue;
+        const seat = table.seatMap[m.clientId];
+        if (seat !== undefined) {
+            const state = getStateForPlayer(table.game, {}, seat);
+            state.zoom = true;
+            send(m.ws, { type: 'game_state', state });
+        }
+    }
+}
+
+function foldZoomPlayer(table, clientId) {
+    const seat = table.seatMap[clientId];
+    if (seat === undefined) return;
+
+    if (table.game && table.game.players[seat]) {
+        table.game.players[seat].folded = true;
+        table.game.players[seat].connected = false;
+    }
+
+    if (table.pending && table.pending.playerId === seat) {
+        clearTimeout(table.pending.timer);
+        const p = table.pending;
+        table.pending = null;
+        p.resolve({ type: 'fold' });
+    }
+
+    table.activeMemberIds.delete(clientId);
+}
+
+async function runZoomTable(table) {
+    try {
+        await table.game.playHand();
+    } catch (e) {
+        console.error('Zoom hand error:', e);
+    }
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    // Return remaining active members to pool
+    for (const cid of table.activeMemberIds) {
+        if (zoomPlayers.has(cid)) {
+            addToZoomPool(cid);
+        }
+    }
+
+    // Clean up
+    if (table.pending) clearTimeout(table.pending.timer);
+    zoomTables.delete(table.id);
+}
+
+function handleZoomAction(client, msg) {
+    const pd = zoomPlayers.get(client.id);
+    if (!pd || !pd.tableId) return;
+    const table = zoomTables.get(pd.tableId);
+    if (!table || !table.pending) return;
+    const seat = table.seatMap[client.id];
+    if (table.pending.type !== 'action' || table.pending.playerId !== seat) return;
+    clearTimeout(table.pending.timer);
+    const p = table.pending;
+    table.pending = null;
+    p.resolve(msg.action);
+}
+
+function handleZoomDraw(client, msg) {
+    const pd = zoomPlayers.get(client.id);
+    if (!pd || !pd.tableId) return;
+    const table = zoomTables.get(pd.tableId);
+    if (!table || !table.pending) return;
+    const seat = table.seatMap[client.id];
+    if (table.pending.type !== 'draw' || table.pending.playerId !== seat) return;
+    clearTimeout(table.pending.timer);
+    const p = table.pending;
+    table.pending = null;
+    p.resolve(msg.discards || []);
 }
 
 // ============================================

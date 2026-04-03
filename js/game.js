@@ -100,6 +100,7 @@ class GameState {
         this.roundBets = 0;
         this.gameOver = false;
         this.isShowdown = false;
+        this.isFirstRound = false;
         this.fastFold = false;
         this.fastFoldActive = false;
         this.zoomMode = false; // random game each hand
@@ -116,6 +117,7 @@ class GameState {
         this.onPlayerAction = null;
         this.onShowdown = null;
         this.onHandEnd = null;
+        this.onPlayerFold = null;
 
         // Filtered games
         this.filteredGames = GAME_LIST;
@@ -561,6 +563,7 @@ class GameState {
 
     // Returns true if hand is over (only 1 player left)
     async bettingRound(startIdx, isPreflop, limitBetSize) {
+        this.isFirstRound = !!isPreflop;
         if (startIdx < 0) return this.checkHandOver();
 
         const gc = this.gameConfig;
@@ -694,6 +697,7 @@ class GameState {
                 if (player.isHuman && this.fastFold) {
                     this.fastFoldActive = true;
                 }
+                if (this.onPlayerFold) this.onPlayerFold(player);
                 break;
 
             case 'check':

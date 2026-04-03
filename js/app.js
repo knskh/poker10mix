@@ -7,6 +7,7 @@ let turnTimer = null;
 let turnTimerStart = 0;
 let turnTimeLimit = 45;
 let loggedInAccount = null; // { name, email }
+let isInZoom = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
@@ -42,7 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('stats_data', renderStats);
     client.on('stats_update', onStatsUpdate);
     client.on('auth_result', onAuthResult);
+    client.on('zoom_joined', onZoomJoined);
     client.on('zoom_waiting', onZoomWaiting);
+    client.on('zoom_left', onZoomLeft);
     client.on('error', (msg) => alert(msg));
 });
 
@@ -194,8 +197,8 @@ function setupLobbyScreen() {
     document.getElementById('btn-create-room').addEventListener('click', () => {
         client.createRoom();
     });
-    document.getElementById('btn-create-zoom').addEventListener('click', () => {
-        client.createRoom(true);
+    document.getElementById('btn-join-zoom').addEventListener('click', () => {
+        client.joinZoom();
     });
     document.getElementById('btn-join-by-id').addEventListener('click', () => {
         const id = document.getElementById('room-id-input').value.trim().toUpperCase();
@@ -207,7 +210,14 @@ function setupLobbyScreen() {
     document.getElementById('btn-refresh-rooms').addEventListener('click', () => client.getRooms());
 }
 
-function renderRoomList(rooms) {
+function renderRoomList(data) {
+    const rooms = Array.isArray(data) ? data : (data.rooms || []);
+    const zoomCount = data.zoomCount || 0;
+
+    // Update zoom player count
+    const zoomBtn = document.getElementById('btn-join-zoom');
+    if (zoomBtn) zoomBtn.textContent = `Zoom卓に参加${zoomCount > 0 ? ' (' + zoomCount + '人)' : ''}`;
+
     const container = document.getElementById('room-list-body');
     container.innerHTML = '';
     if (!rooms || rooms.length === 0) {
@@ -216,8 +226,7 @@ function renderRoomList(rooms) {
     }
     for (const r of rooms) {
         const tr = document.createElement('tr');
-        const zoomBadge = r.zoom ? ' <span class="zoom-badge">ZOOM</span>' : '';
-        tr.innerHTML = `<td>${r.id}${zoomBadge}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${r.playing ? '<span style="color:#f44">進行中</span>' : '<span style="color:#4f4">待機中</span>'}</td>`;
+        tr.innerHTML = `<td>${r.id}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${r.playing ? '<span style="color:#f44">進行中</span>' : '<span style="color:#4f4">待機中</span>'}</td>`;
         if (!r.playing && r.playerCount < 6) {
             tr.style.cursor = 'pointer';
             tr.addEventListener('click', () => client.joinRoom(r.id));
@@ -274,7 +283,7 @@ function onRoomUpdated(room) {
 }
 
 function renderRoom(room) {
-    document.getElementById('room-id-display').textContent = room.id + (room.zoom ? ' [ZOOM]' : '');
+    document.getElementById('room-id-display').textContent = room.id;
     document.getElementById('room-player-count').textContent = `${room.members.length}/6`;
 
     const list = document.getElementById('room-player-list');
@@ -292,16 +301,6 @@ function renderRoom(room) {
     document.getElementById('room-host-controls').style.display = isHost ? 'block' : 'none';
     document.getElementById('room-waiting-msg').style.display = isHost ? 'none' : 'block';
 
-    // Hide game selection for zoom rooms
-    const gameCheckboxes = document.getElementById('room-game-checkboxes');
-    const gameLabel = gameCheckboxes.previousElementSibling; // h3
-    if (room.zoom) {
-        gameCheckboxes.style.display = 'none';
-        if (gameLabel && gameLabel.tagName === 'H3') gameLabel.textContent = '10-Game Mix Zoom卓（ランダム）';
-    } else {
-        gameCheckboxes.style.display = '';
-        if (gameLabel && gameLabel.tagName === 'H3') gameLabel.textContent = 'ゲーム選択（最低2つ）';
-    }
 
     // Update settings from room
     if (room.settings) {
@@ -356,30 +355,60 @@ function setupGameScreen() {
             showScreen('lobby');
         }
     });
+
+    // Zoom exit button
+    document.getElementById('btn-zoom-exit').addEventListener('click', () => {
+        client.leaveZoom();
+    });
 }
 
-function onGameStarted() {
+function onGameStarted(data) {
     showScreen('game');
+    document.getElementById('zoom-waiting-overlay').classList.add('hidden');
     document.getElementById('game-log').innerHTML = '';
     ui.addLog('ゲーム開始！', 'important');
+
+    // Show/hide zoom-specific UI
+    if (data && data.zoom) {
+        isInZoom = true;
+        document.getElementById('btn-back-room').classList.add('hidden');
+        document.getElementById('btn-zoom-exit').classList.remove('hidden');
+    } else {
+        document.getElementById('btn-back-room').classList.remove('hidden');
+        document.getElementById('btn-zoom-exit').classList.add('hidden');
+    }
 }
 
 function onGameState(state) {
     currentState = state;
-    // In zoom mode, hide waiting overlay when a new hand starts (player not folded)
+    // In zoom mode, hide waiting overlay when receiving game state
     if (state.zoom) {
-        const me = state.players[state.mySeatIndex];
-        if (me && !me.folded) {
-            document.getElementById('zoom-waiting-overlay').classList.add('hidden');
-        }
+        document.getElementById('zoom-waiting-overlay').classList.add('hidden');
     }
     ui.renderFromServer(state);
 }
 
-function onZoomWaiting() {
-    // Show waiting overlay when player folds in zoom mode
+function onZoomJoined() {
+    isInZoom = true;
+    showScreen('game');
+    document.getElementById('zoom-waiting-overlay').classList.remove('hidden');
+    document.getElementById('game-log').innerHTML = '';
+    document.getElementById('btn-back-room').classList.add('hidden');
+    document.getElementById('btn-zoom-exit').classList.remove('hidden');
+    ui.addLog('Zoom卓に参加しました。テーブルを探しています...', 'important');
+}
+
+function onZoomWaiting(data) {
     document.getElementById('zoom-waiting-overlay').classList.remove('hidden');
     stopTurnTimer();
+}
+
+function onZoomLeft() {
+    isInZoom = false;
+    document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+    document.getElementById('btn-zoom-exit').classList.add('hidden');
+    document.getElementById('btn-back-room').classList.remove('hidden');
+    showScreen('lobby');
 }
 
 function onYourTurn(data) {
@@ -498,6 +527,11 @@ function stopTurnTimer() {
 
 function onGameOver(data) {
     stopTurnTimer();
+    if (isInZoom) {
+        // Zoom: no dialog, just wait for next table
+        ui.addLog(`${data.winner} が勝利！`, 'important');
+        return;
+    }
     ui.addLog(`ゲーム終了！ ${data.winner} が優勝！`, 'important');
     setTimeout(() => {
         if (confirm(`ゲーム終了！ ${data.winner} が優勝！\nロビーに戻りますか？`)) {

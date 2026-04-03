@@ -56,7 +56,7 @@ class PokerClient {
                 this.name = msg.name;
                 break;
             case 'room_list':
-                this.emit('room_list', msg.rooms);
+                this.emit('room_list', { rooms: msg.rooms, zoomCount: msg.zoomCount || 0 });
                 break;
             case 'room_joined':
                 this.roomId = msg.room.id;
@@ -70,7 +70,7 @@ class PokerClient {
                 this.emit('room_left');
                 break;
             case 'game_started':
-                this.emit('game_started');
+                this.emit('game_started', msg);
                 break;
             case 'game_state':
                 this.emit('game_state', msg.state);
@@ -99,8 +99,14 @@ class PokerClient {
             case 'auth_result':
                 this.emit('auth_result', msg);
                 break;
+            case 'zoom_joined':
+                this.emit('zoom_joined');
+                break;
             case 'zoom_waiting':
-                this.emit('zoom_waiting');
+                this.emit('zoom_waiting', msg);
+                break;
+            case 'zoom_left':
+                this.emit('zoom_left');
                 break;
             case 'error':
                 this.emit('error', msg.message);
@@ -109,7 +115,9 @@ class PokerClient {
     }
 
     setName(name) { this.name = name; this.send({ type: 'set_name', name }); }
-    createRoom(zoom) { this.send({ type: 'create_room', zoom: !!zoom }); }
+    createRoom() { this.send({ type: 'create_room' }); }
+    joinZoom() { this.send({ type: 'join_zoom' }); }
+    leaveZoom() { this.send({ type: 'leave_zoom' }); }
     joinRoom(roomId) { this.send({ type: 'join_room', roomId }); }
     leaveRoom() { this.send({ type: 'leave_room' }); }
     updateSettings(settings) { this.send({ type: 'update_settings', settings }); }
