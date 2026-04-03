@@ -22,27 +22,16 @@ const { GAME_LIST, GameState } = require('./js/game');
 const { StatsTracker } = require('./js/stats');
 
 // ============================================
-// Account System (email/password)
+// Account System (Supabase + password hashing)
 // ============================================
 const crypto = require('crypto');
-const ACCOUNTS_FILE = path.join(__dirname, 'accounts.json');
+const { createClient } = require('@supabase/supabase-js');
 
-// In-memory accounts store: { email: { name, email, passwordHash, salt } }
-let accounts = {};
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-function loadAccounts() {
-    try {
-        if (fs.existsSync(ACCOUNTS_FILE)) {
-            accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
-        }
-    } catch (e) { console.error('Failed to load accounts:', e.message); }
-}
-
-function saveAccounts() {
-    try {
-        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2), 'utf8');
-    } catch (e) { console.error('Failed to save accounts:', e.message); }
-}
+if (!supabase) console.warn('Supabase not configured. Account registration/login will not persist.');
 
 function hashPassword(password, salt) {
     if (!salt) salt = crypto.randomBytes(16).toString('hex');
@@ -50,7 +39,94 @@ function hashPassword(password, salt) {
     return { hash, salt };
 }
 
-loadAccounts();
+// ============================================
+// Auth Handlers (async for Supabase)
+// ============================================
+async function handleRegister(ws, client, msg) {
+    const email = (msg.email || '').trim().toLowerCase();
+    const name = (msg.name || '').trim().slice(0, 20);
+    const password = msg.password || '';
+
+    if (!email || !name || password.length < 4) {
+        send(ws, { type: 'auth_result', success: false, message: '入力内容を確認してください' });
+        return;
+    }
+
+    if (!supabase) {
+        send(ws, { type: 'auth_result', success: false, message: 'データベース未設定です' });
+        return;
+    }
+
+    try {
+        // Check if email already exists
+        const { data: existing } = await supabase.from('accounts').select('email').eq('email', email).limit(1);
+        if (existing && existing.length > 0) {
+            send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
+            return;
+        }
+
+        const { hash, salt } = hashPassword(password);
+        const { error } = await supabase.from('accounts').insert({
+            email, name, password_hash: hash, salt
+        });
+
+        if (error) {
+            console.error('Register error:', error.message);
+            send(ws, { type: 'auth_result', success: false, message: '登録に失敗しました' });
+            return;
+        }
+
+        client.name = name;
+        client.email = email;
+        client.authenticated = true;
+        console.log(`Register: ${name} (${email})`);
+        send(ws, { type: 'auth_result', success: true, name, email });
+    } catch (e) {
+        console.error('Register error:', e.message);
+        send(ws, { type: 'auth_result', success: false, message: 'エラーが発生しました' });
+    }
+}
+
+async function handleLogin(ws, client, msg) {
+    const email = (msg.email || '').trim().toLowerCase();
+    const password = msg.password || '';
+
+    if (!email || !password) {
+        send(ws, { type: 'auth_result', success: false, message: 'メールアドレスとパスワードを入力してください' });
+        return;
+    }
+
+    if (!supabase) {
+        send(ws, { type: 'auth_result', success: false, message: 'データベース未設定です' });
+        return;
+    }
+
+    try {
+        const { data, error } = await supabase.from('accounts').select('*').eq('email', email).limit(1);
+
+        if (error || !data || data.length === 0) {
+            send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+            return;
+        }
+
+        const account = data[0];
+        const { hash } = hashPassword(password, account.salt);
+
+        if (hash !== account.password_hash) {
+            send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+            return;
+        }
+
+        client.name = account.name;
+        client.email = email;
+        client.authenticated = true;
+        console.log(`Login: ${account.name} (${email})`);
+        send(ws, { type: 'auth_result', success: true, name: account.name, email });
+    } catch (e) {
+        console.error('Login error:', e.message);
+        send(ws, { type: 'auth_result', success: false, message: 'エラーが発生しました' });
+    }
+}
 
 // ============================================
 // HTTP Server
@@ -267,46 +343,12 @@ function handleMessage(ws, client, msg) {
             break;
 
         case 'register': {
-            const email = (msg.email || '').trim().toLowerCase();
-            const name = (msg.name || '').trim().slice(0, 20);
-            const password = msg.password || '';
-            if (!email || !name || password.length < 4) {
-                send(ws, { type: 'auth_result', success: false, message: '入力内容を確認してください' });
-                break;
-            }
-            if (accounts[email]) {
-                send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
-                break;
-            }
-            const { hash, salt } = hashPassword(password);
-            accounts[email] = { name, email, passwordHash: hash, salt };
-            saveAccounts();
-            client.name = name;
-            client.email = email;
-            client.authenticated = true;
-            console.log(`Register: ${name} (${email})`);
-            send(ws, { type: 'auth_result', success: true, name, email });
+            handleRegister(ws, client, msg);
             break;
         }
 
         case 'login': {
-            const email = (msg.email || '').trim().toLowerCase();
-            const password = msg.password || '';
-            const account = accounts[email];
-            if (!account) {
-                send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
-                break;
-            }
-            const { hash } = hashPassword(password, account.salt);
-            if (hash !== account.passwordHash) {
-                send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
-                break;
-            }
-            client.name = account.name;
-            client.email = email;
-            client.authenticated = true;
-            console.log(`Login: ${account.name} (${email})`);
-            send(ws, { type: 'auth_result', success: true, name: account.name, email });
+            handleLogin(ws, client, msg);
             break;
         }
 
