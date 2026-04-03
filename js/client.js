@@ -99,6 +99,9 @@ class PokerClient {
             case 'auth_result':
                 this.emit('auth_result', msg);
                 break;
+            case 'zoom_waiting':
+                this.emit('zoom_waiting');
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -106,7 +109,7 @@ class PokerClient {
     }
 
     setName(name) { this.name = name; this.send({ type: 'set_name', name }); }
-    createRoom() { this.send({ type: 'create_room' }); }
+    createRoom(zoom) { this.send({ type: 'create_room', zoom: !!zoom }); }
     joinRoom(roomId) { this.send({ type: 'join_room', roomId }); }
     leaveRoom() { this.send({ type: 'leave_room' }); }
     updateSettings(settings) { this.send({ type: 'update_settings', settings }); }

@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('stats_data', renderStats);
     client.on('stats_update', onStatsUpdate);
     client.on('auth_result', onAuthResult);
+    client.on('zoom_waiting', onZoomWaiting);
     client.on('error', (msg) => alert(msg));
 });
 
@@ -193,6 +194,9 @@ function setupLobbyScreen() {
     document.getElementById('btn-create-room').addEventListener('click', () => {
         client.createRoom();
     });
+    document.getElementById('btn-create-zoom').addEventListener('click', () => {
+        client.createRoom(true);
+    });
     document.getElementById('btn-join-by-id').addEventListener('click', () => {
         const id = document.getElementById('room-id-input').value.trim().toUpperCase();
         if (id.length === 4) client.joinRoom(id);
@@ -212,7 +216,8 @@ function renderRoomList(rooms) {
     }
     for (const r of rooms) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.id}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${r.playing ? '<span style="color:#f44">進行中</span>' : '<span style="color:#4f4">待機中</span>'}</td>`;
+        const zoomBadge = r.zoom ? ' <span class="zoom-badge">ZOOM</span>' : '';
+        tr.innerHTML = `<td>${r.id}${zoomBadge}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${r.playing ? '<span style="color:#f44">進行中</span>' : '<span style="color:#4f4">待機中</span>'}</td>`;
         if (!r.playing && r.playerCount < 6) {
             tr.style.cursor = 'pointer';
             tr.addEventListener('click', () => client.joinRoom(r.id));
@@ -269,7 +274,7 @@ function onRoomUpdated(room) {
 }
 
 function renderRoom(room) {
-    document.getElementById('room-id-display').textContent = room.id;
+    document.getElementById('room-id-display').textContent = room.id + (room.zoom ? ' [ZOOM]' : '');
     document.getElementById('room-player-count').textContent = `${room.members.length}/6`;
 
     const list = document.getElementById('room-player-list');
@@ -286,6 +291,17 @@ function renderRoom(room) {
     const isHost = room.hostId === client.clientId;
     document.getElementById('room-host-controls').style.display = isHost ? 'block' : 'none';
     document.getElementById('room-waiting-msg').style.display = isHost ? 'none' : 'block';
+
+    // Hide game selection for zoom rooms
+    const gameCheckboxes = document.getElementById('room-game-checkboxes');
+    const gameLabel = gameCheckboxes.previousElementSibling; // h3
+    if (room.zoom) {
+        gameCheckboxes.style.display = 'none';
+        if (gameLabel && gameLabel.tagName === 'H3') gameLabel.textContent = '10-Game Mix Zoom卓（ランダム）';
+    } else {
+        gameCheckboxes.style.display = '';
+        if (gameLabel && gameLabel.tagName === 'H3') gameLabel.textContent = 'ゲーム選択（最低2つ）';
+    }
 
     // Update settings from room
     if (room.settings) {
@@ -350,7 +366,20 @@ function onGameStarted() {
 
 function onGameState(state) {
     currentState = state;
+    // In zoom mode, hide waiting overlay when a new hand starts (player not folded)
+    if (state.zoom) {
+        const me = state.players[state.mySeatIndex];
+        if (me && !me.folded) {
+            document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+        }
+    }
     ui.renderFromServer(state);
+}
+
+function onZoomWaiting() {
+    // Show waiting overlay when player folds in zoom mode
+    document.getElementById('zoom-waiting-overlay').classList.remove('hidden');
+    stopTurnTimer();
 }
 
 function onYourTurn(data) {

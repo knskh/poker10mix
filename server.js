@@ -173,6 +173,7 @@ class Room {
         this.pending = null; // { type, playerId, resolve, timer }
         this.seatMap = {};   // clientId -> seatIndex
         this.stats = new StatsTracker();
+        this.zoom = false;   // Zoom mode flag
     }
 
     getMember(clientId) {
@@ -196,6 +197,7 @@ class Room {
             settings: this.settings,
             playing: this.playing,
             playerCount: this.members.length,
+            zoom: this.zoom,
         };
     }
 }
@@ -227,6 +229,7 @@ function broadcastRoomList() {
     const list = [...rooms.values()].map(r => ({
         id: r.id, hostName: r.members[0]?.name || '???',
         playerCount: r.members.length, playing: r.playing,
+        zoom: r.zoom || false,
     }));
     for (const [ws] of clients) {
         send(ws, { type: 'room_list', rooms: list });
@@ -287,6 +290,7 @@ function getStateForPlayer(game, room, playerSeat) {
         dealerSeat: game.dealerSeat,
         isShowdown: game.isShowdown,
         mySeatIndex: playerSeat,
+        zoom: room.zoom || false,
     };
 }
 
@@ -295,6 +299,10 @@ function broadcastGameState(room) {
     for (const m of room.members) {
         const seat = room.seatMap[m.clientId];
         if (seat !== undefined) {
+            // In zoom mode, skip updates for folded players (they see waiting screen)
+            // Exception: still send when hand is resetting (player not folded) or showdown
+            const player = room.game.players[seat];
+            if (room.zoom && player && player.folded && !room.game.isShowdown) continue;
             send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, seat) });
         }
     }
@@ -356,6 +364,10 @@ function handleMessage(ws, client, msg) {
             if (client.roomId) leaveRoom(client);
             const roomId = generateRoomId();
             const room = new Room(roomId, client.id, client.name);
+            if (msg.zoom) {
+                room.zoom = true;
+                room.settings.selectedGames = GAME_LIST.map((_, i) => i);
+            }
             room.members.push({ clientId: client.id, name: client.name, ws });
             rooms.set(roomId, room);
             client.roomId = roomId;
@@ -388,7 +400,7 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(client.roomId);
             if (!room || room.hostId !== client.id || room.playing) return;
             if (msg.settings) {
-                if (msg.settings.selectedGames) room.settings.selectedGames = msg.settings.selectedGames;
+                if (!room.zoom && msg.settings.selectedGames) room.settings.selectedGames = msg.settings.selectedGames;
                 if (msg.settings.startingChips) room.settings.startingChips = msg.settings.startingChips;
             }
             broadcastRoomUpdate(room);
@@ -399,7 +411,7 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(client.roomId);
             if (!room || room.hostId !== client.id) return;
             if (room.members.length < 2) { send(ws, { type: 'error', message: '2人以上必要です' }); return; }
-            if (room.settings.selectedGames.length < 2) { send(ws, { type: 'error', message: '2つ以上のゲームを選択してください' }); return; }
+            if (!room.zoom && room.settings.selectedGames.length < 2) { send(ws, { type: 'error', message: '2つ以上のゲームを選択してください' }); return; }
             if (room.playing) return;
             startGame(room);
             break;
@@ -413,6 +425,10 @@ function handleMessage(ws, client, msg) {
             clearTimeout(room.pending.timer);
             const p = room.pending;
             room.pending = null;
+            // In zoom mode, notify the folding player immediately
+            if (room.zoom && msg.action && msg.action.type === 'fold') {
+                send(ws, { type: 'zoom_waiting' });
+            }
             p.resolve(msg.action);
             break;
         }
@@ -510,7 +526,13 @@ function startGame(room) {
 
     const game = new GameState(names, room.settings.startingChips);
     game.filteredGames = filteredGames;
+    game.zoomMode = room.zoom || false;
     game.delay = (ms) => new Promise(r => setTimeout(r, Math.min(ms, 800)));
+
+    // Zoom: start with a random game
+    if (room.zoom) {
+        game.currentGameIndex = Math.floor(Math.random() * filteredGames.length);
+    }
 
     // Seat map: member index = seat index
     room.seatMap = {};
@@ -608,7 +630,7 @@ async function runGameLoop(room) {
         }
 
         broadcastGameState(room);
-        await new Promise(r => setTimeout(r, 2500));
+        await new Promise(r => setTimeout(r, room.zoom ? 500 : 2500));
 
         // Reset actions
         for (const p of game.players) p.lastAction = '';

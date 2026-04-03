@@ -102,6 +102,7 @@ class GameState {
         this.isShowdown = false;
         this.fastFold = false;
         this.fastFoldActive = false;
+        this.zoomMode = false; // random game each hand
 
         // Callbacks
         this.onUpdate = null;
@@ -197,11 +198,20 @@ class GameState {
         this.handsInCurrentGame++;
         this.nextDealer();
 
-        // Check game rotation (every orbit = playerCount hands)
-        if (this.handsInCurrentGame >= this.playerCount) {
-            this.handsInCurrentGame = 0;
-            this.currentGameIndex = (this.currentGameIndex + 1) % this.filteredGames.length;
-            this.log(`ゲームチェンジ → ${this.gameConfig.name}`, 'important');
+        if (this.zoomMode) {
+            // Random game each hand
+            const prevIndex = this.currentGameIndex;
+            this.currentGameIndex = Math.floor(Math.random() * this.filteredGames.length);
+            if (this.currentGameIndex !== prevIndex) {
+                this.log(`ゲームチェンジ → ${this.gameConfig.name}`, 'important');
+            }
+        } else {
+            // Check game rotation (every orbit = playerCount hands)
+            if (this.handsInCurrentGame >= this.playerCount) {
+                this.handsInCurrentGame = 0;
+                this.currentGameIndex = (this.currentGameIndex + 1) % this.filteredGames.length;
+                this.log(`ゲームチェンジ → ${this.gameConfig.name}`, 'important');
+            }
         }
 
         // Check if game is over (only 1 player with chips)

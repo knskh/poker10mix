@@ -57,6 +57,7 @@
                     <h2>ルーム一覧</h2>
                     <div class="room-actions">
                         <button id="btn-create-room" class="btn-primary">ルーム作成</button>
+                        <button id="btn-create-zoom" class="btn-primary btn-zoom">Zoom卓を作成</button>
                         <div class="join-by-id">
                             <input type="text" id="room-id-input" placeholder="ルームID" maxlength="4" style="text-transform:uppercase">
                             <button id="btn-join-by-id" class="btn-small">参加</button>
@@ -165,6 +166,14 @@
                 <div class="draw-hint">交換するカードをクリックして選択</div>
                 <button id="btn-draw" class="btn-action">ドロー</button>
                 <button id="btn-stand-pat" class="btn-action">スタンドパット</button>
+            </div>
+
+            <div id="zoom-waiting-overlay" class="hidden">
+                <div class="zoom-waiting-inner">
+                    <div class="zoom-waiting-icon">Z</div>
+                    <p>次のハンドを待っています...</p>
+                    <span class="zoom-waiting-hint">フォールド済み - 新しいハンドが自動的に開始されます</span>
+                </div>
             </div>
 
             <div id="game-log"></div>
