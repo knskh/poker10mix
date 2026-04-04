@@ -10,8 +10,10 @@ class StatsTracker {
     // Get or create player stats
     getPlayer(playerId) {
         if (!this.data[playerId]) {
-            this.data[playerId] = { total: this.emptyStats(), byGame: {} };
+            this.data[playerId] = { total: this.emptyStats(), byGame: {}, byPosition: {} };
         }
+        // Migration: add byPosition if missing
+        if (!this.data[playerId].byPosition) this.data[playerId].byPosition = {};
         return this.data[playerId];
     }
 
@@ -19,6 +21,24 @@ class StatsTracker {
         const p = this.getPlayer(playerId);
         if (!p.byGame[gameId]) p.byGame[gameId] = this.emptyStats();
         return p.byGame[gameId];
+    }
+
+    getPlayerPosition(playerId, position) {
+        const p = this.getPlayer(playerId);
+        if (!p.byPosition[position]) p.byPosition[position] = this.emptyStats();
+        return p.byPosition[position];
+    }
+
+    // Determine position label based on seat relative to dealer
+    static getPosition(seatIdx, dealerSeat, playerCount) {
+        const offset = (seatIdx - dealerSeat + playerCount) % playerCount;
+        if (playerCount === 2) return offset === 0 ? 'BTN' : 'BB';
+        if (offset === 0) return 'BTN';
+        if (offset === 1) return 'SB';
+        if (offset === 2) return 'BB';
+        if (offset === playerCount - 1) return 'CO';
+        if (playerCount >= 5 && offset === playerCount - 2) return 'HJ';
+        return 'EP';
     }
 
     emptyStats() {
@@ -41,17 +61,21 @@ class StatsTracker {
     }
 
     // Start tracking a new hand
-    beginHand(players, gameConfig) {
+    beginHand(players, gameConfig, dealerSeat) {
         this.currentHand = {
             gameId: gameConfig.id,
             players: {},
-            firstRoundRaiseCount: 0, // tracks total raises in first betting round
+            firstRoundRaiseCount: 0,
             isFirstRound: true,
             startChips: {},
+            positions: {},
         };
+        const activeCount = players.filter(p => !p.folded).length;
         for (const p of players) {
             if (p.folded) continue;
             this.currentHand.startChips[p.id] = p.chips;
+            const pos = StatsTracker.getPosition(p.id, dealerSeat || 0, activeCount);
+            this.currentHand.positions[p.id] = pos;
             this.currentHand.players[p.id] = {
                 vpip: false, pfr: false,
                 threeBet: false, fourBet: false, fiveBet: false,
@@ -170,8 +194,9 @@ class StatsTracker {
 
             const total = this.getPlayer(p.id).total;
             const game = this.getPlayerGame(p.id, gid);
+            const pos = this.getPlayerPosition(p.id, h.positions[p.id] || 'EP');
 
-            for (const s of [total, game]) {
+            for (const s of [total, game, pos]) {
                 s.handsPlayed++;
 
                 const chipDiff = p.chips - (h.startChips[p.id] || 0);

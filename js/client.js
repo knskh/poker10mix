@@ -108,6 +108,9 @@ class PokerClient {
             case 'zoom_left':
                 this.emit('zoom_left');
                 break;
+            case 'zoom_sitout':
+                this.emit('zoom_sitout');
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -118,6 +121,8 @@ class PokerClient {
     createRoom() { this.send({ type: 'create_room' }); }
     joinZoom() { this.send({ type: 'join_zoom' }); }
     leaveZoom() { this.send({ type: 'leave_zoom' }); }
+    zoomSitout() { this.send({ type: 'zoom_sitout' }); }
+    zoomRejoin() { this.send({ type: 'zoom_rejoin' }); }
     joinRoom(roomId) { this.send({ type: 'join_room', roomId }); }
     leaveRoom() { this.send({ type: 'leave_room' }); }
     updateSettings(settings) { this.send({ type: 'update_settings', settings }); }

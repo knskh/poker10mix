@@ -605,7 +605,8 @@ class GameState {
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', amount: Math.min(size, player.chips) });
                         } else {
-                            actions.push({ type: 'raise', amount: Math.min(raiseTotal - player.currentBet, player.chips) });
+                            const amt = Math.min(raiseTotal - player.currentBet, player.chips);
+                            actions.push({ type: 'raise', amount: amt, total: player.currentBet + amt });
                         }
                     } else if (gc.betting === 'no-limit') {
                         const minRaiseSize = Math.max(this.minRaise, this.currentBet * 2 - player.currentBet);
@@ -613,9 +614,9 @@ class GameState {
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', min: this.minRaise, max: maxBet });
                         } else {
-                            actions.push({ type: 'raise', min: Math.min(minRaiseSize, maxBet), max: maxBet });
+                            actions.push({ type: 'raise', min: Math.min(minRaiseSize, maxBet), max: maxBet, currentBet: player.currentBet });
                         }
-                        actions.push({ type: 'allin', amount: player.chips });
+                        actions.push({ type: 'allin', amount: player.chips, total: player.currentBet + player.chips });
                     } else if (gc.betting === 'pot-limit') {
                         const potAfterCall = this.pot + callAmount;
                         const maxRaiseAmt = potAfterCall + callAmount;
@@ -623,7 +624,7 @@ class GameState {
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', min: this.minRaise, max: maxBet });
                         } else {
-                            actions.push({ type: 'raise', min: Math.min(this.currentBet + this.minRaise - player.currentBet, maxBet), max: maxBet });
+                            actions.push({ type: 'raise', min: Math.min(this.currentBet + this.minRaise - player.currentBet, maxBet), max: maxBet, currentBet: player.currentBet });
                         }
                     }
                 }

@@ -8,6 +8,8 @@ let turnTimerStart = 0;
 let turnTimeLimit = 45;
 let loggedInAccount = null; // { name, email }
 let isInZoom = false;
+let handHistory = []; // last 30 hands [{gameName, logs:[]}]
+let currentHandLogs = []; // logs for current hand
 
 document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
@@ -37,7 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('game_state', onGameState);
     client.on('your_turn', onYourTurn);
     client.on('your_draw', onYourDraw);
-    client.on('log', (d) => ui.addLog(d.message, d.cls));
+    client.on('log', (d) => {
+        ui.addLog(d.message, d.cls);
+        currentHandLogs.push(d.message);
+    });
     client.on('chat', onChat);
     client.on('game_over', onGameOver);
     client.on('stats_data', renderStats);
@@ -46,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('zoom_joined', onZoomJoined);
     client.on('zoom_waiting', onZoomWaiting);
     client.on('zoom_left', onZoomLeft);
+    client.on('zoom_sitout', onZoomSitout);
     client.on('error', (msg) => alert(msg));
 });
 
@@ -95,7 +101,6 @@ function setupLoginScreen() {
     document.getElementById('btn-logout').addEventListener('click', () => {
         loggedInAccount = null;
         showScreen('login');
-        document.getElementById('btn-logout').classList.add('hidden');
     });
 }
 
@@ -103,11 +108,6 @@ function enterLobby(displayName) {
     showScreen('lobby');
     const userEl = document.getElementById('lobby-username');
     userEl.textContent = displayName;
-    if (loggedInAccount) {
-        document.getElementById('btn-logout').classList.remove('hidden');
-    } else {
-        document.getElementById('btn-logout').classList.add('hidden');
-    }
 }
 
 // ==========================================
@@ -208,6 +208,15 @@ function setupLobbyScreen() {
         if (e.key === 'Enter') document.getElementById('btn-join-by-id').click();
     });
     document.getElementById('btn-refresh-rooms').addEventListener('click', () => client.getRooms());
+
+    // Hand history button
+    document.getElementById('btn-lobby-history').addEventListener('click', () => {
+        renderHandHistory('lobby-hand-history');
+        document.getElementById('history-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-history-close').addEventListener('click', () => {
+        document.getElementById('history-modal').classList.add('hidden');
+    });
 }
 
 function renderRoomList(data) {
@@ -325,7 +334,7 @@ function setupGameScreen() {
 
     // Bet slider
     document.getElementById('bet-slider').addEventListener('input', (e) => {
-        document.getElementById('bet-amount-display').textContent = e.target.value;
+        document.getElementById('bet-amount-display').textContent = parseInt(e.target.value) + sliderOffset;
     });
 
     // Draw buttons
@@ -360,12 +369,33 @@ function setupGameScreen() {
     document.getElementById('btn-zoom-exit').addEventListener('click', () => {
         client.leaveZoom();
     });
+
+    // Zoom sit-out button
+    document.getElementById('btn-zoom-sitout').addEventListener('click', () => {
+        client.zoomSitout();
+    });
+
+    // Zoom sit-out overlay buttons
+    document.getElementById('btn-zoom-rejoin').addEventListener('click', () => {
+        document.getElementById('zoom-sitout-overlay').classList.add('hidden');
+        document.getElementById('zoom-waiting-overlay').classList.remove('hidden');
+        client.zoomRejoin();
+    });
+    document.getElementById('btn-zoom-lobby').addEventListener('click', () => {
+        client.leaveZoom();
+    });
 }
 
 function onGameStarted(data) {
     showScreen('game');
     document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+    document.getElementById('zoom-sitout-overlay').classList.add('hidden');
+
+    // Save previous hand to history
+    saveCurrentHand();
+
     document.getElementById('game-log').innerHTML = '';
+    currentHandLogs = [];
     ui.addLog('ゲーム開始！', 'important');
 
     // Show/hide zoom-specific UI
@@ -373,17 +403,19 @@ function onGameStarted(data) {
         isInZoom = true;
         document.getElementById('btn-back-room').classList.add('hidden');
         document.getElementById('btn-zoom-exit').classList.remove('hidden');
+        document.getElementById('btn-zoom-sitout').classList.remove('hidden');
     } else {
         document.getElementById('btn-back-room').classList.remove('hidden');
         document.getElementById('btn-zoom-exit').classList.add('hidden');
+        document.getElementById('btn-zoom-sitout').classList.add('hidden');
     }
 }
 
 function onGameState(state) {
     currentState = state;
-    // In zoom mode, hide waiting overlay when receiving game state
     if (state.zoom) {
         document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+        document.getElementById('zoom-sitout-overlay').classList.add('hidden');
     }
     ui.renderFromServer(state);
 }
@@ -406,14 +438,55 @@ function onZoomWaiting(data) {
 function onZoomLeft() {
     isInZoom = false;
     document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+    document.getElementById('zoom-sitout-overlay').classList.add('hidden');
     document.getElementById('btn-zoom-exit').classList.add('hidden');
+    document.getElementById('btn-zoom-sitout').classList.add('hidden');
     document.getElementById('btn-back-room').classList.remove('hidden');
+    saveCurrentHand();
     showScreen('lobby');
+}
+
+function onZoomSitout() {
+    stopTurnTimer();
+    saveCurrentHand();
+    document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+    document.getElementById('zoom-sitout-overlay').classList.remove('hidden');
+    renderHandHistory('zoom-hand-history');
+}
+
+function saveCurrentHand() {
+    if (currentHandLogs.length > 1) {
+        const gameName = currentState ? currentState.gameName : '';
+        handHistory.push({ gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString() });
+        if (handHistory.length > 30) handHistory.shift();
+    }
+    currentHandLogs = [];
+}
+
+function renderHandHistory(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (handHistory.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim);padding:8px;">まだ履歴がありません</p>';
+        return;
+    }
+    let html = '';
+    for (let i = handHistory.length - 1; i >= 0; i--) {
+        const h = handHistory[i];
+        html += `<div class="hand-history-item">`;
+        html += `<div class="hand-history-header">#${i + 1} ${h.gameName} <span class="hand-history-time">${h.time}</span></div>`;
+        html += `<div class="hand-history-logs">`;
+        for (const log of h.logs) {
+            html += `<div class="hand-history-log">${log}</div>`;
+        }
+        html += `</div></div>`;
+    }
+    container.innerHTML = html;
 }
 
 function onYourTurn(data) {
     startTurnTimer(data.timeLimit || 45);
-    showActionButtons(data.actions);
+    showActionButtons(data.actions, data);
 }
 
 function onYourDraw(data) {
@@ -425,14 +498,19 @@ function onYourDraw(data) {
     if (currentState) ui.renderPlayerHand(currentState);
 }
 
-function showActionButtons(actions) {
+function showActionButtons(actions, turnData) {
     const bar = document.getElementById('action-bar');
     const btnDiv = document.getElementById('action-buttons');
     const sliderArea = document.getElementById('bet-slider-area');
+    const presetsDiv = document.getElementById('bet-presets');
     bar.classList.remove('hidden');
     btnDiv.innerHTML = '';
     sliderArea.classList.add('hidden');
+    presetsDiv.classList.add('hidden');
+    presetsDiv.innerHTML = '';
     let hasSlider = false;
+    let sliderAction = null; // 'bet' or 'raise'
+    let sliderMin = 0, sliderMax = 0;
 
     for (const action of actions) {
         const btn = document.createElement('button');
@@ -455,11 +533,14 @@ function showActionButtons(actions) {
                 if (action.min !== undefined) {
                     btn.textContent = 'ベット';
                     hasSlider = true;
+                    sliderAction = 'bet';
+                    sliderMin = action.min;
+                    sliderMax = action.max;
                     btn.addEventListener('click', () => {
                         const val = parseInt(document.getElementById('bet-slider').value);
                         sendActionAndHide({ type: 'bet', amount: val });
                     });
-                    setupSlider(action.min, action.max);
+                    setupSlider(action.min, action.max, 0);
                 } else {
                     btn.textContent = `ベット ${action.amount}`;
                     btn.addEventListener('click', () => { sendActionAndHide({ type: 'bet', amount: action.amount }); });
@@ -469,32 +550,81 @@ function showActionButtons(actions) {
                 if (action.min !== undefined) {
                     btn.textContent = 'レイズ';
                     hasSlider = true;
+                    sliderAction = 'raise';
+                    sliderMin = action.min;
+                    sliderMax = action.max;
+                    const curBet = action.currentBet || 0;
                     btn.addEventListener('click', () => {
                         const val = parseInt(document.getElementById('bet-slider').value);
                         sendActionAndHide({ type: 'raise', amount: val });
                     });
-                    setupSlider(action.min, action.max);
+                    setupSlider(action.min, action.max, curBet);
                 } else {
-                    btn.textContent = `レイズ ${action.amount}`;
+                    btn.textContent = `レイズ ${action.total || action.amount}`;
                     btn.addEventListener('click', () => { sendActionAndHide({ type: 'raise', amount: action.amount }); });
                 }
                 break;
             case 'allin':
-                btn.textContent = `オールイン ${action.amount}`;
+                btn.textContent = `オールイン ${action.total || action.amount}`;
                 btn.className = 'btn-action btn-allin';
                 btn.addEventListener('click', () => { sendActionAndHide({ type: 'allin', amount: action.amount }); });
                 break;
         }
         btnDiv.appendChild(btn);
     }
-    if (hasSlider) sliderArea.classList.remove('hidden');
+    if (hasSlider) {
+        sliderArea.classList.remove('hidden');
+        renderBetPresets(turnData, sliderAction, sliderMin, sliderMax);
+    }
 }
 
-function setupSlider(min, max) {
+function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
+    const presetsDiv = document.getElementById('bet-presets');
+    if (!turnData) return;
+    const presets = [];
+    const bb = turnData.bigBlind || 100;
+    const pot = turnData.pot || 0;
+    const isFirstRound = turnData.isFirstRound;
+    const tableBet = turnData.currentBet || 0;
+
+    // Preflop unopened: BB-based buttons (when currentBet <= bigBlind, meaning no open raise yet)
+    if (isFirstRound && tableBet <= bb) {
+        [2, 2.5, 3, 3.5, 4].forEach(mult => {
+            const amount = Math.round(bb * mult);
+            presets.push({ label: `${mult}BB`, amount });
+        });
+    } else if (!isFirstRound) {
+        // Postflop: pot percentage buttons
+        [0.33, 0.66, 1.0, 1.5].forEach(pct => {
+            const amount = Math.round(pot * pct);
+            presets.push({ label: `${Math.round(pct * 100)}%`, amount });
+        });
+    }
+
+    if (presets.length === 0) return;
+
+    for (const p of presets) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-preset';
+        btn.textContent = p.label;
+        const clampedVal = Math.max(sliderMin, Math.min(p.amount, sliderMax));
+        btn.addEventListener('click', () => {
+            const slider = document.getElementById('bet-slider');
+            slider.value = clampedVal;
+            document.getElementById('bet-amount-display').textContent = clampedVal + sliderOffset;
+        });
+        presetsDiv.appendChild(btn);
+    }
+    presetsDiv.classList.remove('hidden');
+}
+
+let sliderOffset = 0; // currentBet to add for total display
+function setupSlider(min, max, currentBet) {
     const slider = document.getElementById('bet-slider');
     slider.min = min; slider.max = max; slider.value = min;
     slider.step = Math.max(Math.floor(min / 2), 10);
-    document.getElementById('bet-amount-display').textContent = min;
+    sliderOffset = currentBet || 0;
+    document.getElementById('bet-amount-display').textContent = min + sliderOffset;
 }
 
 function sendActionAndHide(action) {
@@ -528,11 +658,12 @@ function stopTurnTimer() {
 function onGameOver(data) {
     stopTurnTimer();
     if (isInZoom) {
-        // Zoom: no dialog, just wait for next table
         ui.addLog(`${data.winner} が勝利！`, 'important');
+        saveCurrentHand();
         return;
     }
     ui.addLog(`ゲーム終了！ ${data.winner} が優勝！`, 'important');
+    saveCurrentHand();
     setTimeout(() => {
         if (confirm(`ゲーム終了！ ${data.winner} が優勝！\nロビーに戻りますか？`)) {
             client.leaveRoom();
@@ -571,14 +702,13 @@ function setupStatsModal() {
     document.getElementById('btn-stats-close').addEventListener('click', () => {
         document.getElementById('stats-modal').classList.add('hidden');
     });
-    // Lobby stats button
     document.getElementById('btn-lobby-stats').addEventListener('click', () => {
         renderStatsFromStorage();
         document.getElementById('stats-modal').classList.remove('hidden');
     });
 }
 
-// Render stats from server (in-game, keyed by seat index)
+// Render stats from server (in-game)
 function renderStats(data) {
     const container = document.getElementById('stats-table-container');
     if (!data.stats || Object.keys(data.stats).length === 0) {
@@ -594,7 +724,7 @@ function renderStats(data) {
     container.innerHTML = html;
 }
 
-// Render stats from localStorage (lobby view, keyed by player name)
+// Render stats from localStorage (lobby)
 function renderStatsFromStorage() {
     const container = document.getElementById('stats-table-container');
     const saved = loadSavedStats();
@@ -606,9 +736,13 @@ function renderStatsFromStorage() {
     let html = '<div style="text-align:right;padding:4px 8px;"><button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button></div>';
     for (const [name, c] of Object.entries(saved)) {
         const isMe = name === client.name ? ' style="color:var(--gold)"' : '';
-        html += renderStatsBlock(name, c, isMe);
+        html += renderPlayerStatsWithTabs(name, c, isMe);
     }
     container.innerHTML = html;
+    // Bind tab clicks
+    container.querySelectorAll('.stats-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => handleStatsTabClick(e.target));
+    });
     document.getElementById('btn-stats-clear').addEventListener('click', () => {
         if (confirm('すべてのスタッツをリセットしますか？')) {
             localStorage.removeItem(STATS_STORAGE_KEY);
@@ -617,10 +751,86 @@ function renderStatsFromStorage() {
     });
 }
 
-function renderStatsBlock(pName, c, extraAttr) {
-    let html = `<h3${extraAttr}>${pName} (${c.hands}ハンド)</h3>`;
-    if (!c.hands || c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p>'; return html; }
-    html += `<table class="stats-table"><tbody>
+// Show stats for a specific player (avatar click)
+function showPlayerStats(playerName) {
+    const saved = loadSavedStats();
+    const stats = saved[playerName];
+    const container = document.getElementById('stats-table-container');
+    if (!stats || !stats.hands) {
+        container.innerHTML = `<h3 style="color:var(--gold)">${playerName}</h3><p style="color:var(--text-dim);padding:16px;">データなし</p>`;
+    } else {
+        container.innerHTML = renderPlayerStatsWithTabs(playerName, stats, ' style="color:var(--gold)"');
+        container.querySelectorAll('.stats-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => handleStatsTabClick(e.target));
+        });
+    }
+    document.getElementById('stats-modal').classList.remove('hidden');
+}
+
+function handleStatsTabClick(tab) {
+    const panel = tab.closest('.stats-player-panel');
+    if (!panel) return;
+    panel.querySelectorAll('.stats-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    panel.querySelectorAll('.stats-tab-content').forEach(c => c.classList.add('hidden'));
+    const target = panel.querySelector(`.stats-tab-content[data-tab="${tab.dataset.tab}"]`);
+    if (target) target.classList.remove('hidden');
+}
+
+const GAME_NAMES = {
+    td: 'TD', lhe: 'LHE', o8: 'O8', razz: 'Razz', stud: 'Stud',
+    stud8: 'Stud8', nlhe: 'NLHE', plo: 'PLO', sd: 'SD', badugi: 'Badugi'
+};
+
+function renderPlayerStatsWithTabs(pName, c, extraAttr) {
+    let html = `<div class="stats-player-panel">`;
+    html += `<h3${extraAttr || ''}>${pName} (${c.hands}ハンド)</h3>`;
+    if (!c.hands || c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p></div>'; return html; }
+
+    // Tabs
+    html += `<div class="stats-tabs-bar">`;
+    html += `<button class="stats-tab active" data-tab="total">全体</button>`;
+    html += `<button class="stats-tab" data-tab="game">ゲーム別</button>`;
+    html += `<button class="stats-tab" data-tab="position">ポジション別</button>`;
+    html += `</div>`;
+
+    // Total tab
+    html += `<div class="stats-tab-content" data-tab="total">${renderStatsTable(c)}</div>`;
+
+    // Game tab
+    html += `<div class="stats-tab-content hidden" data-tab="game">`;
+    if (c.byGame && Object.keys(c.byGame).length > 0) {
+        for (const [gid, gs] of Object.entries(c.byGame)) {
+            if (!gs.hands || gs.hands === 0) continue;
+            html += `<h4 class="stats-sub-header">${GAME_NAMES[gid] || gid} (${gs.hands}h)</h4>`;
+            html += renderStatsTable(gs);
+        }
+    } else {
+        html += '<p style="color:var(--text-dim)">データなし</p>';
+    }
+    html += `</div>`;
+
+    // Position tab
+    html += `<div class="stats-tab-content hidden" data-tab="position">`;
+    if (c.byPosition && Object.keys(c.byPosition).length > 0) {
+        const posOrder = ['BTN', 'SB', 'BB', 'CO', 'HJ', 'EP'];
+        const sorted = Object.entries(c.byPosition).sort((a, b) => posOrder.indexOf(a[0]) - posOrder.indexOf(b[0]));
+        for (const [pos, ps] of sorted) {
+            if (!ps.hands || ps.hands === 0) continue;
+            html += `<h4 class="stats-sub-header">${pos} (${ps.hands}h)</h4>`;
+            html += renderStatsTable(ps);
+        }
+    } else {
+        html += '<p style="color:var(--text-dim)">データなし</p>';
+    }
+    html += `</div>`;
+
+    html += `</div>`;
+    return html;
+}
+
+function renderStatsTable(c) {
+    return `<table class="stats-table"><tbody>
         <tr><td class="stat-label">VPIP</td><td class="stat-value">${c.vpip}%</td>
         <td class="stat-label">PFR</td><td class="stat-value">${c.pfr}%</td></tr>
         <tr><td class="stat-label">3-Bet</td><td class="stat-value">${c.threeBet}%</td>
@@ -634,7 +844,11 @@ function renderStatsBlock(pName, c, extraAttr) {
         <tr><td class="stat-label">Win Rate</td><td class="stat-value">${c.winRate}/100h</td>
         <td class="stat-label">SD Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin}</td></tr>
     </tbody></table>`;
-    return html;
+}
+
+// Legacy alias
+function renderStatsBlock(pName, c, extraAttr) {
+    return renderPlayerStatsWithTabs(pName, c, extraAttr);
 }
 
 // ==========================================

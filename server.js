@@ -248,9 +248,21 @@ function broadcastStatsUpdate(room) {
     if (!room.game || !room.stats) return;
     const playerStats = {};
     for (let i = 0; i < room.game.playerCount; i++) {
-        const raw = room.stats.getPlayer(i).total;
-        const calc = room.stats.calc(raw);
-        playerStats[room.game.players[i].name] = calc;
+        const pd = room.stats.getPlayer(i);
+        const calc = room.stats.calc(pd.total);
+        // Include per-game stats
+        const byGame = {};
+        for (const [gid, raw] of Object.entries(pd.byGame)) {
+            byGame[gid] = room.stats.calc(raw);
+        }
+        // Include per-position stats
+        const byPos = {};
+        if (pd.byPosition) {
+            for (const [pos, raw] of Object.entries(pd.byPosition)) {
+                byPos[pos] = room.stats.calc(raw);
+            }
+        }
+        playerStats[room.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
     }
     broadcastToRoom(room, { type: 'stats_update', stats: playerStats });
 }
@@ -277,6 +289,9 @@ function getStateForPlayer(game, room, playerSeat) {
             };
         }),
         pot: game.pot,
+        currentBet: game.currentBet,
+        bigBlind: gc.bigBlind || gc.bigBet || 100,
+        isFirstRound: game.isFirstRound,
         communityCards: game.communityCards,
         gameName: gc.name, gameId: gc.id, gameType: gc.type, gameRules: gc.rules,
         totalGames: game.filteredGames.length,
@@ -440,6 +455,14 @@ function handleMessage(ws, client, msg) {
             handleLeaveZoom(ws, client);
             break;
 
+        case 'zoom_sitout':
+            handleZoomSitout(ws, client);
+            break;
+
+        case 'zoom_rejoin':
+            handleZoomRejoin(ws, client);
+            break;
+
         case 'chat': {
             const room = rooms.get(client.roomId);
             if (!room) return;
@@ -549,7 +572,14 @@ function startGame(room) {
             }
 
             // Send action request
-            send(member.ws, { type: 'your_turn', actions, timeLimit: 45 });
+            const _gc = game.gameConfig;
+            send(member.ws, {
+                type: 'your_turn', actions, timeLimit: 45,
+                pot: game.pot,
+                currentBet: game.currentBet,
+                isFirstRound: game.isFirstRound,
+                bigBlind: _gc.bigBlind || _gc.bigBet || 100,
+            });
 
             // Timer: 45 seconds
             const timer = setTimeout(() => {
@@ -588,7 +618,7 @@ function startGame(room) {
     };
 
     // Stats hooks
-    game.onHandStart = () => room.stats.beginHand(game.players, game.gameConfig);
+    game.onHandStart = () => room.stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
     game.onFirstRoundEnd = () => room.stats.endFirstRound();
     game.onPlayerAction = (player, action, isBlinds) => room.stats.recordAction(player, action, isBlinds);
     game.onShowdown = (winnerIds) => room.stats.recordShowdown(winnerIds);
@@ -673,6 +703,33 @@ function handleLeaveZoom(ws, client) {
     broadcastRoomList();
 }
 
+function handleZoomSitout(ws, client) {
+    if (!client.inZoom) return;
+
+    // Remove from pool
+    const poolIdx = zoomPool.findIndex(p => p.clientId === client.id);
+    if (poolIdx >= 0) zoomPool.splice(poolIdx, 1);
+
+    // Fold from active table
+    const pd = zoomPlayers.get(client.id);
+    if (pd && pd.tableId) {
+        const table = zoomTables.get(pd.tableId);
+        if (table) foldZoomPlayer(table, client.id);
+        pd.tableId = null;
+    }
+
+    send(ws, { type: 'zoom_sitout' });
+}
+
+function handleZoomRejoin(ws, client) {
+    if (!client.inZoom) return;
+    const pd = zoomPlayers.get(client.id);
+    if (!pd) return;
+
+    // Re-add to pool
+    addToZoomPool(client.id);
+}
+
 function leaveZoom(client) {
     if (!client.inZoom) return;
     client.inZoom = false;
@@ -745,6 +802,8 @@ function createZoomTable(members) {
         if (pd) pd.tableId = tableId;
     });
 
+    const stats = new StatsTracker();
+
     const table = {
         id: tableId,
         game,
@@ -752,6 +811,7 @@ function createZoomTable(members) {
         activeMemberIds: new Set(members.map(m => m.clientId)),
         seatMap,
         pending: null,
+        stats,
     };
 
     zoomTables.set(tableId, table);
@@ -763,6 +823,14 @@ function createZoomTable(members) {
             if (table.activeMemberIds.has(m.clientId))
                 send(m.ws, { type: 'log', message: msg, cls });
         }
+    };
+    game.onHandStart = () => stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
+    game.onFirstRoundEnd = () => stats.endFirstRound();
+    game.onPlayerAction = (player, action, isBlinds) => stats.recordAction(player, action, isBlinds);
+    game.onShowdown = (winnerIds) => stats.recordShowdown(winnerIds);
+    game.onHandEnd = (hadShowdown) => {
+        stats.endHand(game.players, hadShowdown);
+        broadcastZoomStatsUpdate(table);
     };
 
     game.onGetPlayerAction = (actions, player) => {
@@ -781,7 +849,14 @@ function createZoomTable(members) {
             }
 
             const timeLimit = table.game.isFirstRound ? 45 : 30;
-            send(member.ws, { type: 'your_turn', actions, timeLimit });
+            const gc = game.gameConfig;
+            send(member.ws, {
+                type: 'your_turn', actions, timeLimit,
+                pot: game.pot,
+                currentBet: game.currentBet,
+                isFirstRound: game.isFirstRound,
+                bigBlind: gc.bigBlind || gc.bigBet || 100,
+            });
 
             const timer = setTimeout(() => {
                 table.pending = null;
@@ -852,6 +927,31 @@ function getZoomMemberBySeat(table, seatIdx) {
         }
     }
     return null;
+}
+
+function broadcastZoomStatsUpdate(table) {
+    if (!table.game || !table.stats) return;
+    const playerStats = {};
+    for (let i = 0; i < table.game.playerCount; i++) {
+        const pd = table.stats.getPlayer(i);
+        const calc = table.stats.calc(pd.total);
+        const byGame = {};
+        for (const [gid, raw] of Object.entries(pd.byGame)) {
+            byGame[gid] = table.stats.calc(raw);
+        }
+        const byPos = {};
+        if (pd.byPosition) {
+            for (const [pos, raw] of Object.entries(pd.byPosition)) {
+                byPos[pos] = table.stats.calc(raw);
+            }
+        }
+        playerStats[table.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
+    }
+    for (const m of table.members) {
+        if (table.activeMemberIds.has(m.clientId)) {
+            send(m.ws, { type: 'stats_update', stats: playerStats });
+        }
+    }
 }
 
 function broadcastZoomTableState(table) {

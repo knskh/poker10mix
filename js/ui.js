@@ -4,6 +4,90 @@
 const RANK_DISPLAY = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
 const SUIT_DISPLAY = { s:'\u2660', h:'\u2665', d:'\u2666', c:'\u2663' };
 
+// Detailed hand description for display
+function describeHand(gameId, gameType, playerCards, communityCards) {
+    if (!playerCards || playerCards.length === 0) return '';
+
+    const RNAME = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K', 14:'A' };
+
+    try {
+        const gc = GAME_LIST.find(g => g.id === gameId);
+        if (!gc) return '';
+
+        // Community games need enough cards to evaluate
+        const board = communityCards || [];
+        if (gc.type === 'community') {
+            if (gc.exactHole && board.length < 3) return ''; // Omaha needs 3+ board
+            if (!gc.exactHole && (playerCards.length + board.length) < 5) return ''; // Hold'em needs 5+ total
+        }
+        if (gc.type === 'stud' && playerCards.length < 5) return ''; // Stud needs 5+ cards
+
+        const result = evaluateHand(gc, playerCards, board);
+        const parts = [];
+
+        if (result.high) {
+            parts.push(describeEval(gameId, result.high, playerCards, communityCards));
+        }
+        if (result.low) {
+            parts.push(describeLow(result.low));
+        }
+        return parts.filter(Boolean).join(' / ');
+    } catch (e) {
+        return '';
+    }
+
+    function describeEval(gid, ev, hole, board) {
+        const cat = ev.value[0];
+
+        // 2-7 lowball games
+        if (gid === 'td' || gid === 'sd') {
+            if (ev.isPenalty) return ev.name;
+            const ranks = ev.value.slice(1);
+            return ranks.map(r => RNAME[r]).join('-') + ' ロー';
+        }
+
+        // Badugi
+        if (gid === 'badugi') {
+            const ranks = ev.cards.map(c => c.rank === 14 ? 1 : c.rank).sort((a, b) => a - b);
+            return ev.name + ' ' + ranks.map(r => RNAME[r]).join('-');
+        }
+
+        // Razz
+        if (gid === 'razz') {
+            if (ev.value[0] < 0) return ev.name; // pair fallback
+            const ranks = ev.value;
+            return ranks.map(r => RNAME[r]).join('-') + ' ロー';
+        }
+
+        // Standard high hands
+        switch (cat) {
+            case 9: { // straight flush
+                const h = ev.value[1];
+                if (h === 14) return 'ロイヤルフラッシュ';
+                return 'ストレートフラッシュ ' + RNAME[h - 4] + '〜' + RNAME[h];
+            }
+            case 8: return 'フォーカード ' + RNAME[ev.value[1]];
+            case 7: return 'フルハウス ' + RNAME[ev.value[1]] + '&' + RNAME[ev.value[2]];
+            case 6: return 'フラッシュ ' + RNAME[ev.value[1]] + 'ハイ';
+            case 5: {
+                const h = ev.value[1];
+                return 'ストレート ' + RNAME[h === 5 ? 1 : h - 4] + '〜' + RNAME[h];
+            }
+            case 4: return 'トリップス ' + RNAME[ev.value[1]];
+            case 3: return 'ツーペア ' + RNAME[ev.value[1]] + '&' + RNAME[ev.value[2]];
+            case 2: return 'ワンペア ' + RNAME[ev.value[1]];
+            case 1: return 'ハイカード ' + RNAME[ev.value[1]];
+            default: return ev.name || '';
+        }
+    }
+
+    function describeLow(ev) {
+        if (!ev) return '';
+        const ranks = ev.value;
+        return 'ロー ' + ranks.map(r => RNAME[r]).join('-');
+    }
+}
+
 class PokerUI {
     constructor() {
         this.selectedCards = new Set();
@@ -14,6 +98,7 @@ class PokerUI {
     _setupResize() {
         const resize = () => this.scaleTable();
         window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', () => setTimeout(resize, 200));
         // Initial scale after DOM is ready
         setTimeout(resize, 100);
     }
@@ -22,14 +107,19 @@ class PokerUI {
         const container = document.getElementById('table-container');
         const area = document.getElementById('table-area');
         if (!container || !area) return;
-        // Base size: table 700w + seat overflow ~80 = 780px wide
-        // Height: 50px top margin + 300px table + 10px gap + 76px hand + 50px seat bottom overflow = ~486px
-        const baseW = 780;
-        const baseH = 500;
+        const isMobile = window.innerWidth <= 600;
+        const baseW = isMobile ? area.clientWidth : 780;
+        const baseH = isMobile ? area.clientHeight : 514;
         const areaW = area.clientWidth;
         const areaH = area.clientHeight;
-        const scale = Math.min(areaW / baseW, areaH / baseH, 1.15);
-        container.style.transform = `scale(${Math.max(scale, 0.5)})`;
+        if (isMobile) {
+            // On mobile, CSS handles table size via vw, so scale minimally
+            const scale = Math.min(areaW / baseW, areaH / baseH, 1.0);
+            container.style.transform = `scale(${Math.max(scale, 0.45)})`;
+        } else {
+            const scale = Math.min(areaW / baseW, areaH / baseH, 1.15);
+            container.style.transform = `scale(${Math.max(scale, 0.5)})`;
+        }
     }
 
     // Render from server-provided state
@@ -44,6 +134,14 @@ class PokerUI {
 
         // Pot
         document.getElementById('pot-display').textContent = s.pot > 0 ? `ポット: ${s.pot}` : '';
+
+        // Table info (current bet level)
+        const tableInfo = document.getElementById('table-info');
+        if (tableInfo) {
+            const parts = [];
+            if (s.currentBet > 0) parts.push(`ベット: ${s.currentBet}`);
+            tableInfo.textContent = parts.join(' | ');
+        }
 
         // Community cards
         const ccDiv = document.getElementById('community-cards');
@@ -131,10 +229,15 @@ class PokerUI {
             el.appendChild(btn);
         }
 
-        // Avatar
+        // Avatar (clickable for stats)
         const avatar = document.createElement('div');
         avatar.className = 'seat-avatar';
         avatar.textContent = (p.name || '?')[0].toUpperCase();
+        avatar.style.cursor = 'pointer';
+        avatar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof showPlayerStats === 'function') showPlayerStats(p.name);
+        });
         el.appendChild(avatar);
 
         // Name
@@ -238,6 +341,17 @@ class PokerUI {
             label.style.cssText = 'font-size:10px;color:#888;margin-top:2px;text-align:center;width:100%;';
             label.textContent = `(裏${me.downCards.length}枚 / 表${(me.upCards || []).length}枚)`;
             container.appendChild(label);
+        }
+
+        // Hand rank display
+        if (cards.length >= 2) {
+            const desc = describeHand(s.gameId, s.gameType, cards, s.communityCards || []);
+            if (desc) {
+                const rankLabel = document.createElement('div');
+                rankLabel.className = 'hand-rank-label';
+                rankLabel.textContent = desc;
+                container.appendChild(rankLabel);
+            }
         }
     }
 
