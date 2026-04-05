@@ -21,6 +21,11 @@ function persistHandHistory() {
     try { localStorage.setItem('poker10mix_hand_history', JSON.stringify(handHistory)); } catch (e) {}
 }
 
+// Save hand history on tab close/reload
+window.addEventListener('beforeunload', () => {
+    saveCurrentHand();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
     setupAccountLogin();
@@ -452,6 +457,7 @@ function onZoomJoined() {
 function onZoomWaiting(data) {
     document.getElementById('zoom-waiting-overlay').classList.remove('hidden');
     stopTurnTimer();
+    saveCurrentHand();
 }
 
 function onZoomLeft() {
