@@ -8,8 +8,18 @@ let turnTimerStart = 0;
 let turnTimeLimit = 45;
 let loggedInAccount = null; // { name, email }
 let isInZoom = false;
-let handHistory = []; // last 30 hands [{gameName, logs:[]}]
+let handHistory = loadHandHistory(); // last 30 hands [{gameName, logs:[]}]
 let currentHandLogs = []; // logs for current hand
+
+function loadHandHistory() {
+    try {
+        const raw = localStorage.getItem('poker10mix_hand_history');
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+}
+function persistHandHistory() {
+    try { localStorage.setItem('poker10mix_hand_history', JSON.stringify(handHistory)); } catch (e) {}
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
@@ -468,6 +478,7 @@ function saveCurrentHand() {
         const gameName = currentState ? currentState.gameName : '';
         handHistory.push({ gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString() });
         if (handHistory.length > 30) handHistory.shift();
+        persistHandHistory();
     }
     currentHandLogs = [];
 }
@@ -697,14 +708,48 @@ function saveSavedStats(stats) {
     try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats)); } catch (e) {}
 }
 
+// Stats history for graphs
+const STATS_HISTORY_KEY = 'poker10mix_stats_history';
+function loadStatsHistory() {
+    try { const r = localStorage.getItem(STATS_HISTORY_KEY); return r ? JSON.parse(r) : {}; } catch (e) { return {}; }
+}
+function saveStatsHistory(h) {
+    try { localStorage.setItem(STATS_HISTORY_KEY, JSON.stringify(h)); } catch (e) {}
+}
+
 // Called when server sends stats_update after each hand (keyed by player name)
 function onStatsUpdate(data) {
     if (!data.stats) return;
     const saved = loadSavedStats();
+    const history = loadStatsHistory();
     for (const [name, calc] of Object.entries(data.stats)) {
         saved[name] = calc;
+        // Append snapshot to history (sample every hand)
+        if (!history[name]) history[name] = [];
+        const arr = history[name];
+        const hands = parseInt(calc.hands) || 0;
+        // Only add if hands increased
+        if (arr.length === 0 || hands > (arr[arr.length - 1].h || 0)) {
+            arr.push({
+                h: hands,
+                vpip: parseFloat(calc.vpip) || 0,
+                pfr: parseFloat(calc.pfr) || 0,
+                threeBet: parseFloat(calc.threeBet) || 0,
+                fourBet: parseFloat(calc.fourBet) || 0,
+                foldTo3Bet: parseFloat(calc.foldTo3Bet) || 0,
+                allIn: parseFloat(calc.allIn) || 0,
+                agg: parseFloat(calc.postflopAgg) || 0,
+                af: parseFloat(calc.af) || 0,
+                wtsd: parseFloat(calc.wtsd) || 0,
+                wsd: parseFloat(calc.wsd) || 0,
+                wr: parseFloat(calc.winRate) || 0,
+            });
+            // Keep max 5000 snapshots per player
+            if (arr.length > 5000) arr.splice(0, arr.length - 5000);
+        }
     }
     saveSavedStats(saved);
+    saveStatsHistory(history);
 }
 
 function setupStatsModal() {
@@ -880,6 +925,12 @@ function handleStatsTabClick(tab) {
     panel.querySelectorAll('.stats-tab-content').forEach(c => c.classList.add('hidden'));
     const target = panel.querySelector(`.stats-tab-content[data-tab="${tab.dataset.tab}"]`);
     if (target) target.classList.remove('hidden');
+    // Render graph when graph tab selected
+    if (tab.dataset.tab === 'graph') {
+        const playerName = tab.dataset.player;
+        const graphContent = target;
+        if (graphContent) initGraphTab(graphContent, playerName);
+    }
 }
 
 const GAME_NAMES = {
@@ -897,6 +948,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     html += `<button class="stats-tab active" data-tab="total">全体</button>`;
     html += `<button class="stats-tab" data-tab="game">ゲーム別</button>`;
     html += `<button class="stats-tab" data-tab="position">ポジション別</button>`;
+    html += `<button class="stats-tab" data-tab="graph" data-player="${pName.replace(/"/g, '&quot;')}">グラフ</button>`;
     html += `</div>`;
 
     // Total tab
@@ -938,6 +990,30 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     }
     html += `</div>`;
 
+    // Graph tab
+    html += `<div class="stats-tab-content hidden" data-tab="graph">`;
+    html += `<div class="graph-controls" data-player="${pName.replace(/"/g, '&quot;')}">`;
+    html += `<div class="graph-checkboxes">`;
+    const graphStats = [
+        { key: 'vpip', label: 'VPIP', color: '#4fc3f7', checked: true },
+        { key: 'pfr', label: 'PFR', color: '#f0c040', checked: true },
+        { key: 'threeBet', label: '3-Bet', color: '#e65100', checked: false },
+        { key: 'fourBet', label: '4-Bet', color: '#ab47bc', checked: false },
+        { key: 'foldTo3Bet', label: 'Fold to 3Bet', color: '#ef5350', checked: false },
+        { key: 'allIn', label: 'All-in%', color: '#ff7043', checked: false },
+        { key: 'agg', label: 'Agg%', color: '#66bb6a', checked: false },
+        { key: 'af', label: 'AF', color: '#26a69a', checked: false },
+        { key: 'wtsd', label: 'WTSD%', color: '#42a5f5', checked: false },
+        { key: 'wsd', label: 'W$SD', color: '#7e57c2', checked: false },
+        { key: 'wr', label: 'Win Rate', color: '#ffa726', checked: true },
+    ];
+    for (const gs of graphStats) {
+        html += `<label class="graph-cb-label" style="color:${gs.color}"><input type="checkbox" class="graph-cb" data-key="${gs.key}" ${gs.checked ? 'checked' : ''}>${gs.label}</label>`;
+    }
+    html += `</div>`;
+    html += `<canvas class="stats-graph-canvas" width="560" height="280"></canvas>`;
+    html += `</div></div>`;
+
     html += `</div>`;
     return html;
 }
@@ -962,6 +1038,154 @@ function renderStatsTable(c) {
 // Legacy alias
 function renderStatsBlock(pName, c, extraAttr) {
     return renderPlayerStatsWithTabs(pName, c, extraAttr);
+}
+
+// ==========================================
+// Stats Graph
+// ==========================================
+const GRAPH_STAT_META = {
+    vpip: { label: 'VPIP', color: '#4fc3f7', unit: '%' },
+    pfr: { label: 'PFR', color: '#f0c040', unit: '%' },
+    threeBet: { label: '3-Bet', color: '#e65100', unit: '%' },
+    fourBet: { label: '4-Bet', color: '#ab47bc', unit: '%' },
+    foldTo3Bet: { label: 'Fold to 3Bet', color: '#ef5350', unit: '%' },
+    allIn: { label: 'All-in%', color: '#ff7043', unit: '%' },
+    agg: { label: 'Agg%', color: '#66bb6a', unit: '%' },
+    af: { label: 'AF', color: '#26a69a', unit: '' },
+    wtsd: { label: 'WTSD%', color: '#42a5f5', unit: '%' },
+    wsd: { label: 'W$SD', color: '#7e57c2', unit: '%' },
+    wr: { label: 'Win Rate', color: '#ffa726', unit: '/100h' },
+};
+
+function initGraphTab(graphContent, playerName) {
+    const canvas = graphContent.querySelector('.stats-graph-canvas');
+    if (!canvas) return;
+    const controls = graphContent.querySelector('.graph-controls');
+    if (!controls) return;
+
+    const draw = () => {
+        const selected = [];
+        controls.querySelectorAll('.graph-cb:checked').forEach(cb => selected.push(cb.dataset.key));
+        drawStatsGraph(canvas, playerName, selected);
+    };
+
+    // Bind checkbox changes
+    controls.querySelectorAll('.graph-cb').forEach(cb => {
+        cb.removeEventListener('change', cb._graphHandler);
+        cb._graphHandler = draw;
+        cb.addEventListener('change', draw);
+    });
+
+    draw();
+}
+
+function drawStatsGraph(canvas, playerName, selectedKeys) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 560;
+    const h = canvas.clientHeight || 280;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear
+    ctx.fillStyle = '#1a1d24';
+    ctx.fillRect(0, 0, w, h);
+
+    const history = loadStatsHistory();
+    const data = history[playerName];
+    if (!data || data.length < 2 || selectedKeys.length === 0) {
+        ctx.fillStyle = '#7a8090';
+        ctx.font = '13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(data && data.length < 2 ? 'データが不足しています（2ハンド以上必要）' : 'スタッツを選択してください', w / 2, h / 2);
+        return;
+    }
+
+    const pad = { top: 20, right: 16, bottom: 36, left: 48 };
+    const plotW = w - pad.left - pad.right;
+    const plotH = h - pad.top - pad.bottom;
+
+    // Find ranges
+    const minH = data[0].h;
+    const maxH = data[data.length - 1].h;
+    const hRange = maxH - minH || 1;
+
+    // Find y range across selected stats
+    let yMin = Infinity, yMax = -Infinity;
+    for (const d of data) {
+        for (const key of selectedKeys) {
+            const v = d[key];
+            if (v !== undefined && isFinite(v)) {
+                if (v < yMin) yMin = v;
+                if (v > yMax) yMax = v;
+            }
+        }
+    }
+    if (!isFinite(yMin)) { yMin = 0; yMax = 100; }
+    const yPad = (yMax - yMin) * 0.1 || 5;
+    yMin = Math.max(yMin - yPad, selectedKeys.includes('wr') ? yMin - yPad : 0);
+    yMax = yMax + yPad;
+    const yRange = yMax - yMin || 1;
+
+    // Grid
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 0.5;
+    const ySteps = 5;
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#7a8090';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= ySteps; i++) {
+        const y = pad.top + plotH - (plotH * i / ySteps);
+        const val = yMin + yRange * i / ySteps;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(val.toFixed(1), pad.left - 4, y + 3);
+    }
+
+    // X axis labels
+    ctx.textAlign = 'center';
+    const xSteps = Math.min(5, data.length - 1);
+    for (let i = 0; i <= xSteps; i++) {
+        const hVal = minH + hRange * i / xSteps;
+        const x = pad.left + plotW * i / xSteps;
+        ctx.fillText(Math.round(hVal).toLocaleString(), x, h - pad.bottom + 16);
+    }
+    ctx.fillText('ハンド数', pad.left + plotW / 2, h - 4);
+
+    // Draw lines
+    for (const key of selectedKeys) {
+        const meta = GRAPH_STAT_META[key];
+        if (!meta) continue;
+        ctx.strokeStyle = meta.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        let started = false;
+        for (const d of data) {
+            const v = d[key];
+            if (v === undefined || !isFinite(v)) continue;
+            const x = pad.left + plotW * ((d.h - minH) / hRange);
+            const y = pad.top + plotH - plotH * ((v - yMin) / yRange);
+            if (!started) { ctx.moveTo(x, y); started = true; }
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    // Legend
+    ctx.font = '10px sans-serif';
+    let lx = pad.left;
+    const ly = pad.top - 6;
+    for (const key of selectedKeys) {
+        const meta = GRAPH_STAT_META[key];
+        if (!meta) continue;
+        ctx.fillStyle = meta.color;
+        ctx.fillRect(lx, ly - 8, 12, 3);
+        ctx.fillText(meta.label, lx + 15, ly - 2);
+        lx += ctx.measureText(meta.label).width + 28;
+    }
 }
 
 // ==========================================

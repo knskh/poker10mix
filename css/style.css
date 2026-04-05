@@ -290,6 +290,13 @@ body {
 .ranking-table td { padding: 5px 8px; border-bottom: 1px solid #222; }
 .ranking-me { color: var(--gold); font-weight: bold; }
 
+/* Graph */
+.graph-controls { width: 100%; }
+.graph-checkboxes { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
+.graph-cb-label { font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.graph-cb-label input { accent-color: currentColor; }
+.stats-graph-canvas { width: 100%; height: 280px; border-radius: 4px; background: #1a1d24; display: block; }
+
 .stats-player-panel { margin-bottom: 20px; }
 .stats-tabs-bar { display: flex; gap: 4px; margin-bottom: 10px; }
 .stats-tab {
@@ -785,6 +792,8 @@ body {
     .stats-tab { padding: 6px 10px; font-size: 11px; }
     .stats-sub-header { font-size: 12px; }
     .stats-sub-sub-header { font-size: 11px; padding-left: 10px; }
+    .stats-graph-canvas { height: 200px; }
+    .graph-cb-label { font-size: 10px; }
     #rules-modal { padding: 16px; width: 95%; }
     #rules-content { font-size: 13px; line-height: 1.5; }
 
