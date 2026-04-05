@@ -116,6 +116,17 @@ const GAME_CATEGORY_LABELS = {
     hilo: { label: 'Hi-Lo', color: '#777', textColor: '#fff' },
 };
 
+function getBettingType(gameId) {
+    const gc = GAME_LIST.find(g => g.id === gameId);
+    return gc ? gc.betting : 'limit';
+}
+
+const BETTING_TYPE_LABELS = {
+    'no-limit': { label: 'No-Limit', color: '#d32f2f' },
+    'pot-limit': { label: 'Pot-Limit', color: '#f57c00' },
+    'limit': { label: 'Limit', color: '#616161' },
+};
+
 class PokerUI {
     constructor() {
         this.selectedCards = new Set();
@@ -165,9 +176,11 @@ class PokerUI {
         const typeBadge = GAME_TYPE_LABELS[gameType];
         const catBadge = GAME_CATEGORY_LABELS[getGameCategory(s.gameId)];
         const gameNameEl = document.getElementById('game-name');
+        const betBadge = BETTING_TYPE_LABELS[getBettingType(s.gameId)];
         gameNameEl.innerHTML = s.gameName
             + ` <span class="game-type-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
-            + ` <span class="game-type-badge" style="background:${catBadge.color};color:${catBadge.textColor};border:1px solid #555">${catBadge.label}</span>`;
+            + ` <span class="game-type-badge" style="background:${catBadge.color};color:${catBadge.textColor};border:1px solid #555">${catBadge.label}</span>`
+            + ` <span class="game-type-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
         document.getElementById('game-rotation').textContent =
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';
