@@ -110,6 +110,12 @@ const GAME_TYPE_LABELS = {
     community: { label: 'HOLD\'EM', color: '#66bb6a' },
 };
 
+const GAME_CATEGORY_LABELS = {
+    high: { label: 'HIGH', color: '#e0d8c8', textColor: '#333' },
+    low: { label: 'LOW BALL', color: '#222', textColor: '#ccc' },
+    hilo: { label: 'Hi-Lo', color: '#777', textColor: '#fff' },
+};
+
 class PokerUI {
     constructor() {
         this.selectedCards = new Set();
@@ -154,11 +160,14 @@ class PokerUI {
         felt.classList.add('felt-' + getGameCategory(s.gameId));
         felt.classList.add('rail-' + getGameType(s.gameId));
 
-        // Top bar with game type badge
+        // Top bar with game type + category badges
         const gameType = getGameType(s.gameId);
-        const badge = GAME_TYPE_LABELS[gameType];
+        const typeBadge = GAME_TYPE_LABELS[gameType];
+        const catBadge = GAME_CATEGORY_LABELS[getGameCategory(s.gameId)];
         const gameNameEl = document.getElementById('game-name');
-        gameNameEl.innerHTML = s.gameName + ` <span class="game-type-badge" style="background:${badge.color}">${badge.label}</span>`;
+        gameNameEl.innerHTML = s.gameName
+            + ` <span class="game-type-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
+            + ` <span class="game-type-badge" style="background:${catBadge.color};color:${catBadge.textColor};border:1px solid #555">${catBadge.label}</span>`;
         document.getElementById('game-rotation').textContent =
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';
