@@ -96,6 +96,20 @@ function getGameCategory(gameId) {
     return 'high';
 }
 
+function getGameType(gameId) {
+    const DRAW_GAMES = ['td', 'sd', 'badugi'];
+    const STUD_GAMES = ['razz', 'stud', 'stud8'];
+    if (DRAW_GAMES.includes(gameId)) return 'draw';
+    if (STUD_GAMES.includes(gameId)) return 'stud';
+    return 'community';
+}
+
+const GAME_TYPE_LABELS = {
+    draw: { label: 'DRAW', color: '#42a5f5' },
+    stud: { label: 'STUD', color: '#ef5350' },
+    community: { label: 'HOLD\'EM', color: '#66bb6a' },
+};
+
 class PokerUI {
     constructor() {
         this.selectedCards = new Set();
@@ -134,14 +148,17 @@ class PokerUI {
     renderFromServer(s) {
         if (!s) return;
 
-        // Table theme by game category
+        // Table theme by game category (felt color) + game type (rail color)
         const felt = document.getElementById('table-felt');
-        felt.classList.remove('felt-high', 'felt-low', 'felt-hilo');
-        const gameCategory = getGameCategory(s.gameId);
-        felt.classList.add('felt-' + gameCategory);
+        felt.classList.remove('felt-high', 'felt-low', 'felt-hilo', 'rail-draw', 'rail-stud', 'rail-community');
+        felt.classList.add('felt-' + getGameCategory(s.gameId));
+        felt.classList.add('rail-' + getGameType(s.gameId));
 
-        // Top bar
-        document.getElementById('game-name').textContent = s.gameName;
+        // Top bar with game type badge
+        const gameType = getGameType(s.gameId);
+        const badge = GAME_TYPE_LABELS[gameType];
+        const gameNameEl = document.getElementById('game-name');
+        gameNameEl.innerHTML = s.gameName + ` <span class="game-type-badge" style="background:${badge.color}">${badge.label}</span>`;
         document.getElementById('game-rotation').textContent =
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';

@@ -406,6 +406,18 @@ body {
 #table-felt.felt-hilo #pot-display { color: #e0e0e0; }
 #table-felt.felt-hilo #table-info { color: #bbb; }
 
+/* Game type rail colors */
+#table-felt.rail-draw { border-color: #1565c0; box-shadow: 0 0 0 4px #1a1d24, 0 0 0 12px #1565c0, 0 0 0 14px #1a1d24, inset 0 0 40px rgba(0,0,0,0.4), 0 4px 24px rgba(21,101,192,0.3); }
+#table-felt.rail-stud { border-color: #c62828; box-shadow: 0 0 0 4px #1a1d24, 0 0 0 12px #c62828, 0 0 0 14px #1a1d24, inset 0 0 40px rgba(0,0,0,0.4), 0 4px 24px rgba(198,40,40,0.3); }
+#table-felt.rail-community { border-color: #2e7d32; box-shadow: 0 0 0 4px #1a1d24, 0 0 0 12px #2e7d32, 0 0 0 14px #1a1d24, inset 0 0 40px rgba(0,0,0,0.4), 0 4px 24px rgba(46,125,50,0.3); }
+
+/* Game type badge */
+.game-type-badge {
+    display: inline-block; font-size: 9px; font-weight: bold; color: #fff;
+    padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;
+    letter-spacing: 0.5px;
+}
+
 /* Subtle felt texture */
 #table-felt::before {
     content: '';
@@ -748,8 +760,14 @@ body {
     /* --- Game Screen --- */
     #top-bar { height: 36px; gap: 6px; padding: 4px 8px; }
     #game-name { font-size: 13px; }
+    .game-type-badge { font-size: 8px; padding: 1px 4px; margin-left: 4px; }
     #game-rotation { font-size: 11px; }
     #turn-timer { font-size: 13px; }
+
+    /* Table - mobile rail */
+    #table-felt.rail-draw { box-shadow: 0 0 0 2px #1a1d24, 0 0 0 6px #1565c0, 0 0 0 8px #1a1d24, inset 0 0 20px rgba(0,0,0,0.4), 0 2px 12px rgba(21,101,192,0.3); }
+    #table-felt.rail-stud { box-shadow: 0 0 0 2px #1a1d24, 0 0 0 6px #c62828, 0 0 0 8px #1a1d24, inset 0 0 20px rgba(0,0,0,0.4), 0 2px 12px rgba(198,40,40,0.3); }
+    #table-felt.rail-community { box-shadow: 0 0 0 2px #1a1d24, 0 0 0 6px #2e7d32, 0 0 0 8px #1a1d24, inset 0 0 20px rgba(0,0,0,0.4), 0 2px 12px rgba(46,125,50,0.3); }
 
     /* Table */
     #table-area { padding: 0 4px; }
