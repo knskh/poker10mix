@@ -743,6 +743,8 @@ function onStatsUpdate(data) {
                 wtsd: parseFloat(calc.wtsd) || 0,
                 wsd: parseFloat(calc.wsd) || 0,
                 wr: parseFloat(calc.winRate) || 0,
+                sdWin: parseInt(calc.showdownWin) || 0,
+                nsdWin: parseInt(calc.nonShowdownWin) || 0,
             });
             // Keep max 5000 snapshots per player
             if (arr.length > 5000) arr.splice(0, arr.length - 5000);
@@ -1006,6 +1008,8 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
         { key: 'wtsd', label: 'WTSD%', color: '#42a5f5', checked: false },
         { key: 'wsd', label: 'W$SD', color: '#7e57c2', checked: false },
         { key: 'wr', label: 'Win Rate', color: '#ffa726', checked: true },
+        { key: 'sdWin', label: 'SD Win', color: '#29b6f6', checked: false },
+        { key: 'nsdWin', label: 'Non-SD Win', color: '#9ccc65', checked: false },
     ];
     for (const gs of graphStats) {
         html += `<label class="graph-cb-label" style="color:${gs.color}"><input type="checkbox" class="graph-cb" data-key="${gs.key}" ${gs.checked ? 'checked' : ''}>${gs.label}</label>`;
@@ -1032,6 +1036,8 @@ function renderStatsTable(c) {
         <td class="stat-label">W$SD</td><td class="stat-value">${c.wsd}%</td></tr>
         <tr><td class="stat-label">Win Rate</td><td class="stat-value">${c.winRate}/100h</td>
         <td class="stat-label">SD Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin}</td></tr>
+        <tr><td class="stat-label">Non-SD Win</td><td class="stat-value">${typeof c.nonShowdownWin === 'number' ? c.nonShowdownWin.toLocaleString() : (c.nonShowdownWin || '-')}</td>
+        <td></td><td></td></tr>
     </tbody></table>`;
 }
 
@@ -1055,6 +1061,8 @@ const GRAPH_STAT_META = {
     wtsd: { label: 'WTSD%', color: '#42a5f5', unit: '%' },
     wsd: { label: 'W$SD', color: '#7e57c2', unit: '%' },
     wr: { label: 'Win Rate', color: '#ffa726', unit: '/100h' },
+    sdWin: { label: 'SD Win', color: '#29b6f6', unit: '' },
+    nsdWin: { label: 'Non-SD Win', color: '#9ccc65', unit: '' },
 };
 
 function initGraphTab(graphContent, playerName) {
