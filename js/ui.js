@@ -88,6 +88,14 @@ function describeHand(gameId, gameType, playerCards, communityCards) {
     }
 }
 
+function getGameCategory(gameId) {
+    const LOW_GAMES = ['td', 'sd', 'razz', 'badugi'];
+    const HILO_GAMES = ['o8', 'stud8'];
+    if (LOW_GAMES.includes(gameId)) return 'low';
+    if (HILO_GAMES.includes(gameId)) return 'hilo';
+    return 'high';
+}
+
 class PokerUI {
     constructor() {
         this.selectedCards = new Set();
@@ -125,6 +133,12 @@ class PokerUI {
     // Render from server-provided state
     renderFromServer(s) {
         if (!s) return;
+
+        // Table theme by game category
+        const felt = document.getElementById('table-felt');
+        felt.classList.remove('felt-high', 'felt-low', 'felt-hilo');
+        const gameCategory = getGameCategory(s.gameId);
+        felt.classList.add('felt-' + gameCategory);
 
         // Top bar
         document.getElementById('game-name').textContent = s.gameName;

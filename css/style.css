@@ -372,6 +372,40 @@ body {
     margin: 50px 0 10px; flex-shrink: 0;
 }
 
+/* Game category felt themes */
+/* High games (LHE, Stud, NLHE, PLO) - bright/white felt */
+#table-felt.felt-high {
+    background: radial-gradient(ellipse at 50% 40%, #e8e4dd 0%, #d5d0c8 50%, #bfb9b0 80%, #a8a29a 100%);
+    border-color: #888;
+}
+#table-felt.felt-high::before {
+    background: repeating-radial-gradient(ellipse at center, transparent 0px, rgba(0,0,0,0.01) 1px, transparent 2px);
+}
+#table-felt.felt-high #pot-display,
+#table-felt.felt-high #table-info { color: #333; text-shadow: 0 1px 2px rgba(255,255,255,0.5); }
+
+/* Lowball games (TD, SD, Razz, Badugi) - dark/black felt */
+#table-felt.felt-low {
+    background: radial-gradient(ellipse at 50% 40%, #2a2a2a 0%, #1e1e1e 50%, #141414 80%, #0a0a0a 100%);
+    border-color: #444;
+}
+#table-felt.felt-low::before {
+    background: repeating-radial-gradient(ellipse at center, transparent 0px, rgba(255,255,255,0.015) 1px, transparent 2px);
+}
+#table-felt.felt-low #pot-display { color: #ccc; }
+#table-felt.felt-low #table-info { color: #999; }
+
+/* Hi-Lo games (O8, Stud8) - gray felt */
+#table-felt.felt-hilo {
+    background: radial-gradient(ellipse at 50% 40%, #6b6b6b 0%, #555 50%, #444 80%, #363636 100%);
+    border-color: #666;
+}
+#table-felt.felt-hilo::before {
+    background: repeating-radial-gradient(ellipse at center, transparent 0px, rgba(255,255,255,0.01) 1px, transparent 2px);
+}
+#table-felt.felt-hilo #pot-display { color: #e0e0e0; }
+#table-felt.felt-hilo #table-info { color: #bbb; }
+
 /* Subtle felt texture */
 #table-felt::before {
     content: '';
