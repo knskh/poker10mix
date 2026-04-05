@@ -274,6 +274,22 @@ body {
 .stat-value { font-weight: bold; color: var(--accent); }
 .stat-label { color: var(--text-dim); }
 
+/* Stats toolbar & search */
+.stats-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; flex-wrap: wrap; }
+.stats-search-box { display: flex; gap: 4px; flex: 1; min-width: 150px; }
+.stats-search-box input {
+    flex: 1; padding: 5px 8px; font-size: 13px; border: 1px solid #444;
+    border-radius: 4px; background: #1a1d24; color: var(--text); outline: none;
+}
+.stats-search-box input:focus { border-color: var(--accent); }
+
+/* Ranking */
+.ranking-section-title { color: var(--gold); font-size: 14px; margin: 8px 0 6px; padding-left: 4px; }
+.ranking-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+.ranking-table th { text-align: left; padding: 6px 8px; color: var(--text-dim); border-bottom: 1px solid #333; font-weight: normal; }
+.ranking-table td { padding: 5px 8px; border-bottom: 1px solid #222; }
+.ranking-me { color: var(--gold); font-weight: bold; }
+
 .stats-player-panel { margin-bottom: 20px; }
 .stats-tabs-bar { display: flex; gap: 4px; margin-bottom: 10px; }
 .stats-tab {
@@ -284,6 +300,7 @@ body {
 .stats-tab:hover { background: #3a3d45; }
 .stats-tab.active:hover { background: var(--accent); }
 .stats-sub-header { color: var(--gold); font-size: 13px; margin: 8px 0 4px; padding-left: 4px; border-left: 3px solid var(--accent); }
+.stats-sub-sub-header { color: var(--text-dim); font-size: 12px; margin: 6px 0 3px; padding-left: 12px; border-left: 2px solid #555; font-weight: normal; }
 
 /* ============================================================
    GAME SCREEN - PokerStars Style
@@ -767,6 +784,7 @@ body {
     .stats-table td { padding: 4px 6px; }
     .stats-tab { padding: 6px 10px; font-size: 11px; }
     .stats-sub-header { font-size: 12px; }
+    .stats-sub-sub-header { font-size: 11px; padding-left: 10px; }
     #rules-modal { padding: 16px; width: 95%; }
     #rules-content { font-size: 13px; line-height: 1.5; }
 

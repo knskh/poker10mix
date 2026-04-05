@@ -209,6 +209,15 @@ function setupLobbyScreen() {
     });
     document.getElementById('btn-refresh-rooms').addEventListener('click', () => client.getRooms());
 
+    // Ranking button
+    document.getElementById('btn-lobby-ranking').addEventListener('click', () => {
+        renderRanking();
+        document.getElementById('ranking-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-ranking-close').addEventListener('click', () => {
+        document.getElementById('ranking-modal').classList.add('hidden');
+    });
+
     // Hand history button
     document.getElementById('btn-lobby-history').addEventListener('click', () => {
         renderHandHistory('lobby-hand-history');
@@ -724,31 +733,127 @@ function renderStats(data) {
     container.innerHTML = html;
 }
 
-// Render stats from localStorage (lobby)
+// Render stats from localStorage (lobby) - default: my stats only
 function renderStatsFromStorage() {
     const container = document.getElementById('stats-table-container');
     const saved = loadSavedStats();
-    const names = Object.keys(saved);
-    if (names.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-dim);padding:16px;">まだスタッツがありません。ゲームをプレイすると記録されます。</p>';
-        return;
+
+    // Search bar + reset
+    let html = '<div class="stats-toolbar">';
+    html += '<div class="stats-search-box"><input type="text" id="stats-search-input" placeholder="プレイヤー名で検索..." autocomplete="off"><button id="btn-stats-search" class="btn-small">検索</button></div>';
+    html += '<button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button>';
+    html += '</div>';
+
+    // Show my stats
+    const myStats = saved[client.name];
+    if (myStats && myStats.hands > 0) {
+        html += renderPlayerStatsWithTabs(client.name, myStats, ' style="color:var(--gold)"');
+    } else {
+        html += '<p style="color:var(--text-dim);padding:16px;">まだスタッツがありません。ゲームをプレイすると記録されます。</p>';
     }
-    let html = '<div style="text-align:right;padding:4px 8px;"><button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button></div>';
-    for (const [name, c] of Object.entries(saved)) {
-        const isMe = name === client.name ? ' style="color:var(--gold)"' : '';
-        html += renderPlayerStatsWithTabs(name, c, isMe);
-    }
+
     container.innerHTML = html;
-    // Bind tab clicks
+    bindStatsEvents(container);
+}
+
+// Render search result for a specific player
+function renderStatsSearchResult(playerName) {
+    const container = document.getElementById('stats-table-container');
+    const saved = loadSavedStats();
+
+    let html = '<div class="stats-toolbar">';
+    html += '<div class="stats-search-box"><input type="text" id="stats-search-input" placeholder="プレイヤー名で検索..." autocomplete="off" value="' + playerName.replace(/"/g, '&quot;') + '"><button id="btn-stats-search" class="btn-small">検索</button></div>';
+    html += '<button id="btn-stats-back-me" class="btn-small">自分に戻る</button>';
+    html += '<button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button>';
+    html += '</div>';
+
+    // Find matching players
+    const query = playerName.toLowerCase();
+    const matches = Object.entries(saved).filter(([name]) => name.toLowerCase().includes(query));
+
+    if (matches.length === 0) {
+        html += `<p style="color:var(--text-dim);padding:16px;">"${playerName}" に一致するプレイヤーが見つかりません</p>`;
+    } else {
+        for (const [name, c] of matches) {
+            const isMe = name === client.name ? ' style="color:var(--gold)"' : '';
+            html += renderPlayerStatsWithTabs(name, c, isMe);
+        }
+    }
+
+    container.innerHTML = html;
+    bindStatsEvents(container);
+    const backBtn = document.getElementById('btn-stats-back-me');
+    if (backBtn) backBtn.addEventListener('click', renderStatsFromStorage);
+}
+
+function bindStatsEvents(container) {
     container.querySelectorAll('.stats-tab').forEach(tab => {
         tab.addEventListener('click', (e) => handleStatsTabClick(e.target));
     });
-    document.getElementById('btn-stats-clear').addEventListener('click', () => {
-        if (confirm('すべてのスタッツをリセットしますか？')) {
-            localStorage.removeItem(STATS_STORAGE_KEY);
-            renderStatsFromStorage();
-        }
+    const searchInput = document.getElementById('stats-search-input');
+    const searchBtn = document.getElementById('btn-stats-search');
+    if (searchBtn && searchInput) {
+        const doSearch = () => {
+            const q = searchInput.value.trim();
+            if (q) renderStatsSearchResult(q);
+        };
+        searchBtn.addEventListener('click', doSearch);
+        searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+    }
+    const clearBtn = document.getElementById('btn-stats-clear');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (confirm('すべてのスタッツをリセットしますか？')) {
+                localStorage.removeItem(STATS_STORAGE_KEY);
+                renderStatsFromStorage();
+            }
+        });
+    }
+}
+
+// Ranking display
+function renderRanking() {
+    const container = document.getElementById('ranking-container');
+    const saved = loadSavedStats();
+    const entries = Object.entries(saved).filter(([, c]) => c.hands > 0);
+
+    if (entries.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim);padding:16px;">データなし</p>';
+        return;
+    }
+
+    let html = '';
+
+    // Win Rate ranking (10000+ hands only)
+    html += '<h3 class="ranking-section-title">Win Rate ランキング（10,000ハンド以上）</h3>';
+    const wrEntries = entries.filter(([, c]) => c.hands >= 10000)
+        .map(([name, c]) => ({ name, winRate: parseFloat(c.winRate) || 0, hands: c.hands }))
+        .sort((a, b) => b.winRate - a.winRate);
+
+    if (wrEntries.length === 0) {
+        html += '<p style="color:var(--text-dim);padding:8px 16px;">10,000ハンド以上のプレイヤーがいません</p>';
+    } else {
+        html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>Win Rate</th><th>ハンド数</th></tr></thead><tbody>';
+        wrEntries.forEach((e, i) => {
+            const isMe = e.name === client.name ? ' class="ranking-me"' : '';
+            html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.winRate}/100h</td><td>${e.hands.toLocaleString()}</td></tr>`;
+        });
+        html += '</tbody></table>';
+    }
+
+    // Hands played ranking (all players)
+    html += '<h3 class="ranking-section-title" style="margin-top:16px;">ハンド数ランキング</h3>';
+    const handEntries = entries.map(([name, c]) => ({ name, hands: c.hands, winRate: c.winRate }))
+        .sort((a, b) => b.hands - a.hands);
+
+    html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>ハンド数</th><th>Win Rate</th></tr></thead><tbody>';
+    handEntries.forEach((e, i) => {
+        const isMe = e.name === client.name ? ' class="ranking-me"' : '';
+        html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.hands.toLocaleString()}</td><td>${e.winRate}/100h</td></tr>`;
     });
+    html += '</tbody></table>';
+
+    container.innerHTML = html;
 }
 
 // Show stats for a specific player (avatar click)
@@ -810,7 +915,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     }
     html += `</div>`;
 
-    // Position tab
+    // Position tab (with per-game breakdown)
     html += `<div class="stats-tab-content hidden" data-tab="position">`;
     if (c.byPosition && Object.keys(c.byPosition).length > 0) {
         const posOrder = ['BTN', 'SB', 'BB', 'CO', 'HJ', 'EP'];
@@ -819,6 +924,14 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
             if (!ps.hands || ps.hands === 0) continue;
             html += `<h4 class="stats-sub-header">${pos} (${ps.hands}h)</h4>`;
             html += renderStatsTable(ps);
+            // Per-game breakdown within this position
+            if (ps.byGame && Object.keys(ps.byGame).length > 0) {
+                for (const [gid, gs] of Object.entries(ps.byGame)) {
+                    if (!gs.hands || gs.hands === 0) continue;
+                    html += `<h5 class="stats-sub-sub-header">${pos} / ${GAME_NAMES[gid] || gid} (${gs.hands}h)</h5>`;
+                    html += renderStatsTable(gs);
+                }
+            }
         }
     } else {
         html += '<p style="color:var(--text-dim)">データなし</p>';

@@ -49,6 +49,7 @@
                 <div class="lobby-user">
                     <span id="lobby-username"></span>
                     <button id="btn-lobby-stats" class="btn-small">Stats</button>
+                    <button id="btn-lobby-ranking" class="btn-small">ランキング</button>
                     <button id="btn-lobby-history" class="btn-small">履歴</button>
                     <button id="btn-logout">ログアウト</button>
                 </div>
@@ -118,6 +119,17 @@
                     <button id="btn-stats-close" class="btn-small">閉じる</button>
                 </div>
                 <div id="stats-table-container"></div>
+            </div>
+        </div>
+
+        <!-- Ranking Modal -->
+        <div id="ranking-modal" class="hidden">
+            <div class="stats-modal-inner">
+                <div class="stats-header">
+                    <h2>ランキング</h2>
+                    <button id="btn-ranking-close" class="btn-small">閉じる</button>
+                </div>
+                <div id="ranking-container"></div>
             </div>
         </div>
 

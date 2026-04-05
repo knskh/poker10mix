@@ -25,8 +25,18 @@ class StatsTracker {
 
     getPlayerPosition(playerId, position) {
         const p = this.getPlayer(playerId);
-        if (!p.byPosition[position]) p.byPosition[position] = this.emptyStats();
+        if (!p.byPosition[position]) p.byPosition[position] = { total: this.emptyStats(), byGame: {} };
+        // Migration: if old flat format (has handsPlayed directly), convert
+        if (p.byPosition[position].handsPlayed !== undefined) {
+            p.byPosition[position] = { total: p.byPosition[position], byGame: {} };
+        }
         return p.byPosition[position];
+    }
+
+    getPlayerPositionGame(playerId, position, gameId) {
+        const posData = this.getPlayerPosition(playerId, position);
+        if (!posData.byGame[gameId]) posData.byGame[gameId] = this.emptyStats();
+        return posData.byGame[gameId];
     }
 
     // Determine position label based on seat relative to dealer
@@ -194,9 +204,11 @@ class StatsTracker {
 
             const total = this.getPlayer(p.id).total;
             const game = this.getPlayerGame(p.id, gid);
-            const pos = this.getPlayerPosition(p.id, h.positions[p.id] || 'EP');
+            const posLabel = h.positions[p.id] || 'EP';
+            const posTotal = this.getPlayerPosition(p.id, posLabel).total;
+            const posGame = this.getPlayerPositionGame(p.id, posLabel, gid);
 
-            for (const s of [total, game, pos]) {
+            for (const s of [total, game, posTotal, posGame]) {
                 s.handsPlayed++;
 
                 const chipDiff = p.chips - (h.startChips[p.id] || 0);

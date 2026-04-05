@@ -255,11 +255,18 @@ function broadcastStatsUpdate(room) {
         for (const [gid, raw] of Object.entries(pd.byGame)) {
             byGame[gid] = room.stats.calc(raw);
         }
-        // Include per-position stats
+        // Include per-position stats (with per-game breakdown)
         const byPos = {};
         if (pd.byPosition) {
-            for (const [pos, raw] of Object.entries(pd.byPosition)) {
-                byPos[pos] = room.stats.calc(raw);
+            for (const [pos, posData] of Object.entries(pd.byPosition)) {
+                const posTotal = posData.total ? room.stats.calc(posData.total) : room.stats.calc(posData);
+                const posByGame = {};
+                if (posData.byGame) {
+                    for (const [gid2, raw2] of Object.entries(posData.byGame)) {
+                        posByGame[gid2] = room.stats.calc(raw2);
+                    }
+                }
+                byPos[pos] = { ...posTotal, byGame: posByGame };
             }
         }
         playerStats[room.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
@@ -941,8 +948,15 @@ function broadcastZoomStatsUpdate(table) {
         }
         const byPos = {};
         if (pd.byPosition) {
-            for (const [pos, raw] of Object.entries(pd.byPosition)) {
-                byPos[pos] = table.stats.calc(raw);
+            for (const [pos, posData] of Object.entries(pd.byPosition)) {
+                const posTotal = posData.total ? table.stats.calc(posData.total) : table.stats.calc(posData);
+                const posByGame = {};
+                if (posData.byGame) {
+                    for (const [gid2, raw2] of Object.entries(posData.byGame)) {
+                        posByGame[gid2] = table.stats.calc(raw2);
+                    }
+                }
+                byPos[pos] = { ...posTotal, byGame: posByGame };
             }
         }
         playerStats[table.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
