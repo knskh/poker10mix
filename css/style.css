@@ -306,6 +306,14 @@ body {
 .stats-tab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
 .stats-tab:hover { background: #3a3d45; }
 .stats-tab.active:hover { background: var(--accent); }
+/* Stats dropdown */
+.stats-dropdown {
+    width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid #444;
+    border-radius: 4px; background: #1a1d24; color: var(--gold); margin-bottom: 8px;
+    outline: none; cursor: pointer;
+}
+.stats-dropdown:focus { border-color: var(--accent); }
+
 .stats-sub-header { color: var(--gold); font-size: 13px; margin: 8px 0 4px; padding-left: 4px; border-left: 3px solid var(--accent); }
 .stats-sub-sub-header { color: var(--text-dim); font-size: 12px; margin: 6px 0 3px; padding-left: 12px; border-left: 2px solid #555; font-weight: normal; }
 

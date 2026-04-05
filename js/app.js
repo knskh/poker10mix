@@ -837,6 +837,7 @@ function bindStatsEvents(container) {
     container.querySelectorAll('.stats-tab').forEach(tab => {
         tab.addEventListener('click', (e) => handleStatsTabClick(e.target));
     });
+    bindDropdownEvents(container);
     const searchInput = document.getElementById('stats-search-input');
     const searchBtn = document.getElementById('btn-stats-search');
     if (searchBtn && searchInput) {
@@ -915,6 +916,7 @@ function showPlayerStats(playerName) {
         container.querySelectorAll('.stats-tab').forEach(tab => {
             tab.addEventListener('click', (e) => handleStatsTabClick(e.target));
         });
+        bindDropdownEvents(container);
     }
     document.getElementById('stats-modal').classList.remove('hidden');
 }
@@ -930,9 +932,42 @@ function handleStatsTabClick(tab) {
     // Render graph when graph tab selected
     if (tab.dataset.tab === 'graph') {
         const playerName = tab.dataset.player;
-        const graphContent = target;
-        if (graphContent) initGraphTab(graphContent, playerName);
+        if (target) initGraphTab(target, playerName);
     }
+}
+
+function bindDropdownEvents(container) {
+    // Game dropdown
+    container.querySelectorAll('.stats-game-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const panel = sel.closest('.stats-tab-content');
+            panel.querySelectorAll('.stats-dropdown-content[data-game]').forEach(d => d.style.display = 'none');
+            const target = panel.querySelector(`.stats-dropdown-content[data-game="${sel.value}"]`);
+            if (target) target.style.display = '';
+        });
+    });
+    // Position dropdown
+    container.querySelectorAll('.stats-pos-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const panel = sel.closest('.stats-tab-content');
+            panel.querySelectorAll('.stats-dropdown-content[data-pos]').forEach(d => d.style.display = 'none');
+            const target = panel.querySelector(`.stats-dropdown-content[data-pos="${sel.value}"]`);
+            if (target) target.style.display = '';
+        });
+    });
+    // Position-game sub-dropdown
+    container.querySelectorAll('.stats-pos-game-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const pos = sel.dataset.pos;
+            const parentDiv = sel.closest(`.stats-dropdown-content[data-pos="${pos}"]`);
+            if (!parentDiv) return;
+            parentDiv.querySelectorAll('.stats-dropdown-content[data-pos-game]').forEach(d => d.style.display = 'none');
+            if (sel.value) {
+                const target = parentDiv.querySelector(`.stats-dropdown-content[data-pos-game="${pos}-${sel.value}"]`);
+                if (target) target.style.display = '';
+            }
+        });
+    });
 }
 
 const GAME_NAMES = {
@@ -956,36 +991,59 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     // Total tab
     html += `<div class="stats-tab-content" data-tab="total">${renderStatsTable(c)}</div>`;
 
-    // Game tab
+    // Game tab (with dropdown)
     html += `<div class="stats-tab-content hidden" data-tab="game">`;
     if (c.byGame && Object.keys(c.byGame).length > 0) {
-        for (const [gid, gs] of Object.entries(c.byGame)) {
-            if (!gs.hands || gs.hands === 0) continue;
-            html += `<h4 class="stats-sub-header">${GAME_NAMES[gid] || gid} (${gs.hands}h)</h4>`;
+        html += `<select class="stats-dropdown stats-game-select">`;
+        const gameEntries = Object.entries(c.byGame).filter(([, gs]) => gs.hands > 0);
+        for (const [gid, gs] of gameEntries) {
+            html += `<option value="${gid}">${GAME_NAMES[gid] || gid} (${gs.hands}h)</option>`;
+        }
+        html += `</select>`;
+        for (const [gid, gs] of gameEntries) {
+            html += `<div class="stats-dropdown-content" data-game="${gid}"${gid !== gameEntries[0][0] ? ' style="display:none"' : ''}>`;
             html += renderStatsTable(gs);
+            html += `</div>`;
         }
     } else {
         html += '<p style="color:var(--text-dim)">データなし</p>';
     }
     html += `</div>`;
 
-    // Position tab (with per-game breakdown)
+    // Position tab (with dropdown + per-game sub-dropdown)
     html += `<div class="stats-tab-content hidden" data-tab="position">`;
     if (c.byPosition && Object.keys(c.byPosition).length > 0) {
         const posOrder = ['BTN', 'SB', 'BB', 'CO', 'HJ', 'EP'];
-        const sorted = Object.entries(c.byPosition).sort((a, b) => posOrder.indexOf(a[0]) - posOrder.indexOf(b[0]));
-        for (const [pos, ps] of sorted) {
-            if (!ps.hands || ps.hands === 0) continue;
-            html += `<h4 class="stats-sub-header">${pos} (${ps.hands}h)</h4>`;
+        const posEntries = Object.entries(c.byPosition)
+            .filter(([, ps]) => ps.hands > 0)
+            .sort((a, b) => posOrder.indexOf(a[0]) - posOrder.indexOf(b[0]));
+        html += `<select class="stats-dropdown stats-pos-select">`;
+        for (const [pos, ps] of posEntries) {
+            html += `<option value="${pos}">${pos} (${ps.hands}h)</option>`;
+        }
+        html += `</select>`;
+        for (const [pos, ps] of posEntries) {
+            html += `<div class="stats-dropdown-content" data-pos="${pos}"${pos !== posEntries[0][0] ? ' style="display:none"' : ''}>`;
             html += renderStatsTable(ps);
-            // Per-game breakdown within this position
+            // Per-game sub-dropdown within position
             if (ps.byGame && Object.keys(ps.byGame).length > 0) {
-                for (const [gid, gs] of Object.entries(ps.byGame)) {
-                    if (!gs.hands || gs.hands === 0) continue;
-                    html += `<h5 class="stats-sub-sub-header">${pos} / ${GAME_NAMES[gid] || gid} (${gs.hands}h)</h5>`;
-                    html += renderStatsTable(gs);
+                const posGameEntries = Object.entries(ps.byGame).filter(([, gs]) => gs.hands > 0);
+                if (posGameEntries.length > 0) {
+                    html += `<h5 class="stats-sub-sub-header" style="margin-top:8px">ゲーム別</h5>`;
+                    html += `<select class="stats-dropdown stats-pos-game-select" data-pos="${pos}">`;
+                    html += `<option value="">-- 選択 --</option>`;
+                    for (const [gid, gs] of posGameEntries) {
+                        html += `<option value="${gid}">${GAME_NAMES[gid] || gid} (${gs.hands}h)</option>`;
+                    }
+                    html += `</select>`;
+                    for (const [gid, gs] of posGameEntries) {
+                        html += `<div class="stats-dropdown-content" data-pos-game="${pos}-${gid}" style="display:none">`;
+                        html += renderStatsTable(gs);
+                        html += `</div>`;
+                    }
                 }
             }
+            html += `</div>`;
         }
     } else {
         html += '<p style="color:var(--text-dim)">データなし</p>';
