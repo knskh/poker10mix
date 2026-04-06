@@ -494,7 +494,32 @@ function onZoomSitout() {
 function saveCurrentHand() {
     if (currentHandLogs.length > 1) {
         const gameName = currentState ? currentState.gameName : '';
-        handHistory.push({ gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString() });
+        // Capture player's hand cards
+        let myCards = '';
+        if (currentState) {
+            const me = currentState.players[currentState.mySeatIndex];
+            if (me) {
+                let cards = [];
+                if (currentState.gameType === 'stud') {
+                    cards = [...(me.downCards || []), ...(me.upCards || [])];
+                } else {
+                    cards = me.hand || [];
+                }
+                if (cards.length > 0) {
+                    const RANK_D = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
+                    const SUIT_D = { s:'♠', h:'♥', d:'♦', c:'♣' };
+                    myCards = cards.map(c => (RANK_D[c.rank] || c.rank) + (SUIT_D[c.suit] || c.suit)).join(' ');
+                }
+            }
+        }
+        // Capture community cards
+        let communityCards = '';
+        if (currentState && currentState.communityCards && currentState.communityCards.length > 0) {
+            const RANK_D = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
+            const SUIT_D = { s:'♠', h:'♥', d:'♦', c:'♣' };
+            communityCards = currentState.communityCards.map(c => (RANK_D[c.rank] || c.rank) + (SUIT_D[c.suit] || c.suit)).join(' ');
+        }
+        handHistory.push({ gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString(), myCards, communityCards });
         if (handHistory.length > 30) handHistory.shift();
         persistHandHistory();
     }
@@ -513,6 +538,12 @@ function renderHandHistory(containerId) {
         const h = handHistory[i];
         html += `<div class="hand-history-item">`;
         html += `<div class="hand-history-header">#${i + 1} ${h.gameName} <span class="hand-history-time">${h.time}</span></div>`;
+        if (h.myCards || h.communityCards) {
+            html += `<div class="hand-history-cards">`;
+            if (h.myCards) html += `<span class="hh-label">ハンド:</span> <span class="hh-cards">${h.myCards}</span>`;
+            if (h.communityCards) html += ` <span class="hh-label">ボード:</span> <span class="hh-cards">${h.communityCards}</span>`;
+            html += `</div>`;
+        }
         html += `<div class="hand-history-logs">`;
         for (const log of h.logs) {
             html += `<div class="hand-history-log">${log}</div>`;
