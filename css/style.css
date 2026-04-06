@@ -805,6 +805,8 @@ body {
 }
 .hh-round-cards { display: flex; gap: 2px; }
 .hh-round-actions { display: flex; flex-direction: column; gap: 1px; padding-left: 4px; }
+.hh-draw-cards { font-size: 11px; color: var(--text-dim); padding: 2px 4px; display: flex; align-items: center; gap: 4px; }
+.hh-draw-label { font-size: 10px; color: #999; min-width: 50px; }
 .hh-action { font-size: 12px; color: var(--text); padding: 2px 0; line-height: 1.5; display: flex; align-items: center; gap: 6px; }
 .hh-action-pos {
     font-size: 9px; font-weight: bold; color: var(--text-dim); background: #333;

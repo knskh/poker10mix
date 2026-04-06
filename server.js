@@ -882,7 +882,13 @@ function createZoomTable(members) {
                 send(m.ws, { type: 'log', message: msg, cls });
         }
     };
-    game.onHandStart = () => stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
+    game.onHandStart = () => {
+        stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
+        for (const m of table.members) {
+            if (table.activeMemberIds.has(m.clientId))
+                send(m.ws, { type: 'hand_start' });
+        }
+    };
     game.onFirstRoundEnd = () => stats.endFirstRound();
     game.onPlayerAction = (player, action, isBlinds) => stats.recordAction(player, action, isBlinds);
     game.onShowdown = (winnerIds) => stats.recordShowdown(winnerIds);
