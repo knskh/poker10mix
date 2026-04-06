@@ -426,7 +426,7 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(client.roomId);
             if (!room || room.hostId !== client.id) return;
             if (room.members.length < 2) { send(ws, { type: 'error', message: '2人以上必要です' }); return; }
-            if (room.settings.selectedGames.length < 2) { send(ws, { type: 'error', message: '2つ以上のゲームを選択してください' }); return; }
+            if (room.settings.selectedGames.length < 1) { send(ws, { type: 'error', message: '1つ以上のゲームを選択してください' }); return; }
             if (room.playing) return;
             startGame(room);
             break;
