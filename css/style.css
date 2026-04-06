@@ -758,7 +758,30 @@ body {
 .hh-detail-title { font-size: 14px; font-weight: bold; color: var(--accent); }
 .hh-detail-time { font-size: 11px; color: var(--text-dim); }
 
-/* Card groups in detail */
+/* Player summary table */
+.hh-player-table {
+    margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 8px;
+}
+.hh-p-row {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0;
+    border-bottom: 1px solid #2a2d35; font-size: 13px;
+}
+.hh-p-row:last-child { border-bottom: none; }
+.hh-p-row-me { background: rgba(79, 195, 247, 0.08); border-radius: 4px; padding: 4px 4px; }
+.hh-p-pos {
+    font-size: 10px; font-weight: bold; color: var(--text-dim); background: #333;
+    border-radius: 3px; padding: 2px 6px; min-width: 30px; text-align: center;
+}
+.hh-p-name { flex: 1; font-weight: bold; color: var(--text); }
+.hh-p-me { color: var(--accent); }
+.hh-p-diff { min-width: 55px; text-align: right; font-size: 12px; font-weight: bold; }
+.hh-win { color: #4caf50; }
+.hh-loss { color: #ef5350; }
+.hh-even { color: var(--text-dim); }
+.hh-p-cards { display: flex; gap: 2px; }
+.hh-folded-label { font-size: 10px; color: #666; font-style: italic; }
+
+/* Card groups in detail (fallback) */
 .hh-detail-cards { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
 .hh-card-group { display: flex; flex-direction: column; gap: 4px; }
 .hh-card-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
@@ -772,36 +795,22 @@ body {
 }
 .hh-vc-suit { font-size: 12px; }
 .hh-vc-down { border: 2px dashed #888; background: #e8e4dc; }
-.hh-final-hand { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #444; }
-
-/* Showdown section */
-.hh-showdown {
-    background: #252830; border-radius: 4px; padding: 8px; margin-bottom: 8px;
-    border: 1px solid #3a3d45;
-}
-.hh-showdown-title {
-    font-size: 11px; font-weight: bold; color: var(--gold);
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
-    padding-bottom: 4px; border-bottom: 1px solid #333;
-}
-.hh-sd-player {
-    display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;
-}
-.hh-sd-name {
-    font-size: 12px; color: var(--text); min-width: 70px; font-weight: bold;
-}
-.hh-sd-me { color: var(--accent); }
 
 /* Rounds */
-.hh-rounds { display: flex; flex-direction: column; gap: 8px; }
-.hh-round { background: #252830; border-radius: 4px; padding: 8px; }
+.hh-rounds { display: flex; flex-direction: column; gap: 4px; }
+.hh-round { padding: 6px 0; border-top: 1px solid #333; }
+.hh-round-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .hh-round-name {
-    font-size: 11px; font-weight: bold; color: var(--gold);
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
-    padding-bottom: 3px; border-bottom: 1px solid #333;
+    font-size: 13px; font-weight: bold; color: var(--text);
 }
-.hh-round-actions { display: flex; flex-direction: column; gap: 2px; }
-.hh-action { font-size: 12px; color: var(--text); padding: 2px 0; line-height: 1.5; }
+.hh-round-cards { display: flex; gap: 2px; }
+.hh-round-actions { display: flex; flex-direction: column; gap: 1px; padding-left: 4px; }
+.hh-action { font-size: 12px; color: var(--text); padding: 2px 0; line-height: 1.5; display: flex; align-items: center; gap: 6px; }
+.hh-action-pos {
+    font-size: 9px; font-weight: bold; color: var(--text-dim); background: #333;
+    border-radius: 3px; padding: 1px 5px; min-width: 26px; text-align: center;
+    flex-shrink: 0;
+}
 
 /* Action colors */
 .act-fold { color: #888; }
@@ -810,6 +819,14 @@ body {
 .act-check { color: #66bb6a; }
 .act-allin { color: #f44336; font-weight: bold; }
 .act-win { color: var(--gold); font-weight: bold; }
+
+/* Result section */
+.hh-result {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 0; border-top: 1px solid #333; margin-top: 4px;
+}
+.hh-result-label { font-size: 13px; font-weight: bold; color: var(--text); }
+.hh-result-win { font-size: 12px; font-weight: bold; color: #4caf50; }
 
 /* ============================================================
    RESPONSIVE - Tablet (max-width: 860px)

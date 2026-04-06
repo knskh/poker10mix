@@ -13,6 +13,7 @@ let currentHandLogs = []; // logs for current hand
 let startingHandCards = []; // starting hand card objects captured at hand start
 let cardSnapshots = []; // track card changes per round for stud/draw
 let showdownPlayers = null; // opponent cards captured at showdown
+let lastHandResult = null; // full hand result from server
 
 function loadHandHistory() {
     try {
@@ -65,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('chat', onChat);
     client.on('game_over', onGameOver);
     client.on('stats_data', renderStats);
+    client.on('hand_result', onHandResult);
     client.on('stats_update', onStatsUpdate);
     client.on('auth_result', onAuthResult);
     client.on('zoom_joined', onZoomJoined);
@@ -455,6 +457,11 @@ function onHandStart() {
     startingHandCards = [];
     cardSnapshots = [];
     showdownPlayers = null;
+    lastHandResult = null;
+}
+
+function onHandResult(data) {
+    lastHandResult = data;
 }
 
 function onGameState(state) {
@@ -599,6 +606,19 @@ function saveCurrentHand() {
             }) : [],
             gameType: currentState ? currentState.gameType : '',
             showdownPlayers: showdownPlayers ? [...showdownPlayers] : null,
+            handResult: lastHandResult ? {
+                gameName: lastHandResult.gameName,
+                gameType: lastHandResult.gameType,
+                communityCards: (lastHandResult.communityCards || []).map(c => ({ r: c.rank, s: c.suit })),
+                dealerSeat: lastHandResult.dealerSeat,
+                players: lastHandResult.players.map(p => ({
+                    name: p.name, position: p.position, folded: p.folded,
+                    chips: p.chips, startChips: p.startChips,
+                    cards: p.cards.map(c => ({ r: c.rank, s: c.suit })),
+                    upCards: (p.upCards || []).map(c => ({ r: c.rank, s: c.suit })),
+                    downCards: (p.downCards || []).map(c => ({ r: c.rank, s: c.suit })),
+                })),
+            } : null,
         });
         if (handHistory.length > 30) handHistory.shift();
         persistHandHistory();
@@ -663,8 +683,39 @@ function renderMiniCards(cardObjs) {
 
 function renderHandDetail(h, idx) {
     if (!h) return '';
-    // Parse logs into rounds
-    const rounds = [{ name: 'Pre', logs: [] }];
+    const hr = h.handResult;
+    const myName = client.name;
+
+    // Header: game name + time
+    let html = `<div class="hh-detail-header">`;
+    html += `<span class="hh-detail-title">#${idx + 1} ${h.gameName || ''}</span>`;
+    html += `<span class="hh-detail-time">${h.time || ''}</span>`;
+    html += `</div>`;
+
+    // === Player summary table (position, name, result, cards) ===
+    if (hr && hr.players) {
+        html += `<div class="hh-player-table">`;
+        for (const p of hr.players) {
+            const diff = p.chips - p.startChips;
+            const diffStr = diff > 0 ? `<span class="hh-win">+${diff}</span>` :
+                            diff < 0 ? `<span class="hh-loss">${diff}</span>` :
+                            `<span class="hh-even">±0</span>`;
+            const isMe = p.name === myName;
+            const nameClass = isMe ? 'hh-p-name hh-p-me' : 'hh-p-name';
+            const cards = p.cards && p.cards.length > 0 && !p.folded ? renderMiniCards(p.cards) :
+                          p.folded ? '<span class="hh-folded-label">fold</span>' : '';
+            html += `<div class="hh-p-row${isMe ? ' hh-p-row-me' : ''}">`;
+            html += `<span class="hh-p-pos">${p.position}</span>`;
+            html += `<span class="${nameClass}">${p.name}</span>`;
+            html += `<span class="hh-p-diff">${diffStr}</span>`;
+            html += `<span class="hh-p-cards">${cards}</span>`;
+            html += `</div>`;
+        }
+        html += `</div>`;
+    }
+
+    // === Parse logs into rounds ===
+    const rounds = [{ name: 'Preflop', logs: [], cards: [] }];
     const ROUND_MARKERS = {
         'フロップ': 'Flop', 'ターン': 'Turn', 'リバー': 'River',
         '3rd': '3rd St', '4th': '4th St', '5th': '5th St', '6th': '6th St', '7th': '7th St',
@@ -674,7 +725,7 @@ function renderHandDetail(h, idx) {
         let matched = false;
         for (const [marker, name] of Object.entries(ROUND_MARKERS)) {
             if (log.includes(marker)) {
-                rounds.push({ name, logs: [] });
+                rounds.push({ name, logs: [], cards: [] });
                 matched = true;
                 break;
             }
@@ -684,90 +735,93 @@ function renderHandDetail(h, idx) {
         }
     }
 
-    let html = `<div class="hh-detail-header">`;
-    html += `<span class="hh-detail-title">#${idx + 1} ${h.gameName || ''}</span>`;
-    html += `<span class="hh-detail-time">${h.time || ''}</span>`;
-    html += `</div>`;
+    // Assign community cards to rounds (Flop=3, Turn=1, River=1)
+    const cc = (hr && hr.communityCards) || h.communityCardObjs || [];
+    if (cc.length >= 3) {
+        const flopRound = rounds.find(r => r.name === 'Flop');
+        if (flopRound) flopRound.cards = cc.slice(0, 3);
+        const turnRound = rounds.find(r => r.name === 'Turn');
+        if (turnRound && cc.length >= 4) turnRound.cards = [cc[3]];
+        const riverRound = rounds.find(r => r.name === 'River');
+        if (riverRound && cc.length >= 5) riverRound.cards = [cc[4]];
+    }
 
-    // Cards section
-    html += `<div class="hh-detail-cards">`;
+    // Assign draw snapshots to draw rounds
     const snaps = h.cardSnapshots || [];
-    if (snaps.length > 0 && snaps[0].type === 'stud') {
-        // Stud: show cards per street
-        const streetNames = ['3rd St', '4th St', '5th St', '6th St', '7th St'];
-        for (let si = 0; si < snaps.length; si++) {
-            const snap = snaps[si];
-            const streetLabel = streetNames[si] || `Street ${si + 3}`;
-            let streetCards = [];
-            if (si === 0) {
-                // 3rd street: show all initial cards (down↓ + up↑)
-                streetCards = snap.down.map(c => ({ ...c, faceDown: true }))
-                    .concat(snap.up.map(c => ({ ...c, faceDown: false })));
-            } else {
-                // Subsequent streets: show only the new card(s)
-                const prevDown = snaps[si - 1].down.length;
-                const prevUp = snaps[si - 1].up.length;
-                const newDown = snap.down.slice(prevDown);
-                const newUp = snap.up.slice(prevUp);
-                streetCards = newDown.map(c => ({ ...c, faceDown: true }))
-                    .concat(newUp.map(c => ({ ...c, faceDown: false })));
+    if (snaps.length > 0 && snaps[0].type === 'draw') {
+        let drawIdx = 0;
+        for (const round of rounds) {
+            if (round.name.startsWith('Draw')) {
+                drawIdx++;
+                if (snaps[drawIdx]) round.cards = snaps[drawIdx].hand;
             }
-            html += `<div class="hh-card-group"><span class="hh-card-label">${streetLabel}</span>`;
-            html += renderVisualCardsWithType(streetCards);
-            html += `</div>`;
         }
-        // Show final hand
-        if (snaps.length > 0) {
-            const last = snaps[snaps.length - 1];
-            const finalCards = [...last.down, ...last.up];
-            html += `<div class="hh-card-group hh-final-hand"><span class="hh-card-label">最終ハンド</span>${renderVisualCards(finalCards)}</div>`;
-        }
-    } else if (snaps.length > 0 && snaps[0].type === 'draw') {
-        // Draw: show hand at each draw stage
-        for (let si = 0; si < snaps.length; si++) {
-            const label = si === 0 ? 'スタート' : `ドロー${si}後`;
-            html += `<div class="hh-card-group"><span class="hh-card-label">${label}</span>${renderVisualCards(snaps[si].hand)}</div>`;
-        }
-    } else {
-        // Fallback: community card games (Hold'em, Omaha)
-        if (h.startCards && h.startCards.length > 0) {
-            html += `<div class="hh-card-group"><span class="hh-card-label">ハンド</span>${renderVisualCards(h.startCards)}</div>`;
-        }
-    }
-    // Community cards (always show if available)
-    if (h.communityCardObjs && h.communityCardObjs.length > 0) {
-        html += `<div class="hh-card-group"><span class="hh-card-label">ボード</span>${renderVisualCards(h.communityCardObjs)}</div>`;
-    }
-    html += `</div>`;
-
-    // Showdown: all players' cards
-    if (h.showdownPlayers && h.showdownPlayers.length > 0) {
-        html += `<div class="hh-showdown">`;
-        html += `<div class="hh-showdown-title">ショーダウン</div>`;
-        for (const p of h.showdownPlayers) {
-            const nameClass = p.isMe ? 'hh-sd-name hh-sd-me' : 'hh-sd-name';
-            html += `<div class="hh-sd-player">`;
-            html += `<span class="${nameClass}">${p.name}</span>`;
-            html += renderVisualCards(p.cards);
-            html += `</div>`;
-        }
-        html += `</div>`;
     }
 
-    // Rounds timeline
+    // === Rounds with actions ===
     html += `<div class="hh-rounds">`;
     for (const round of rounds) {
-        if (round.logs.length === 0) continue;
+        if (round.logs.length === 0 && round.cards.length === 0) continue;
         html += `<div class="hh-round">`;
-        html += `<div class="hh-round-name">${round.name}</div>`;
+        // Round header: name + pot info + community cards
+        html += `<div class="hh-round-header">`;
+        html += `<span class="hh-round-name">${round.name}</span>`;
+        if (round.cards.length > 0) {
+            html += `<span class="hh-round-cards">${renderMiniCards(round.cards)}</span>`;
+        }
+        html += `</div>`;
+        // Actions with position tags
         html += `<div class="hh-round-actions">`;
         for (const log of round.logs) {
             const actionClass = getActionClass(log);
-            html += `<div class="hh-action ${actionClass}">${log}</div>`;
+            // Try to extract player name for position tag
+            let posTag = '';
+            if (hr && hr.players) {
+                for (const p of hr.players) {
+                    if (log.startsWith(p.name)) {
+                        posTag = `<span class="hh-action-pos">${p.position}</span>`;
+                        break;
+                    }
+                }
+            }
+            html += `<div class="hh-action ${actionClass}">${posTag}${log}</div>`;
         }
         html += `</div></div>`;
     }
     html += `</div>`;
+
+    // === Result section ===
+    if (hr && hr.players) {
+        const winners = hr.players.filter(p => p.chips - p.startChips > 0);
+        if (winners.length > 0) {
+            html += `<div class="hh-result">`;
+            html += `<span class="hh-result-label">Result</span>`;
+            for (const w of winners) {
+                html += `<span class="hh-result-win">${w.name} won +${w.chips - w.startChips}</span>`;
+            }
+            html += `</div>`;
+        }
+    }
+
+    // === Fallback for old data without handResult ===
+    if (!hr) {
+        // Show old-style cards
+        html += `<div class="hh-detail-cards">`;
+        if (h.startCards && h.startCards.length > 0) {
+            html += `<div class="hh-card-group"><span class="hh-card-label">ハンド</span>${renderVisualCards(h.startCards)}</div>`;
+        }
+        if (h.communityCardObjs && h.communityCardObjs.length > 0) {
+            html += `<div class="hh-card-group"><span class="hh-card-label">ボード</span>${renderVisualCards(h.communityCardObjs)}</div>`;
+        }
+        if (h.showdownPlayers && h.showdownPlayers.length > 0) {
+            for (const p of h.showdownPlayers) {
+                const nameClass = p.isMe ? 'hh-sd-name hh-sd-me' : 'hh-sd-name';
+                html += `<div class="hh-card-group"><span class="${nameClass}">${p.name}</span>${renderVisualCards(p.cards)}</div>`;
+            }
+        }
+        html += `</div>`;
+    }
+
     return html;
 }
 

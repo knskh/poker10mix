@@ -637,8 +637,31 @@ function startGame(room) {
     game.onPlayerAction = (player, action, isBlinds) => room.stats.recordAction(player, action, isBlinds);
     game.onShowdown = (winnerIds) => room.stats.recordShowdown(winnerIds);
     game.onHandEnd = (hadShowdown) => {
+        // Broadcast hand result with all players' cards
+        const gc = game.gameConfig;
+        const activeCount = game.players.filter(p => p.name).length;
+        const handResult = {
+            type: 'hand_result',
+            gameName: gc.name, gameId: gc.id, gameType: gc.type,
+            communityCards: game.communityCards || [],
+            dealerSeat: game.dealerSeat,
+            players: game.players.map((p, i) => {
+                const pos = StatsTracker.getPosition(i, game.dealerSeat, activeCount);
+                const startC = room.stats.currentHand ? (room.stats.currentHand.startChips[i] || p.chips) : p.chips;
+                let cards = [];
+                if (gc.type === 'stud') cards = [...(p.downCards || []), ...(p.upCards || [])];
+                else cards = p.hand || [];
+                return {
+                    name: p.name, position: pos, folded: p.folded,
+                    chips: p.chips, startChips: startC,
+                    cards: cards.map(c => ({ rank: c.rank, suit: c.suit })),
+                    upCards: gc.type === 'stud' ? (p.upCards || []).map(c => ({ rank: c.rank, suit: c.suit })) : [],
+                    downCards: gc.type === 'stud' ? (p.downCards || []).map(c => ({ rank: c.rank, suit: c.suit })) : [],
+                };
+            }),
+        };
+        broadcastToRoom(room, handResult);
         room.stats.endHand(game.players, hadShowdown);
-        // Send stats to all clients after each hand for local storage
         broadcastStatsUpdate(room);
     };
 
@@ -843,6 +866,32 @@ function createZoomTable(members) {
     game.onPlayerAction = (player, action, isBlinds) => stats.recordAction(player, action, isBlinds);
     game.onShowdown = (winnerIds) => stats.recordShowdown(winnerIds);
     game.onHandEnd = (hadShowdown) => {
+        const gc = game.gameConfig;
+        const activeCount = game.players.filter(p => p.name).length;
+        const handResult = {
+            type: 'hand_result',
+            gameName: gc.name, gameId: gc.id, gameType: gc.type,
+            communityCards: game.communityCards || [],
+            dealerSeat: game.dealerSeat,
+            players: game.players.map((p, i) => {
+                const pos = StatsTracker.getPosition(i, game.dealerSeat, activeCount);
+                const startC = stats.currentHand ? (stats.currentHand.startChips[i] || p.chips) : p.chips;
+                let cards = [];
+                if (gc.type === 'stud') cards = [...(p.downCards || []), ...(p.upCards || [])];
+                else cards = p.hand || [];
+                return {
+                    name: p.name, position: pos, folded: p.folded,
+                    chips: p.chips, startChips: startC,
+                    cards: cards.map(c => ({ rank: c.rank, suit: c.suit })),
+                    upCards: gc.type === 'stud' ? (p.upCards || []).map(c => ({ rank: c.rank, suit: c.suit })) : [],
+                    downCards: gc.type === 'stud' ? (p.downCards || []).map(c => ({ rank: c.rank, suit: c.suit })) : [],
+                };
+            }),
+        };
+        for (const m of table.members) {
+            if (table.activeMemberIds.has(m.clientId))
+                send(m.ws, handResult);
+        }
         stats.endHand(game.players, hadShowdown);
         broadcastZoomStatsUpdate(table);
     };
