@@ -803,10 +803,9 @@ function renderStatsFromStorage() {
     const container = document.getElementById('stats-table-container');
     const saved = loadSavedStats();
 
-    // Search bar + reset
+    // Search bar
     let html = '<div class="stats-toolbar">';
     html += '<div class="stats-search-box"><input type="text" id="stats-search-input" placeholder="プレイヤー名で検索..." autocomplete="off"><button id="btn-stats-search" class="btn-small">検索</button></div>';
-    html += '<button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button>';
     html += '</div>';
 
     // Show my stats
@@ -829,7 +828,6 @@ function renderStatsSearchResult(playerName) {
     let html = '<div class="stats-toolbar">';
     html += '<div class="stats-search-box"><input type="text" id="stats-search-input" placeholder="プレイヤー名で検索..." autocomplete="off" value="' + playerName.replace(/"/g, '&quot;') + '"><button id="btn-stats-search" class="btn-small">検索</button></div>';
     html += '<button id="btn-stats-back-me" class="btn-small">自分に戻る</button>';
-    html += '<button id="btn-stats-clear" class="btn-small btn-danger" style="font-size:11px;">リセット</button>';
     html += '</div>';
 
     // Find matching players
@@ -866,15 +864,6 @@ function bindStatsEvents(container) {
         searchBtn.addEventListener('click', doSearch);
         searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
     }
-    const clearBtn = document.getElementById('btn-stats-clear');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (confirm('すべてのスタッツをリセットしますか？')) {
-                localStorage.removeItem(STATS_STORAGE_KEY);
-                renderStatsFromStorage();
-            }
-        });
-    }
 }
 
 // Ranking display
@@ -890,27 +879,26 @@ function renderRanking() {
 
     let html = '';
 
-    // Win Rate ranking (10000+ hands only)
-    html += '<h3 class="ranking-section-title">Win Rate ランキング（10,000ハンド以上）</h3>';
-    const wrEntries = entries.filter(([, c]) => c.hands >= 10000)
+    // Win Rate ranking (all players, top 50)
+    html += '<h3 class="ranking-section-title">Win Rate ランキング（上位50名）</h3>';
+    const wrEntries = entries
         .map(([name, c]) => ({ name, winRate: parseFloat(c.winRate) || 0, hands: c.hands }))
-        .sort((a, b) => b.winRate - a.winRate);
+        .sort((a, b) => b.winRate - a.winRate)
+        .slice(0, 50);
 
-    if (wrEntries.length === 0) {
-        html += '<p style="color:var(--text-dim);padding:8px 16px;">10,000ハンド以上のプレイヤーがいません</p>';
-    } else {
-        html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>Win Rate</th><th>ハンド数</th></tr></thead><tbody>';
-        wrEntries.forEach((e, i) => {
-            const isMe = e.name === client.name ? ' class="ranking-me"' : '';
-            html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.winRate}/100h</td><td>${e.hands.toLocaleString()}</td></tr>`;
-        });
-        html += '</tbody></table>';
-    }
+    html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>Win Rate</th><th>ハンド数</th></tr></thead><tbody>';
+    wrEntries.forEach((e, i) => {
+        const isMe = e.name === client.name ? ' class="ranking-me"' : '';
+        html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.winRate}/100h</td><td>${e.hands.toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table>';
 
-    // Hands played ranking (all players)
-    html += '<h3 class="ranking-section-title" style="margin-top:16px;">ハンド数ランキング</h3>';
-    const handEntries = entries.map(([name, c]) => ({ name, hands: c.hands, winRate: c.winRate }))
-        .sort((a, b) => b.hands - a.hands);
+    // Hands played ranking (all players, top 50)
+    html += '<h3 class="ranking-section-title" style="margin-top:16px;">ハンド数ランキング（上位50名）</h3>';
+    const handEntries = entries
+        .map(([name, c]) => ({ name, hands: c.hands, winRate: c.winRate }))
+        .sort((a, b) => b.hands - a.hands)
+        .slice(0, 50);
 
     html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>ハンド数</th><th>Win Rate</th></tr></thead><tbody>';
     handEntries.forEach((e, i) => {
