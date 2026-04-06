@@ -977,17 +977,18 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
         });
     }
 
-    if (presets.length === 0) return;
+    // Remove presets that exceed slider max (e.g. pot-limit cap)
+    const filtered = presets.filter(p => p.amount <= sliderMax && p.amount >= sliderMin);
+    if (filtered.length === 0) return;
 
-    for (const p of presets) {
+    for (const p of filtered) {
         const btn = document.createElement('button');
         btn.className = 'btn-preset';
         btn.textContent = p.label;
-        const clampedVal = Math.max(sliderMin, Math.min(p.amount, sliderMax));
         btn.addEventListener('click', () => {
             const slider = document.getElementById('bet-slider');
-            slider.value = clampedVal;
-            document.getElementById('bet-amount-display').textContent = clampedVal + sliderOffset;
+            slider.value = p.amount;
+            document.getElementById('bet-amount-display').textContent = p.amount + sliderOffset;
         });
         presetsDiv.appendChild(btn);
     }
