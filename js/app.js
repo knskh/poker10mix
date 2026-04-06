@@ -12,6 +12,7 @@ let handHistory = loadHandHistory(); // last 30 hands [{gameName, logs:[]}]
 let currentHandLogs = []; // logs for current hand
 let startingHandCards = []; // starting hand card objects captured at hand start
 let cardSnapshots = []; // track card changes per round for stud/draw
+let showdownPlayers = null; // opponent cards captured at showdown
 
 function loadHandHistory() {
     try {
@@ -453,6 +454,7 @@ function onHandStart() {
     currentHandLogs = [];
     startingHandCards = [];
     cardSnapshots = [];
+    showdownPlayers = null;
 }
 
 function onGameState(state) {
@@ -494,6 +496,28 @@ function onGameState(state) {
                 }
             }
         }
+    }
+    // Capture all players' cards at showdown
+    if (state.isShowdown && state.players) {
+        const players = [];
+        for (let i = 0; i < state.players.length; i++) {
+            const p = state.players[i];
+            if (!p || p.folded) continue;
+            let cards = [];
+            if (state.gameType === 'stud') {
+                cards = [...(p.downCards || []), ...(p.upCards || [])];
+            } else {
+                cards = p.hand || [];
+            }
+            if (cards.length > 0) {
+                players.push({
+                    name: p.name,
+                    isMe: i === state.mySeatIndex,
+                    cards: cards.map(c => ({ r: c.rank, s: c.suit })),
+                });
+            }
+        }
+        if (players.length > 0) showdownPlayers = players;
     }
     ui.renderFromServer(state);
 }
@@ -574,6 +598,7 @@ function saveCurrentHand() {
                 return copy;
             }) : [],
             gameType: currentState ? currentState.gameType : '',
+            showdownPlayers: showdownPlayers ? [...showdownPlayers] : null,
         });
         if (handHistory.length > 30) handHistory.shift();
         persistHandHistory();
@@ -708,11 +733,26 @@ function renderHandDetail(h, idx) {
         if (h.startCards && h.startCards.length > 0) {
             html += `<div class="hh-card-group"><span class="hh-card-label">ハンド</span>${renderVisualCards(h.startCards)}</div>`;
         }
-        if (h.communityCardObjs && h.communityCardObjs.length > 0) {
-            html += `<div class="hh-card-group"><span class="hh-card-label">ボード</span>${renderVisualCards(h.communityCardObjs)}</div>`;
-        }
+    }
+    // Community cards (always show if available)
+    if (h.communityCardObjs && h.communityCardObjs.length > 0) {
+        html += `<div class="hh-card-group"><span class="hh-card-label">ボード</span>${renderVisualCards(h.communityCardObjs)}</div>`;
     }
     html += `</div>`;
+
+    // Showdown: all players' cards
+    if (h.showdownPlayers && h.showdownPlayers.length > 0) {
+        html += `<div class="hh-showdown">`;
+        html += `<div class="hh-showdown-title">ショーダウン</div>`;
+        for (const p of h.showdownPlayers) {
+            const nameClass = p.isMe ? 'hh-sd-name hh-sd-me' : 'hh-sd-name';
+            html += `<div class="hh-sd-player">`;
+            html += `<span class="${nameClass}">${p.name}</span>`;
+            html += renderVisualCards(p.cards);
+            html += `</div>`;
+        }
+        html += `</div>`;
+    }
 
     // Rounds timeline
     html += `<div class="hh-rounds">`;
