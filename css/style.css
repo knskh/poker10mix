@@ -678,6 +678,13 @@ body {
 }
 
 /* Zoom sit-out overlay */
+.zoom-sitout-overlay {
+    position: fixed; inset: 0;
+    background: rgba(13, 19, 24, 0.95);
+    display: flex; align-items: flex-start; justify-content: center;
+    z-index: 200; overflow-y: auto;
+    animation: zoomFadeIn 0.3s ease;
+}
 #zoom-sitout-overlay {
     position: absolute; inset: 0;
     background: rgba(13, 19, 24, 0.95);

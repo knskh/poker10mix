@@ -134,13 +134,16 @@
         </div>
 
         <!-- Hand History Modal -->
-        <div id="history-modal" class="hidden">
-            <div class="stats-modal-inner">
-                <div class="stats-header">
-                    <h2>ハンド履歴（直近30ハンド）</h2>
-                    <button id="btn-history-close" class="btn-small">閉じる</button>
+        <div id="history-modal" class="zoom-sitout-overlay hidden">
+            <div class="zoom-sitout-inner">
+                <h2>ハンド履歴</h2>
+                <div class="zoom-sitout-buttons" style="margin-bottom:12px;">
+                    <button id="btn-history-close" class="btn-small btn-danger">閉じる</button>
                 </div>
-                <div id="lobby-hand-history" class="hand-history-list"></div>
+                <div class="hand-history-section">
+                    <h3>直近30ハンド</h3>
+                    <div id="lobby-hand-history" class="hand-history-list"></div>
+                </div>
             </div>
         </div>
 
