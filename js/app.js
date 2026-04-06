@@ -227,11 +227,7 @@ function setupLobbyScreen() {
     });
     document.getElementById('btn-refresh-rooms').addEventListener('click', () => client.getRooms());
 
-    // Ranking button
-    document.getElementById('btn-lobby-ranking').addEventListener('click', () => {
-        renderRanking();
-        document.getElementById('ranking-modal').classList.remove('hidden');
-    });
+    // Ranking close button
     document.getElementById('btn-ranking-close').addEventListener('click', () => {
         document.getElementById('ranking-modal').classList.add('hidden');
     });
@@ -410,6 +406,10 @@ function setupGameScreen() {
     });
     document.getElementById('btn-zoom-lobby').addEventListener('click', () => {
         client.leaveZoom();
+    });
+    document.getElementById('btn-zoom-ranking').addEventListener('click', () => {
+        renderRanking();
+        document.getElementById('ranking-modal').classList.remove('hidden');
     });
 
     // Zoom waiting overlay - lobby button
@@ -954,6 +954,7 @@ function onGameOver(data) {
 // Stats Modal & localStorage Persistence
 // ==========================================
 const STATS_STORAGE_KEY = 'poker10mix_stats';
+const ZOOM_STATS_KEY = 'poker10mix_zoom_stats';
 
 function loadSavedStats() {
     try {
@@ -964,6 +965,12 @@ function loadSavedStats() {
 
 function saveSavedStats(stats) {
     try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats)); } catch (e) {}
+}
+function loadZoomStats() {
+    try { const r = localStorage.getItem(ZOOM_STATS_KEY); return r ? JSON.parse(r) : {}; } catch (e) { return {}; }
+}
+function saveZoomStats(stats) {
+    try { localStorage.setItem(ZOOM_STATS_KEY, JSON.stringify(stats)); } catch (e) {}
 }
 
 // Stats history for graphs
@@ -1016,6 +1023,14 @@ function onStatsUpdate(data) {
     }
     saveSavedStats(saved);
     saveStatsHistory(history);
+    // Save zoom-only stats for ranking
+    if (isZoom) {
+        const zoomSaved = loadZoomStats();
+        for (const [name, calc] of Object.entries(data.stats)) {
+            zoomSaved[name] = calc;
+        }
+        saveZoomStats(zoomSaved);
+    }
 }
 
 function setupStatsModal() {
@@ -1115,7 +1130,7 @@ function bindStatsEvents(container) {
 // Ranking display
 function renderRanking() {
     const container = document.getElementById('ranking-container');
-    const saved = loadSavedStats();
+    const saved = loadZoomStats();
     const entries = Object.entries(saved).filter(([, c]) => c.hands > 0);
 
     if (entries.length === 0) {

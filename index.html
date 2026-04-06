@@ -49,7 +49,6 @@
                 <div class="lobby-user">
                     <span id="lobby-username"></span>
                     <button id="btn-lobby-stats" class="btn-small">Stats</button>
-                    <button id="btn-lobby-ranking" class="btn-small">ランキング</button>
                     <button id="btn-lobby-history" class="btn-small">ハンド履歴</button>
                     <button id="btn-logout">ログアウト</button>
                 </div>
@@ -122,16 +121,7 @@
             </div>
         </div>
 
-        <!-- Ranking Modal -->
-        <div id="ranking-modal" class="zoom-sitout-overlay hidden">
-            <div class="zoom-sitout-inner">
-                <h2>ランキング</h2>
-                <div class="zoom-sitout-buttons" style="margin-bottom:12px;">
-                    <button id="btn-ranking-close" class="btn-small btn-danger">閉じる</button>
-                </div>
-                <div id="ranking-container"></div>
-            </div>
-        </div>
+        <!-- Ranking Modal (removed from lobby, now in game screen) -->
 
         <!-- Hand History Modal -->
         <div id="history-modal" class="zoom-sitout-overlay hidden">
@@ -213,12 +203,24 @@
                     <h2>離席中</h2>
                     <div class="zoom-sitout-buttons">
                         <button id="btn-zoom-rejoin" class="btn-primary">テーブルに復帰</button>
+                        <button id="btn-zoom-ranking" class="btn-small">ランキング</button>
                         <button id="btn-zoom-lobby" class="btn-small btn-danger">ロビーに戻る</button>
                     </div>
                     <div class="hand-history-section">
                         <h3>ハンド履歴（直近30ハンド）</h3>
                         <div id="zoom-hand-history" class="hand-history-list"></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Ranking Modal (ZOOM only) -->
+            <div id="ranking-modal" class="zoom-sitout-overlay hidden" style="z-index:210;">
+                <div class="zoom-sitout-inner">
+                    <h2>ランキング（ZOOM卓）</h2>
+                    <div class="zoom-sitout-buttons" style="margin-bottom:12px;">
+                        <button id="btn-ranking-close" class="btn-small btn-danger">閉じる</button>
+                    </div>
+                    <div id="ranking-container"></div>
                 </div>
             </div>
 
