@@ -269,7 +269,28 @@ function broadcastStatsUpdate(room) {
                 byPos[pos] = { ...posTotal, byGame: posByGame };
             }
         }
-        playerStats[room.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
+        // Include raw stats for accumulation on client
+        const rawByGame = {};
+        for (const [gid, raw] of Object.entries(pd.byGame)) {
+            rawByGame[gid] = { ...raw };
+        }
+        const rawByPos = {};
+        if (pd.byPosition) {
+            for (const [pos, posData] of Object.entries(pd.byPosition)) {
+                const posTotal = posData.total ? { ...posData.total } : { ...posData };
+                const posByGame = {};
+                if (posData.byGame) {
+                    for (const [gid2, raw2] of Object.entries(posData.byGame)) {
+                        posByGame[gid2] = { ...raw2 };
+                    }
+                }
+                rawByPos[pos] = { total: posTotal, byGame: posByGame };
+            }
+        }
+        playerStats[room.game.players[i].name] = {
+            ...calc, byGame, byPosition: byPos,
+            raw: { ...pd.total }, rawByGame, rawByPos,
+        };
     }
     const gc = room.game.gameConfig;
     broadcastToRoom(room, {
@@ -1015,7 +1036,27 @@ function broadcastZoomStatsUpdate(table) {
                 byPos[pos] = { ...posTotal, byGame: posByGame };
             }
         }
-        playerStats[table.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
+        const rawByGame = {};
+        for (const [gid, raw] of Object.entries(pd.byGame)) {
+            rawByGame[gid] = { ...raw };
+        }
+        const rawByPos = {};
+        if (pd.byPosition) {
+            for (const [pos, posData] of Object.entries(pd.byPosition)) {
+                const posTotal = posData.total ? { ...posData.total } : { ...posData };
+                const posByGame = {};
+                if (posData.byGame) {
+                    for (const [gid2, raw2] of Object.entries(posData.byGame)) {
+                        posByGame[gid2] = { ...raw2 };
+                    }
+                }
+                rawByPos[pos] = { total: posTotal, byGame: posByGame };
+            }
+        }
+        playerStats[table.game.players[i].name] = {
+            ...calc, byGame, byPosition: byPos,
+            raw: { ...pd.total }, rawByGame, rawByPos,
+        };
     }
     const gc = table.game.gameConfig;
     for (const m of table.members) {

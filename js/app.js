@@ -1053,14 +1053,12 @@ function onGameOver(data) {
 // ==========================================
 const STATS_STORAGE_KEY = 'poker10mix_stats';
 const ZOOM_STATS_KEY = 'poker10mix_zoom_stats';
+const RAW_STATS_KEY = 'poker10mix_raw_stats';
+const RAW_ZOOM_STATS_KEY = 'poker10mix_raw_zoom_stats';
 
 function loadSavedStats() {
-    try {
-        const raw = localStorage.getItem(STATS_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : {};
-    } catch (e) { return {}; }
+    try { const r = localStorage.getItem(STATS_STORAGE_KEY); return r ? JSON.parse(r) : {}; } catch (e) { return {}; }
 }
-
 function saveSavedStats(stats) {
     try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats)); } catch (e) {}
 }
@@ -1069,6 +1067,65 @@ function loadZoomStats() {
 }
 function saveZoomStats(stats) {
     try { localStorage.setItem(ZOOM_STATS_KEY, JSON.stringify(stats)); } catch (e) {}
+}
+function loadRawStats() {
+    try { const r = localStorage.getItem(RAW_STATS_KEY); return r ? JSON.parse(r) : {}; } catch (e) { return {}; }
+}
+function saveRawStats(stats) {
+    try { localStorage.setItem(RAW_STATS_KEY, JSON.stringify(stats)); } catch (e) {}
+}
+function loadRawZoomStats() {
+    try { const r = localStorage.getItem(RAW_ZOOM_STATS_KEY); return r ? JSON.parse(r) : {}; } catch (e) { return {}; }
+}
+function saveRawZoomStats(stats) {
+    try { localStorage.setItem(RAW_ZOOM_STATS_KEY, JSON.stringify(stats)); } catch (e) {}
+}
+
+function emptyRawStats() {
+    return {
+        handsPlayed: 0, handsWon: 0,
+        vpipCount: 0, pfrCount: 0,
+        threeBetCount: 0, threeBetOpp: 0,
+        fourBetCount: 0, fourBetOpp: 0,
+        foldTo3Bet: 0, foldTo3BetOpp: 0,
+        allInCount: 0,
+        postflopBets: 0, postflopRaises: 0,
+        postflopCalls: 0, postflopChecks: 0, postflopFolds: 0,
+        sawPostflop: 0, wentToShowdown: 0, wonAtShowdown: 0,
+        totalChipsWon: 0, totalChipsLost: 0,
+        showdownWinnings: 0, nonShowdownWinnings: 0,
+    };
+}
+
+function mergeRawStats(target, source) {
+    for (const key of Object.keys(target)) {
+        if (typeof target[key] === 'number' && typeof source[key] === 'number') {
+            target[key] += source[key];
+        }
+    }
+}
+
+function calcFromRaw(s) {
+    const pct = (n, d) => d > 0 ? (n / d * 100).toFixed(1) : '-';
+    const ratio = (n, d) => d > 0 ? (n / d).toFixed(2) : '-';
+    return {
+        hands: s.handsPlayed,
+        vpip: pct(s.vpipCount, s.handsPlayed),
+        pfr: pct(s.pfrCount, s.handsPlayed),
+        threeBet: pct(s.threeBetCount, s.threeBetOpp),
+        fourBet: pct(s.fourBetCount, s.fourBetOpp),
+        foldTo3Bet: pct(s.foldTo3Bet, s.foldTo3BetOpp),
+        allIn: pct(s.allInCount, s.handsPlayed),
+        postflopAgg: pct(s.postflopBets + s.postflopRaises,
+            s.postflopBets + s.postflopRaises + s.postflopCalls + s.postflopChecks),
+        af: ratio(s.postflopBets + s.postflopRaises, s.postflopCalls),
+        wtsd: pct(s.wentToShowdown, s.sawPostflop),
+        wsd: pct(s.wonAtShowdown, s.wentToShowdown),
+        winRate: s.handsPlayed > 0 ?
+            ((s.totalChipsWon - s.totalChipsLost) / s.handsPlayed * 100).toFixed(1) : '-',
+        showdownWin: s.showdownWinnings,
+        nonShowdownWin: s.nonShowdownWinnings,
+    };
 }
 
 // Stats history for graphs
@@ -1080,17 +1137,95 @@ function saveStatsHistory(h) {
     try { localStorage.setItem(STATS_HISTORY_KEY, JSON.stringify(h)); } catch (e) {}
 }
 
+// Track last session raw to compute delta
+let lastSessionRaw = {};
+
 // Called when server sends stats_update after each hand (keyed by player name)
 function onStatsUpdate(data) {
     if (!data.stats) return;
-    const saved = loadSavedStats();
+    const rawAll = loadRawStats();
     const history = loadStatsHistory();
     const gameId = data.gameId || '';
     const isZoom = !!data.zoom;
     const roomId = data.roomId || '';
-    for (const [name, calc] of Object.entries(data.stats)) {
-        saved[name] = calc;
-        // Build snapshot
+
+    for (const [name, serverData] of Object.entries(data.stats)) {
+        if (serverData.raw) {
+            if (!rawAll[name]) rawAll[name] = { total: emptyRawStats(), byGame: {}, byPosition: {} };
+            const p = rawAll[name];
+            // Compute delta from last session snapshot
+            if (!lastSessionRaw[name]) lastSessionRaw[name] = { total: emptyRawStats(), byGame: {}, byPosition: {} };
+            const prev = lastSessionRaw[name];
+
+            // Delta total
+            const deltaTotal = emptyRawStats();
+            for (const key of Object.keys(deltaTotal)) {
+                deltaTotal[key] = (serverData.raw[key] || 0) - (prev.total[key] || 0);
+            }
+            mergeRawStats(p.total, deltaTotal);
+            prev.total = { ...serverData.raw };
+
+            // Delta byGame
+            if (serverData.rawByGame) {
+                for (const [gid, gRaw] of Object.entries(serverData.rawByGame)) {
+                    if (!p.byGame[gid]) p.byGame[gid] = emptyRawStats();
+                    if (!prev.byGame[gid]) prev.byGame[gid] = emptyRawStats();
+                    const dg = emptyRawStats();
+                    for (const key of Object.keys(dg)) dg[key] = (gRaw[key] || 0) - (prev.byGame[gid][key] || 0);
+                    mergeRawStats(p.byGame[gid], dg);
+                    prev.byGame[gid] = { ...gRaw };
+                }
+            }
+            // Delta byPosition
+            if (serverData.rawByPos) {
+                for (const [pos, posRaw] of Object.entries(serverData.rawByPos)) {
+                    if (!p.byPosition[pos]) p.byPosition[pos] = { total: emptyRawStats(), byGame: {} };
+                    if (!prev.byPosition[pos]) prev.byPosition[pos] = { total: emptyRawStats(), byGame: {} };
+                    if (posRaw.total) {
+                        const dp = emptyRawStats();
+                        for (const key of Object.keys(dp)) dp[key] = (posRaw.total[key] || 0) - (prev.byPosition[pos].total[key] || 0);
+                        mergeRawStats(p.byPosition[pos].total, dp);
+                        prev.byPosition[pos].total = { ...posRaw.total };
+                    }
+                    if (posRaw.byGame) {
+                        for (const [gid, gRaw] of Object.entries(posRaw.byGame)) {
+                            if (!p.byPosition[pos].byGame[gid]) p.byPosition[pos].byGame[gid] = emptyRawStats();
+                            if (!prev.byPosition[pos].byGame[gid]) prev.byPosition[pos].byGame[gid] = emptyRawStats();
+                            const dpg = emptyRawStats();
+                            for (const key of Object.keys(dpg)) dpg[key] = (gRaw[key] || 0) - (prev.byPosition[pos].byGame[gid][key] || 0);
+                            mergeRawStats(p.byPosition[pos].byGame[gid], dpg);
+                            prev.byPosition[pos].byGame[gid] = { ...gRaw };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    saveRawStats(rawAll);
+
+    // Recalculate display stats from accumulated raw
+    const saved = {};
+    for (const [name, p] of Object.entries(rawAll)) {
+        const calc = calcFromRaw(p.total);
+        const byGame = {};
+        for (const [gid, gRaw] of Object.entries(p.byGame)) {
+            byGame[gid] = calcFromRaw(gRaw);
+        }
+        const byPos = {};
+        for (const [pos, posData] of Object.entries(p.byPosition)) {
+            const posCalc = calcFromRaw(posData.total);
+            const posByGame = {};
+            for (const [gid, gRaw] of Object.entries(posData.byGame)) {
+                posByGame[gid] = calcFromRaw(gRaw);
+            }
+            byPos[pos] = { ...posCalc, byGame: posByGame };
+        }
+        saved[name] = { ...calc, byGame, byPosition: byPos };
+    }
+    saveSavedStats(saved);
+
+    // Graph history snapshots
+    for (const [name, calc] of Object.entries(saved)) {
         const hands = parseInt(calc.hands) || 0;
         const snap = {
             h: hands,
@@ -1112,7 +1247,6 @@ function onStatsUpdate(data) {
             zm: isZoom ? 1 : 0,
             rid: roomId,
         };
-        // Append to total history
         if (!history[name]) history[name] = [];
         const arr = history[name];
         if (arr.length === 0 || hands > (arr[arr.length - 1].h || 0)) {
@@ -1120,13 +1254,39 @@ function onStatsUpdate(data) {
             if (arr.length > 5000) arr.splice(0, arr.length - 5000);
         }
     }
-    saveSavedStats(saved);
     saveStatsHistory(history);
-    // Save zoom-only stats for ranking
+
+    // Zoom-only stats for ranking
     if (isZoom) {
-        const zoomSaved = loadZoomStats();
-        for (const [name, calc] of Object.entries(data.stats)) {
-            zoomSaved[name] = calc;
+        const rawZoom = loadRawZoomStats();
+        for (const [name, serverData] of Object.entries(data.stats)) {
+            if (serverData.raw) {
+                if (!rawZoom[name]) rawZoom[name] = emptyRawStats();
+                if (!lastSessionRaw[name]) lastSessionRaw[name] = { total: emptyRawStats(), byGame: {}, byPosition: {} };
+                // Use same delta approach - zoom delta = session raw - prev session raw (already calculated above, so just use the session raw delta)
+                const prev = lastSessionRaw[name];
+                // prev.total was already updated above, so use raw directly minus what it was before this update
+                // Actually we can just rebuild from rawAll for zoom portion
+                // Simpler: track zoom raw separately with delta
+            }
+        }
+        // Rebuild zoom stats from rawAll filtered (not possible without tagging)
+        // Alternative: just accumulate zoom raw with delta like total
+        for (const [name, serverData] of Object.entries(data.stats)) {
+            if (serverData.raw) {
+                if (!rawZoom[name]) rawZoom[name] = emptyRawStats();
+                const zKey = '_zm_' + name;
+                if (!lastSessionRaw[zKey]) lastSessionRaw[zKey] = emptyRawStats();
+                const dz = emptyRawStats();
+                for (const key of Object.keys(dz)) dz[key] = (serverData.raw[key] || 0) - (lastSessionRaw[zKey][key] || 0);
+                mergeRawStats(rawZoom[name], dz);
+                lastSessionRaw[zKey] = { ...serverData.raw };
+            }
+        }
+        saveRawZoomStats(rawZoom);
+        const zoomSaved = {};
+        for (const [name, raw] of Object.entries(rawZoom)) {
+            zoomSaved[name] = calcFromRaw(raw);
         }
         saveZoomStats(zoomSaved);
     }
