@@ -155,7 +155,7 @@ body {
     border-bottom: 1px solid #333;
 }
 .lobby-header h1 { font-size: 22px; color: var(--red); font-weight: 900; }
-.lobby-user { display: flex; align-items: center; gap: 8px; }
+.lobby-user { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .lobby-user span { color: var(--accent); font-weight: bold; font-size: 14px; }
 
 .lobby-body { flex: 1; padding: 24px; overflow-y: auto; }
@@ -678,6 +678,10 @@ body {
 .zoom-waiting-hint {
     font-size: 13px; color: var(--text-dim);
 }
+.zoom-waiting-buttons {
+    display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap;
+}
+.zoom-waiting-buttons .btn-small { font-size: 12px; padding: 8px 14px; }
 
 /* Zoom sit-out overlay */
 .zoom-sitout-overlay {
@@ -691,11 +695,11 @@ body {
     position: absolute; inset: 0;
     background: rgba(13, 19, 24, 0.95);
     display: flex; align-items: flex-start; justify-content: center;
-    z-index: 50; overflow-y: auto;
+    z-index: 50; overflow-y: auto; padding: 8px;
     animation: zoomFadeIn 0.3s ease;
 }
 .zoom-sitout-inner {
-    padding: 30px 20px; width: 100%; max-width: 500px;
+    padding: 30px 20px; width: 100%; max-width: 500px; box-sizing: border-box;
 }
 .zoom-sitout-inner h2 {
     text-align: center; color: var(--gold); margin-bottom: 16px; font-size: 22px;
@@ -931,15 +935,23 @@ body {
     #rules-content { font-size: 13px; line-height: 1.5; }
 
     /* Zoom overlays */
-    .zoom-waiting-inner { padding: 24px 16px; }
+    .zoom-waiting-inner { padding: 24px 12px; }
     .zoom-waiting-icon { width: 60px; height: 60px; font-size: 28px; }
     .zoom-waiting-inner p { font-size: 16px; }
-    .zoom-waiting-hint { font-size: 12px; }
-    .zoom-sitout-inner { padding: 20px 12px; }
-    .zoom-sitout-inner h2 { font-size: 18px; }
-    .zoom-sitout-buttons { flex-direction: column; align-items: center; }
-    .zoom-sitout-buttons .btn-primary { width: 100%; max-width: 280px; }
-    .zoom-sitout-buttons .btn-danger { width: 100%; max-width: 280px; }
+    .zoom-waiting-hint { font-size: 11px; }
+    .zoom-waiting-buttons .btn-small { font-size: 11px; padding: 6px 12px; }
+    .zoom-sitout-inner { padding: 16px 10px; width: 100%; max-width: none; }
+    .zoom-sitout-inner h2 { font-size: 16px; }
+    .zoom-sitout-buttons { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+    .zoom-sitout-buttons .btn-primary { padding: 8px 16px; font-size: 13px; }
+    .zoom-sitout-buttons .btn-small { padding: 6px 12px; font-size: 11px; }
+    .zoom-sitout-buttons .btn-danger { padding: 6px 12px; font-size: 11px; }
+    .zoom-sitout-overlay { padding: 8px; }
+    .ranking-table { font-size: 11px; }
+    .ranking-table th, .ranking-table td { padding: 4px 6px; }
+    .ranking-section-title { font-size: 13px; }
+    .graph-filters select { font-size: 10px; padding: 3px 4px; }
+    .graph-filters { gap: 4px; }
 
     /* Hand history */
     .hand-history-list { max-height: 300px; }

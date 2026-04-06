@@ -412,9 +412,13 @@ function setupGameScreen() {
         document.getElementById('ranking-modal').classList.remove('hidden');
     });
 
-    // Zoom waiting overlay - lobby button
+    // Zoom waiting overlay buttons
     document.getElementById('btn-zoom-waiting-lobby').addEventListener('click', () => {
         client.leaveZoom();
+    });
+    document.getElementById('btn-zoom-waiting-ranking').addEventListener('click', () => {
+        renderRanking();
+        document.getElementById('ranking-modal').classList.remove('hidden');
     });
 }
 
