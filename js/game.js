@@ -639,21 +639,30 @@ class GameState {
                     }
                 }
 
-                let action;
-                this.currentPlayerIndex = idx;
-                this.update();
-                action = await this.onGetPlayerAction(actions, player);
+                // Heads-up preflop: auto-check for BB when no raise (skip silently)
+                const headsUp = this.players.filter(p => !p.folded && p.chips > 0).length === 2;
+                if (isPreflop && headsUp && gc.type !== 'stud'
+                    && idx === this.getBigBlindSeat() && callAmount <= 0
+                    && !actions.some(a => a.type === 'call' || a.type === 'fold')) {
+                    needsToAct.delete(player.id);
+                    player.lastAction = 'check';
+                } else {
+                    let action;
+                    this.currentPlayerIndex = idx;
+                    this.update();
+                    action = await this.onGetPlayerAction(actions, player);
 
-                // Execute action
-                this.executeAction(player, action);
-                needsToAct.delete(player.id);
+                    // Execute action
+                    this.executeAction(player, action);
+                    needsToAct.delete(player.id);
 
-                // If someone raises/bets, everyone else needs to act again
-                if (action.type === 'raise' || action.type === 'bet' || action.type === 'allin') {
-                    raiseCount++;
-                    for (const p of this.players) {
-                        if (p.id !== player.id && !p.folded && !p.allIn && p.chips > 0) {
-                            needsToAct.add(p.id);
+                    // If someone raises/bets, everyone else needs to act again
+                    if (action.type === 'raise' || action.type === 'bet' || action.type === 'allin') {
+                        raiseCount++;
+                        for (const p of this.players) {
+                            if (p.id !== player.id && !p.folded && !p.allIn && p.chips > 0) {
+                                needsToAct.add(p.id);
+                            }
                         }
                     }
                 }
