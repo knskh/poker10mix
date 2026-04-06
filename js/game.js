@@ -266,11 +266,8 @@ class GameState {
         }
         this.update();
 
-        // Preflop betting (heads-up: BB first, SB/BTN last)
-        const activeCount = this.players.filter(p => !p.folded && p.chips > 0).length;
-        const preflopStart = activeCount === 2
-            ? this.getBigBlindSeat()
-            : this.getNextActivePlayer(this.getBigBlindSeat());
+        // Preflop betting (heads-up: SB/BTN first, BB last)
+        const preflopStart = this.getNextActivePlayer(this.getBigBlindSeat());
         if (await this.bettingRound(preflopStart, true)) return;
 
         if (this.onFirstRoundEnd) this.onFirstRoundEnd();
@@ -460,11 +457,8 @@ class GameState {
         }
         this.update();
 
-        // Pre-draw betting (heads-up: BB first, SB/BTN last)
-        const drawActiveCount = this.players.filter(p => !p.folded && p.chips > 0).length;
-        const firstActor = drawActiveCount === 2
-            ? this.getBigBlindSeat()
-            : this.getNextActivePlayer(this.getBigBlindSeat());
+        // Pre-draw betting (heads-up: SB/BTN first, BB last)
+        const firstActor = this.getNextActivePlayer(this.getBigBlindSeat());
         if (await this.bettingRound(firstActor, true, gc.smallBet)) return;
 
         if (this.onFirstRoundEnd) this.onFirstRoundEnd();
