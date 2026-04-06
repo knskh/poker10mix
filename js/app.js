@@ -718,12 +718,13 @@ function renderHandDetail(h, idx) {
             const isMe = p.name === myName;
             const nameClass = isMe ? 'hh-p-name hh-p-me' : 'hh-p-name';
             let cards = '';
-            if (p.folded) {
-                cards = '<span class="hh-folded-label">fold</span>';
-            } else if (hr.gameType === 'stud' && p.downCards && p.downCards.length > 0) {
-                cards = `<span class="hh-stud-down">[${renderMiniCards(p.downCards)}]</span> ${renderMiniCards(p.upCards)}`;
+            const foldTag = p.folded ? '<span class="hh-folded-label">fold</span> ' : '';
+            if (hr.gameType === 'stud' && p.downCards && p.downCards.length > 0) {
+                cards = `${foldTag}<span class="hh-stud-down">[${renderMiniCards(p.downCards)}]</span> ${renderMiniCards(p.upCards)}`;
             } else if (p.cards && p.cards.length > 0) {
-                cards = renderMiniCards(p.cards);
+                cards = foldTag + renderMiniCards(p.cards);
+            } else {
+                cards = foldTag || '';
             }
             html += `<div class="hh-p-row${isMe ? ' hh-p-row-me' : ''}">`;
             html += `<span class="hh-p-pos">${p.position}</span>`;
