@@ -806,7 +806,13 @@ body {
 .hh-round-cards { display: flex; gap: 2px; }
 .hh-round-actions { display: flex; flex-direction: column; gap: 1px; padding-left: 4px; }
 .hh-draw-cards { font-size: 11px; color: var(--text-dim); padding: 2px 4px; display: flex; align-items: center; gap: 4px; }
-.hh-draw-label { font-size: 10px; color: #999; min-width: 50px; }
+.hh-draw-section { font-size: 11px; padding: 2px 4px; margin: 2px 0; }
+.hh-draw-section > .hh-draw-label { display: block; margin-bottom: 2px; }
+.hh-draw-player { display: flex; align-items: center; gap: 4px; padding: 1px 0 1px 8px; }
+.hh-draw-me { background: rgba(255,215,0,0.08); border-radius: 3px; }
+.hh-draw-pname { font-size: 10px; color: #aaa; min-width: 50px; }
+.hh-draw-label { font-size: 10px; color: #999; font-weight: bold; }
+.hh-stud-down { opacity: 0.6; }
 .hh-action { font-size: 12px; color: var(--text); padding: 2px 0; line-height: 1.5; display: flex; align-items: center; gap: 6px; }
 .hh-action-pos {
     font-size: 9px; font-weight: bold; color: var(--text-dim); background: #333;

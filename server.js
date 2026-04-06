@@ -666,6 +666,9 @@ function startGame(room) {
             gameName: gc.name, gameId: gc.id, gameType: gc.type,
             communityCards: game.communityCards || [],
             dealerSeat: game.dealerSeat,
+            drawSnapshots: gc.type === 'draw' ? (game.drawSnapshots || []).map(snap =>
+                snap.map(s => ({ name: s.name, folded: s.folded, hand: s.hand }))
+            ) : [],
             players: game.players.map((p, i) => {
                 const pos = StatsTracker.getPosition(i, game.dealerSeat, activeCount);
                 const startC = room.stats.currentHand ? (room.stats.currentHand.startChips[i] || p.chips) : p.chips;
@@ -900,6 +903,9 @@ function createZoomTable(members) {
             gameName: gc.name, gameId: gc.id, gameType: gc.type,
             communityCards: game.communityCards || [],
             dealerSeat: game.dealerSeat,
+            drawSnapshots: gc.type === 'draw' ? (game.drawSnapshots || []).map(snap =>
+                snap.map(s => ({ name: s.name, folded: s.folded, hand: s.hand }))
+            ) : [],
             players: game.players.map((p, i) => {
                 const pos = StatsTracker.getPosition(i, game.dealerSeat, activeCount);
                 const startC = stats.currentHand ? (stats.currentHand.startChips[i] || p.chips) : p.chips;

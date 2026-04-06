@@ -621,6 +621,11 @@ function saveCurrentHand() {
                 gameType: lastHandResult.gameType,
                 communityCards: (lastHandResult.communityCards || []).map(c => ({ r: c.rank, s: c.suit })),
                 dealerSeat: lastHandResult.dealerSeat,
+                drawSnapshots: (lastHandResult.drawSnapshots || []).map(snap =>
+                    snap.map(s => ({ name: s.name, folded: s.folded,
+                        hand: (s.hand || []).map(c => ({ r: c.rank, s: c.suit })),
+                    }))
+                ),
                 players: lastHandResult.players.map(p => ({
                     name: p.name, position: p.position, folded: p.folded,
                     chips: p.chips, startChips: p.startChips,
@@ -712,8 +717,14 @@ function renderHandDetail(h, idx) {
                             `<span class="hh-even">±0</span>`;
             const isMe = p.name === myName;
             const nameClass = isMe ? 'hh-p-name hh-p-me' : 'hh-p-name';
-            const cards = p.cards && p.cards.length > 0 && !p.folded ? renderMiniCards(p.cards) :
-                          p.folded ? '<span class="hh-folded-label">fold</span>' : '';
+            let cards = '';
+            if (p.folded) {
+                cards = '<span class="hh-folded-label">fold</span>';
+            } else if (hr.gameType === 'stud' && p.downCards && p.downCards.length > 0) {
+                cards = `<span class="hh-stud-down">[${renderMiniCards(p.downCards)}]</span> ${renderMiniCards(p.upCards)}`;
+            } else if (p.cards && p.cards.length > 0) {
+                cards = renderMiniCards(p.cards);
+            }
             html += `<div class="hh-p-row${isMe ? ' hh-p-row-me' : ''}">`;
             html += `<span class="hh-p-pos">${p.position}</span>`;
             html += `<span class="${nameClass}">${p.name}</span>`;
@@ -756,29 +767,58 @@ function renderHandDetail(h, idx) {
         if (riverRound && cc.length >= 5) riverRound.cards = [cc[4]];
     }
 
-    // Assign draw snapshots to draw rounds (pre-draw + post-draw)
-    const snaps = h.cardSnapshots || [];
-    if (snaps.length > 0 && snaps[0].type === 'draw') {
-        // Preflop round gets initial hand
+    // Assign draw snapshots to draw rounds (all players, pre-draw + post-draw)
+    const drawSnaps = (hr && hr.drawSnapshots) || [];
+    const mySnaps = h.cardSnapshots || [];
+    if (drawSnaps.length > 0) {
+        // Use server-side snapshots (all players)
         const preflopRound = rounds.find(r => r.name === 'Preflop');
-        if (preflopRound && snaps[0]) preflopRound.drawHand = snaps[0].hand;
+        if (preflopRound && drawSnaps[0]) preflopRound.drawAllPlayers = drawSnaps[0];
 
         let drawIdx = 0;
         for (const round of rounds) {
             if (round.name.startsWith('Draw')) {
-                // Pre-draw = snapshot before this draw, Post-draw = snapshot after
-                if (snaps[drawIdx]) round.preDraw = snaps[drawIdx].hand;
+                if (drawSnaps[drawIdx]) round.preDrawAll = drawSnaps[drawIdx];
                 drawIdx++;
-                if (snaps[drawIdx]) round.postDraw = snaps[drawIdx].hand;
+                if (drawSnaps[drawIdx]) round.postDrawAll = drawSnaps[drawIdx];
             }
         }
+    } else if (mySnaps.length > 0 && mySnaps[0].type === 'draw') {
+        // Fallback: client-side snapshots (my cards only)
+        const preflopRound = rounds.find(r => r.name === 'Preflop');
+        if (preflopRound && mySnaps[0]) preflopRound.drawHand = mySnaps[0].hand;
+
+        let drawIdx = 0;
+        for (const round of rounds) {
+            if (round.name.startsWith('Draw')) {
+                if (mySnaps[drawIdx]) round.preDraw = mySnaps[drawIdx].hand;
+                drawIdx++;
+                if (mySnaps[drawIdx]) round.postDraw = mySnaps[drawIdx].hand;
+            }
+        }
+    }
+
+    // Helper: render all players' draw hands
+    function renderDrawPlayersHands(snapPlayers, label) {
+        if (!snapPlayers || snapPlayers.length === 0) return '';
+        let out = `<div class="hh-draw-section"><span class="hh-draw-label">${label}</span>`;
+        for (const sp of snapPlayers) {
+            if (sp.folded || !sp.hand || sp.hand.length === 0) continue;
+            const isMe = sp.name === myName;
+            const cls = isMe ? 'hh-draw-player hh-draw-me' : 'hh-draw-player';
+            out += `<div class="${cls}"><span class="hh-draw-pname">${sp.name}:</span>${renderMiniCards(sp.hand)}</div>`;
+        }
+        out += `</div>`;
+        return out;
     }
 
     // === Rounds with actions ===
     html += `<div class="hh-rounds">`;
     for (const round of rounds) {
-        if (round.logs.length === 0 && round.cards.length === 0
-            && !round.drawHand && !round.preDraw && !round.postDraw) continue;
+        const hasContent = round.logs.length > 0 || round.cards.length > 0
+            || round.drawAllPlayers || round.preDrawAll || round.postDrawAll
+            || round.drawHand || round.preDraw || round.postDraw;
+        if (!hasContent) continue;
         html += `<div class="hh-round">`;
         // Round header: name + community cards
         html += `<div class="hh-round-header">`;
@@ -787,12 +827,15 @@ function renderHandDetail(h, idx) {
             html += `<span class="hh-round-cards">${renderMiniCards(round.cards)}</span>`;
         }
         html += `</div>`;
-        // Draw game: show hand for preflop round
-        if (round.drawHand) {
+        // Draw game: all players' hands
+        if (round.drawAllPlayers) {
+            html += renderDrawPlayersHands(round.drawAllPlayers, 'ハンド:');
+        } else if (round.drawHand) {
             html += `<div class="hh-draw-cards"><span class="hh-draw-label">ハンド:</span>${renderMiniCards(round.drawHand)}</div>`;
         }
-        // Draw game: show pre-draw / post-draw hands
-        if (round.preDraw) {
+        if (round.preDrawAll) {
+            html += renderDrawPlayersHands(round.preDrawAll, 'ドロー前:');
+        } else if (round.preDraw) {
             html += `<div class="hh-draw-cards"><span class="hh-draw-label">ドロー前:</span>${renderMiniCards(round.preDraw)}</div>`;
         }
         // Actions with position tags
@@ -811,8 +854,10 @@ function renderHandDetail(h, idx) {
             html += `<div class="hh-action ${actionClass}">${posTag}${log}</div>`;
         }
         html += `</div>`;
-        // Draw game: show post-draw hand after actions
-        if (round.postDraw) {
+        // Post-draw: all players' hands
+        if (round.postDrawAll) {
+            html += renderDrawPlayersHands(round.postDrawAll, 'ドロー後:');
+        } else if (round.postDraw) {
             html += `<div class="hh-draw-cards"><span class="hh-draw-label">ドロー後:</span>${renderMiniCards(round.postDraw)}</div>`;
         }
         html += `</div>`;

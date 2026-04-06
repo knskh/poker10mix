@@ -446,6 +446,7 @@ class GameState {
 
     async playDrawHand() {
         const gc = this.gameConfig;
+        this.drawSnapshots = []; // track all players' hands per draw round
 
         await this.postBlinds();
 
@@ -455,6 +456,8 @@ class GameState {
                 p.hand = this.deck.deal(gc.handSize);
             }
         }
+        // Snapshot: initial deal
+        this.drawSnapshots.push(this._captureDrawSnapshot());
         this.update();
 
         // Pre-draw betting (heads-up: SB/BTN first, BB last)
@@ -468,6 +471,8 @@ class GameState {
             // Draw phase
             this.log(`--- ${d + 1}回目のドロー ---`, 'action');
             await this.drawPhase();
+            // Snapshot: after draw
+            this.drawSnapshots.push(this._captureDrawSnapshot());
             this.update();
 
             // Post-draw betting
@@ -491,6 +496,13 @@ class GameState {
             this.update();
             await this.delay(300);
         }
+    }
+
+    _captureDrawSnapshot() {
+        return this.players.map(p => ({
+            id: p.id, name: p.name, folded: p.folded,
+            hand: (p.hand || []).map(c => ({ rank: c.rank, suit: c.suit })),
+        }));
     }
 
     executeDiscard(player, discardIndices) {
