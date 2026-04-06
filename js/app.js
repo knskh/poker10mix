@@ -1053,6 +1053,7 @@ function onStatsUpdate(data) {
             wr: parseFloat(calc.winRate) || 0,
             sdWin: parseInt(calc.showdownWin) || 0,
             nsdWin: parseInt(calc.nonShowdownWin) || 0,
+            totalWin: (parseInt(calc.showdownWin) || 0) + (parseInt(calc.nonShowdownWin) || 0),
             gid: gameId,
             zm: isZoom ? 1 : 0,
             rid: roomId,
@@ -1393,12 +1394,14 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
         { key: 'wr', label: 'Win Rate', color: '#ffa726', checked: true },
         { key: 'sdWin', label: 'SD Win', color: '#29b6f6', checked: false },
         { key: 'nsdWin', label: 'Non-SD Win', color: '#9ccc65', checked: false },
+        { key: 'totalWin', label: 'Total Win', color: '#ff8a65', checked: false },
     ];
     for (const gs of graphStats) {
         html += `<label class="graph-cb-label" style="color:${gs.color}"><input type="checkbox" class="graph-cb" data-key="${gs.key}" ${gs.checked ? 'checked' : ''}>${gs.label}</label>`;
     }
     html += `</div>`;
     html += `<canvas class="stats-graph-canvas" width="560" height="280"></canvas>`;
+    html += `<div class="graph-summary"></div>`;
     html += `</div></div>`;
 
     html += `</div>`;
@@ -1420,7 +1423,7 @@ function renderStatsTable(c) {
         <tr><td class="stat-label">Win Rate</td><td class="stat-value">${c.winRate}/100h</td>
         <td class="stat-label">SD Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin}</td></tr>
         <tr><td class="stat-label">Non-SD Win</td><td class="stat-value">${typeof c.nonShowdownWin === 'number' ? c.nonShowdownWin.toLocaleString() : (c.nonShowdownWin || '-')}</td>
-        <td></td><td></td></tr>
+        <td class="stat-label">Total Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? ((c.showdownWin || 0) + (c.nonShowdownWin || 0)).toLocaleString() : '-'}</td></tr>
     </tbody></table>`;
 }
 
@@ -1446,6 +1449,7 @@ const GRAPH_STAT_META = {
     wr: { label: 'Win Rate', color: '#ffa726', unit: '/100h' },
     sdWin: { label: 'SD Win', color: '#29b6f6', unit: '' },
     nsdWin: { label: 'Non-SD Win', color: '#9ccc65', unit: '' },
+    totalWin: { label: 'Total Win', color: '#ff8a65', unit: '' },
 };
 
 function initGraphTab(graphContent, playerName) {
@@ -1467,6 +1471,7 @@ function initGraphTab(graphContent, playerName) {
         }
     }
 
+    const summaryDiv = graphContent.querySelector('.graph-summary');
     const draw = () => {
         const selected = [];
         controls.querySelectorAll('.graph-cb:checked').forEach(cb => selected.push(cb.dataset.key));
@@ -1474,6 +1479,36 @@ function initGraphTab(graphContent, playerName) {
         const sourceFilter = controls.querySelector('.graph-filter-source')?.value || '';
         const roomFilter = controls.querySelector('.graph-filter-room')?.value || '';
         drawStatsGraph(canvas, playerName, selected, { gameFilter, sourceFilter, roomFilter });
+        // Update summary with latest values
+        if (summaryDiv) {
+            const hist = loadStatsHistory();
+            let pHist = hist[playerName] || [];
+            if (gameFilter || sourceFilter || roomFilter) {
+                pHist = pHist.filter(d => {
+                    if (gameFilter && d.gid !== gameFilter) return false;
+                    if (sourceFilter === 'zoom' && !d.zm) return false;
+                    if (sourceFilter === 'room' && d.zm) return false;
+                    if (roomFilter && d.rid !== roomFilter) return false;
+                    return true;
+                });
+            }
+            const last = pHist.length > 0 ? pHist[pHist.length - 1] : null;
+            if (last && selected.length > 0) {
+                let shtml = '';
+                for (const key of selected) {
+                    const meta = GRAPH_STAT_META[key];
+                    if (!meta) continue;
+                    const val = last[key];
+                    const display = val !== undefined && isFinite(val)
+                        ? (Number.isInteger(val) ? val.toLocaleString() : val.toFixed(1))
+                        : '-';
+                    shtml += `<span class="graph-summary-item" style="color:${meta.color}"><span class="graph-summary-label">${meta.label}</span><span class="graph-summary-value">${display}${meta.unit}</span></span>`;
+                }
+                summaryDiv.innerHTML = shtml;
+            } else {
+                summaryDiv.innerHTML = '';
+            }
+        }
     };
 
     // Bind checkbox and filter changes
