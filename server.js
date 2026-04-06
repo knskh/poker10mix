@@ -271,7 +271,11 @@ function broadcastStatsUpdate(room) {
         }
         playerStats[room.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
     }
-    broadcastToRoom(room, { type: 'stats_update', stats: playerStats });
+    const gc = room.game.gameConfig;
+    broadcastToRoom(room, {
+        type: 'stats_update', stats: playerStats,
+        gameId: gc.id, gameName: gc.name, zoom: false, roomId: room.id,
+    });
 }
 
 // ============================================
@@ -964,9 +968,12 @@ function broadcastZoomStatsUpdate(table) {
         }
         playerStats[table.game.players[i].name] = { ...calc, byGame, byPosition: byPos };
     }
+    const gc = table.game.gameConfig;
     for (const m of table.members) {
         if (table.activeMemberIds.has(m.clientId)) {
-            send(m.ws, { type: 'stats_update', stats: playerStats });
+            send(m.ws, { type: 'stats_update', stats: playerStats,
+                gameId: gc.id, gameName: gc.name, zoom: true, roomId: 'zoom',
+            });
         }
     }
 }

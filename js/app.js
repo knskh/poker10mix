@@ -980,31 +980,37 @@ function onStatsUpdate(data) {
     if (!data.stats) return;
     const saved = loadSavedStats();
     const history = loadStatsHistory();
+    const gameId = data.gameId || '';
+    const isZoom = !!data.zoom;
+    const roomId = data.roomId || '';
     for (const [name, calc] of Object.entries(data.stats)) {
         saved[name] = calc;
-        // Append snapshot to history (sample every hand)
+        // Build snapshot
+        const hands = parseInt(calc.hands) || 0;
+        const snap = {
+            h: hands,
+            vpip: parseFloat(calc.vpip) || 0,
+            pfr: parseFloat(calc.pfr) || 0,
+            threeBet: parseFloat(calc.threeBet) || 0,
+            fourBet: parseFloat(calc.fourBet) || 0,
+            foldTo3Bet: parseFloat(calc.foldTo3Bet) || 0,
+            allIn: parseFloat(calc.allIn) || 0,
+            agg: parseFloat(calc.postflopAgg) || 0,
+            af: parseFloat(calc.af) || 0,
+            wtsd: parseFloat(calc.wtsd) || 0,
+            wsd: parseFloat(calc.wsd) || 0,
+            wr: parseFloat(calc.winRate) || 0,
+            sdWin: parseInt(calc.showdownWin) || 0,
+            nsdWin: parseInt(calc.nonShowdownWin) || 0,
+            gid: gameId,
+            zm: isZoom ? 1 : 0,
+            rid: roomId,
+        };
+        // Append to total history
         if (!history[name]) history[name] = [];
         const arr = history[name];
-        const hands = parseInt(calc.hands) || 0;
-        // Only add if hands increased
         if (arr.length === 0 || hands > (arr[arr.length - 1].h || 0)) {
-            arr.push({
-                h: hands,
-                vpip: parseFloat(calc.vpip) || 0,
-                pfr: parseFloat(calc.pfr) || 0,
-                threeBet: parseFloat(calc.threeBet) || 0,
-                fourBet: parseFloat(calc.fourBet) || 0,
-                foldTo3Bet: parseFloat(calc.foldTo3Bet) || 0,
-                allIn: parseFloat(calc.allIn) || 0,
-                agg: parseFloat(calc.postflopAgg) || 0,
-                af: parseFloat(calc.af) || 0,
-                wtsd: parseFloat(calc.wtsd) || 0,
-                wsd: parseFloat(calc.wsd) || 0,
-                wr: parseFloat(calc.winRate) || 0,
-                sdWin: parseInt(calc.showdownWin) || 0,
-                nsdWin: parseInt(calc.nonShowdownWin) || 0,
-            });
-            // Keep max 5000 snapshots per player
+            arr.push(snap);
             if (arr.length > 5000) arr.splice(0, arr.length - 5000);
         }
     }
@@ -1299,6 +1305,20 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     // Graph tab
     html += `<div class="stats-tab-content hidden" data-tab="graph">`;
     html += `<div class="graph-controls" data-player="${pName.replace(/"/g, '&quot;')}">`;
+    // Filter dropdowns
+    html += `<div class="graph-filters">`;
+    html += `<select class="graph-filter-game stats-dropdown"><option value="">全ゲーム</option>`;
+    const gameList = [
+        { id:'nlhe', name:'NLHE' }, { id:'lhe', name:'LHE' }, { id:'plo', name:'PLO' },
+        { id:'o8', name:'O8' }, { id:'stud', name:'Stud' }, { id:'stud8', name:'Stud8' },
+        { id:'razz', name:'Razz' }, { id:'td', name:'TD' }, { id:'sd', name:'SD' },
+        { id:'badugi', name:'Badugi' },
+    ];
+    for (const g of gameList) html += `<option value="${g.id}">${g.name}</option>`;
+    html += `</select>`;
+    html += `<select class="graph-filter-source stats-dropdown"><option value="">全卓</option><option value="zoom">ZOOM卓のみ</option><option value="room">通常卓のみ</option></select>`;
+    html += `<select class="graph-filter-room stats-dropdown"><option value="">全ルーム</option></select>`;
+    html += `</div>`;
     html += `<div class="graph-checkboxes">`;
     const graphStats = [
         { key: 'vpip', label: 'VPIP', color: '#4fc3f7', checked: true },
@@ -1375,23 +1395,45 @@ function initGraphTab(graphContent, playerName) {
     const controls = graphContent.querySelector('.graph-controls');
     if (!controls) return;
 
+    // Populate room dropdown from history data
+    const history = loadStatsHistory();
+    const pData = history[playerName] || [];
+    const roomSelect = controls.querySelector('.graph-filter-room');
+    if (roomSelect) {
+        const rooms = new Set();
+        for (const d of pData) { if (d.rid && d.rid !== 'zoom') rooms.add(d.rid); }
+        roomSelect.innerHTML = '<option value="">全ルーム</option>';
+        for (const rid of rooms) {
+            roomSelect.innerHTML += `<option value="${rid}">${rid}</option>`;
+        }
+    }
+
     const draw = () => {
         const selected = [];
         controls.querySelectorAll('.graph-cb:checked').forEach(cb => selected.push(cb.dataset.key));
-        drawStatsGraph(canvas, playerName, selected);
+        const gameFilter = controls.querySelector('.graph-filter-game')?.value || '';
+        const sourceFilter = controls.querySelector('.graph-filter-source')?.value || '';
+        const roomFilter = controls.querySelector('.graph-filter-room')?.value || '';
+        drawStatsGraph(canvas, playerName, selected, { gameFilter, sourceFilter, roomFilter });
     };
 
-    // Bind checkbox changes
+    // Bind checkbox and filter changes
     controls.querySelectorAll('.graph-cb').forEach(cb => {
         cb.removeEventListener('change', cb._graphHandler);
         cb._graphHandler = draw;
         cb.addEventListener('change', draw);
     });
+    controls.querySelectorAll('.graph-filter-game, .graph-filter-source, .graph-filter-room').forEach(sel => {
+        sel.removeEventListener('change', sel._graphHandler);
+        sel._graphHandler = draw;
+        sel.addEventListener('change', draw);
+    });
 
     draw();
 }
 
-function drawStatsGraph(canvas, playerName, selectedKeys) {
+function drawStatsGraph(canvas, playerName, selectedKeys, filters) {
+    filters = filters || {};
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || 560;
@@ -1405,7 +1447,17 @@ function drawStatsGraph(canvas, playerName, selectedKeys) {
     ctx.fillRect(0, 0, w, h);
 
     const history = loadStatsHistory();
-    const data = history[playerName];
+    let data = history[playerName];
+    // Apply filters
+    if (data && (filters.gameFilter || filters.sourceFilter || filters.roomFilter)) {
+        data = data.filter(d => {
+            if (filters.gameFilter && d.gid !== filters.gameFilter) return false;
+            if (filters.sourceFilter === 'zoom' && !d.zm) return false;
+            if (filters.sourceFilter === 'room' && d.zm) return false;
+            if (filters.roomFilter && d.rid !== filters.roomFilter) return false;
+            return true;
+        });
+    }
     if (!data || data.length < 2 || selectedKeys.length === 0) {
         ctx.fillStyle = '#7a8090';
         ctx.font = '13px sans-serif';
