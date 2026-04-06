@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('room_updated', onRoomUpdated);
     client.on('room_left', () => showScreen('lobby'));
     client.on('game_started', onGameStarted);
+    client.on('hand_start', onHandStart);
     client.on('game_state', onGameState);
     client.on('your_turn', onYourTurn);
     client.on('your_draw', onYourDraw);
@@ -408,6 +409,11 @@ function setupGameScreen() {
     document.getElementById('btn-zoom-lobby').addEventListener('click', () => {
         client.leaveZoom();
     });
+
+    // Zoom waiting overlay - lobby button
+    document.getElementById('btn-zoom-waiting-lobby').addEventListener('click', () => {
+        client.leaveZoom();
+    });
 }
 
 function onGameStarted(data) {
@@ -433,6 +439,12 @@ function onGameStarted(data) {
         document.getElementById('btn-zoom-exit').classList.add('hidden');
         document.getElementById('btn-zoom-sitout').classList.add('hidden');
     }
+}
+
+function onHandStart() {
+    saveCurrentHand();
+    document.getElementById('game-log').innerHTML = '';
+    currentHandLogs = [];
 }
 
 function onGameState(state) {

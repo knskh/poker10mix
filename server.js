@@ -625,7 +625,10 @@ function startGame(room) {
     };
 
     // Stats hooks
-    game.onHandStart = () => room.stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
+    game.onHandStart = () => {
+        room.stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
+        broadcastToRoom(room, { type: 'hand_start' });
+    };
     game.onFirstRoundEnd = () => room.stats.endFirstRound();
     game.onPlayerAction = (player, action, isBlinds) => room.stats.recordAction(player, action, isBlinds);
     game.onShowdown = (winnerIds) => room.stats.recordShowdown(winnerIds);

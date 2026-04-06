@@ -72,11 +72,14 @@ class PokerClient {
             case 'game_started':
                 this.emit('game_started', msg);
                 break;
+            case 'hand_start':
+                this.emit('hand_start');
+                break;
             case 'game_state':
                 this.emit('game_state', msg.state);
                 break;
             case 'your_turn':
-                this.emit('your_turn', { actions: msg.actions, timeLimit: msg.timeLimit });
+                this.emit('your_turn', msg);
                 break;
             case 'your_draw':
                 this.emit('your_draw', { hand: msg.hand, timeLimit: msg.timeLimit });
