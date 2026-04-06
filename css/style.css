@@ -750,6 +750,8 @@ body {
     margin-right: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 .hh-vc-suit { font-size: 12px; }
+.hh-vc-down { border: 2px dashed #888; background: #e8e4dc; }
+.hh-final-hand { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #444; }
 
 /* Rounds */
 .hh-rounds { display: flex; flex-direction: column; gap: 8px; }
