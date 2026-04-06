@@ -10,6 +10,7 @@ let loggedInAccount = null; // { name, email }
 let isInZoom = false;
 let handHistory = loadHandHistory(); // last 30 hands [{gameName, logs:[]}]
 let currentHandLogs = []; // logs for current hand
+let startingHandCards = []; // starting hand card objects captured at hand start
 
 function loadHandHistory() {
     try {
@@ -445,6 +446,7 @@ function onHandStart() {
     saveCurrentHand();
     document.getElementById('game-log').innerHTML = '';
     currentHandLogs = [];
+    startingHandCards = [];
 }
 
 function onGameState(state) {
@@ -452,6 +454,21 @@ function onGameState(state) {
     if (state.zoom) {
         document.getElementById('zoom-waiting-overlay').classList.add('hidden');
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
+    }
+    // Capture starting hand on first state with cards
+    if (startingHandCards.length === 0 && state.mySeatIndex !== undefined) {
+        const me = state.players[state.mySeatIndex];
+        if (me) {
+            let cards = [];
+            if (state.gameType === 'stud') {
+                cards = [...(me.downCards || []), ...(me.upCards || [])];
+            } else {
+                cards = me.hand || [];
+            }
+            if (cards.length > 0) {
+                startingHandCards = cards.map(c => ({ r: c.rank, s: c.suit }));
+            }
+        }
     }
     ui.renderFromServer(state);
 }
@@ -491,11 +508,17 @@ function onZoomSitout() {
     renderHandHistory('zoom-hand-history');
 }
 
+const RANK_D = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
+const SUIT_D = { s:'♠', h:'♥', d:'♦', c:'♣' };
+function cardStr(c) { return (RANK_D[c.rank] || c.rank) + (SUIT_D[c.suit] || c.suit); }
+
 function saveCurrentHand() {
     if (currentHandLogs.length > 1) {
         const gameName = currentState ? currentState.gameName : '';
-        // Capture player's hand cards
         let myCards = '';
+        let myCardObjs = [];
+        let communityCards = '';
+        let communityCardObjs = [];
         if (currentState) {
             const me = currentState.players[currentState.mySeatIndex];
             if (me) {
@@ -506,20 +529,20 @@ function saveCurrentHand() {
                     cards = me.hand || [];
                 }
                 if (cards.length > 0) {
-                    const RANK_D = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
-                    const SUIT_D = { s:'♠', h:'♥', d:'♦', c:'♣' };
-                    myCards = cards.map(c => (RANK_D[c.rank] || c.rank) + (SUIT_D[c.suit] || c.suit)).join(' ');
+                    myCards = cards.map(c => cardStr(c)).join(' ');
+                    myCardObjs = cards.map(c => ({ r: c.rank, s: c.suit }));
                 }
             }
+            if (currentState.communityCards && currentState.communityCards.length > 0) {
+                communityCards = currentState.communityCards.map(c => cardStr(c)).join(' ');
+                communityCardObjs = currentState.communityCards.map(c => ({ r: c.rank, s: c.suit }));
+            }
         }
-        // Capture community cards
-        let communityCards = '';
-        if (currentState && currentState.communityCards && currentState.communityCards.length > 0) {
-            const RANK_D = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
-            const SUIT_D = { s:'♠', h:'♥', d:'♦', c:'♣' };
-            communityCards = currentState.communityCards.map(c => (RANK_D[c.rank] || c.rank) + (SUIT_D[c.suit] || c.suit)).join(' ');
-        }
-        handHistory.push({ gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString(), myCards, communityCards });
+        handHistory.push({
+            gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString(),
+            myCards, communityCards, myCardObjs, communityCardObjs,
+            startCards: startingHandCards.length > 0 ? [...startingHandCards] : myCardObjs,
+        });
         if (handHistory.length > 30) handHistory.shift();
         persistHandHistory();
     }
@@ -533,24 +556,129 @@ function renderHandHistory(containerId) {
         container.innerHTML = '<p style="color:var(--text-dim);padding:8px;">まだ履歴がありません</p>';
         return;
     }
-    let html = '';
+    // Compact list of starting hands
+    let html = '<div class="hh-list">';
     for (let i = handHistory.length - 1; i >= 0; i--) {
         const h = handHistory[i];
-        html += `<div class="hand-history-item">`;
-        html += `<div class="hand-history-header">#${i + 1} ${h.gameName} <span class="hand-history-time">${h.time}</span></div>`;
-        if (h.myCards || h.communityCards) {
-            html += `<div class="hand-history-cards">`;
-            if (h.myCards) html += `<span class="hh-label">ハンド:</span> <span class="hh-cards">${h.myCards}</span>`;
-            if (h.communityCards) html += ` <span class="hh-label">ボード:</span> <span class="hh-cards">${h.communityCards}</span>`;
-            html += `</div>`;
+        const cards = h.startCards || h.myCardObjs || [];
+        html += `<div class="hh-row" data-hh-idx="${i}">`;
+        html += `<span class="hh-num">#${i + 1}</span>`;
+        html += `<span class="hh-game-label">${h.gameName || ''}</span>`;
+        html += `<span class="hh-start-cards">${renderMiniCards(cards)}</span>`;
+        html += `<span class="hh-time-label">${h.time || ''}</span>`;
+        html += `</div>`;
+    }
+    html += '</div>';
+    // Detail panel (hidden by default)
+    html += '<div id="hh-detail-' + containerId + '" class="hh-detail hidden"></div>';
+    container.innerHTML = html;
+
+    // Click handlers
+    container.querySelectorAll('.hh-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const idx = parseInt(row.dataset.hhIdx);
+            const detail = container.querySelector('.hh-detail');
+            // Toggle: if same hand, hide
+            if (detail.dataset.activeIdx === String(idx) && !detail.classList.contains('hidden')) {
+                detail.classList.add('hidden');
+                row.classList.remove('hh-row-active');
+                return;
+            }
+            container.querySelectorAll('.hh-row').forEach(r => r.classList.remove('hh-row-active'));
+            row.classList.add('hh-row-active');
+            detail.dataset.activeIdx = String(idx);
+            detail.classList.remove('hidden');
+            detail.innerHTML = renderHandDetail(handHistory[idx], idx);
+        });
+    });
+}
+
+function renderMiniCards(cardObjs) {
+    if (!cardObjs || cardObjs.length === 0) return '<span style="color:var(--text-dim)">--</span>';
+    const SUIT_COLORS = { s: '#aaa', h: '#e53935', d: '#42a5f5', c: '#66bb6a' };
+    return cardObjs.map(c => {
+        const r = RANK_D[c.r] || c.r;
+        const s = SUIT_D[c.s] || c.s;
+        const col = SUIT_COLORS[c.s] || '#ccc';
+        return `<span class="mini-card" style="color:${col}">${r}${s}</span>`;
+    }).join('');
+}
+
+function renderHandDetail(h, idx) {
+    if (!h) return '';
+    // Parse logs into rounds
+    const rounds = [{ name: 'Pre', logs: [] }];
+    const ROUND_MARKERS = {
+        'フロップ': 'Flop', 'ターン': 'Turn', 'リバー': 'River',
+        '3rd': '3rd St', '4th': '4th St', '5th': '5th St', '6th': '6th St', '7th': '7th St',
+        '1回目のドロー': 'Draw 1', '2回目のドロー': 'Draw 2', '3回目のドロー': 'Draw 3',
+    };
+    for (const log of h.logs) {
+        let matched = false;
+        for (const [marker, name] of Object.entries(ROUND_MARKERS)) {
+            if (log.includes(marker)) {
+                rounds.push({ name, logs: [] });
+                matched = true;
+                break;
+            }
         }
-        html += `<div class="hand-history-logs">`;
-        for (const log of h.logs) {
-            html += `<div class="hand-history-log">${log}</div>`;
+        if (!matched) {
+            rounds[rounds.length - 1].logs.push(log);
+        }
+    }
+
+    let html = `<div class="hh-detail-header">`;
+    html += `<span class="hh-detail-title">#${idx + 1} ${h.gameName || ''}</span>`;
+    html += `<span class="hh-detail-time">${h.time || ''}</span>`;
+    html += `</div>`;
+
+    // Cards section
+    html += `<div class="hh-detail-cards">`;
+    if (h.startCards && h.startCards.length > 0) {
+        html += `<div class="hh-card-group"><span class="hh-card-label">ハンド</span>${renderVisualCards(h.startCards)}</div>`;
+    }
+    if (h.communityCardObjs && h.communityCardObjs.length > 0) {
+        html += `<div class="hh-card-group"><span class="hh-card-label">ボード</span>${renderVisualCards(h.communityCardObjs)}</div>`;
+    }
+    html += `</div>`;
+
+    // Rounds timeline
+    html += `<div class="hh-rounds">`;
+    for (const round of rounds) {
+        if (round.logs.length === 0) continue;
+        html += `<div class="hh-round">`;
+        html += `<div class="hh-round-name">${round.name}</div>`;
+        html += `<div class="hh-round-actions">`;
+        for (const log of round.logs) {
+            const actionClass = getActionClass(log);
+            html += `<div class="hh-action ${actionClass}">${log}</div>`;
         }
         html += `</div></div>`;
     }
-    container.innerHTML = html;
+    html += `</div>`;
+    return html;
+}
+
+function renderVisualCards(cardObjs) {
+    if (!cardObjs || cardObjs.length === 0) return '';
+    const SUIT_COLORS = { s: '#333', h: '#e53935', d: '#42a5f5', c: '#2e7d32' };
+    const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
+    return cardObjs.map(c => {
+        const r = RANK_D[c.r] || c.r;
+        const sym = SUIT_SYM[c.s] || c.s;
+        const col = SUIT_COLORS[c.s] || '#333';
+        return `<span class="hh-visual-card" style="color:${col}">${r}<span class="hh-vc-suit">${sym}</span></span>`;
+    }).join('');
+}
+
+function getActionClass(log) {
+    if (log.includes('フォールド')) return 'act-fold';
+    if (log.includes('レイズ') || log.includes('ベット')) return 'act-raise';
+    if (log.includes('コール')) return 'act-call';
+    if (log.includes('チェック')) return 'act-check';
+    if (log.includes('オールイン')) return 'act-allin';
+    if (log.includes('勝利') || log.includes('獲得')) return 'act-win';
+    return '';
 }
 
 function onYourTurn(data) {
