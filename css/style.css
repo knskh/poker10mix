@@ -626,7 +626,19 @@ body {
 
 #bet-slider-area { display: flex; align-items: center; gap: 12px; }
 #bet-slider { width: 200px; accent-color: var(--gold); }
-#bet-amount-display { font-size: 16px; color: var(--gold); font-weight: bold; min-width: 60px; text-align: right; }
+.bet-numpad-input { 
+    font-size: 16px; color: var(--gold); font-weight: bold; 
+    width: 80px; text-align: right; 
+    background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); 
+    border-radius: 6px; padding: 4px 8px; font-family: inherit;
+    outline: none; transition: border-color 0.2s;
+}
+.bet-numpad-input:focus { border-color: var(--accent); box-shadow: 0 0 8px rgba(56,189,248,0.4); }
+.bet-numpad-input::-webkit-outer-spin-button,
+.bet-numpad-input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.bet-numpad-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Draw Action Bar */
 #draw-action-bar {
@@ -972,7 +984,7 @@ body {
     #action-buttons { gap: 6px; }
     #bet-slider-area { gap: 8px; }
     #bet-slider { width: 140px; height: 28px; }
-    #bet-amount-display { font-size: 14px; min-width: 50px; }
+    .bet-numpad-input { font-size: 14px; width: 64px; padding: 4px; }
 
     /* Draw bar */
     #draw-action-bar { padding: 8px; gap: 8px; }

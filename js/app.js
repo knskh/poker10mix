@@ -368,10 +368,32 @@ function setupGameScreen() {
         document.getElementById('rules-modal').classList.add('hidden');
     });
 
-    // Bet slider
-    document.getElementById('bet-slider').addEventListener('input', (e) => {
-        document.getElementById('bet-amount-display').textContent = parseInt(e.target.value) + sliderOffset;
+    // Bet slider and numpad sync
+    const betSlider = document.getElementById('bet-slider');
+    const betInput = document.getElementById('bet-amount-input');
+    
+    betSlider.addEventListener('input', (e) => {
+        if (!betInput) return;
+        betInput.value = parseInt(e.target.value) + sliderOffset;
     });
+    
+    if (betInput) {
+        betInput.addEventListener('input', (e) => {
+            let val = parseInt(e.target.value) || 0;
+            let sliderVal = val - sliderOffset;
+            if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
+            if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
+            betSlider.value = sliderVal;
+        });
+        betInput.addEventListener('blur', (e) => {
+            let val = parseInt(e.target.value) || 0;
+            let sliderVal = val - sliderOffset;
+            if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
+            if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
+            betInput.value = sliderVal + sliderOffset;
+            betSlider.value = sliderVal;
+        });
+    }
 
     // Draw buttons
     document.getElementById('btn-draw').addEventListener('click', () => {
@@ -1038,22 +1060,31 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
     const isFirstRound = turnData.isFirstRound;
     const tableBet = turnData.currentBet || 0;
 
-    // Preflop unopened: BB-based buttons (when currentBet <= bigBlind, meaning no open raise yet)
+    // Preflop unopened: BB-based buttons (when currentBet <= bigBlind)
     if (isFirstRound && tableBet <= bb) {
         [2, 2.5, 3, 3.5, 4].forEach(mult => {
-            const amount = Math.round(bb * mult);
-            presets.push({ label: `${mult}BB`, amount });
+            const targetTotal = Math.round(bb * mult);
+            presets.push({ label: `${mult}BB`, targetTotal });
+        });
+    } else if (isFirstRound && tableBet > bb) {
+        // Preflop facing a raise: 2X, 3X, 4X, 5X of the current bet
+        [2, 3, 4, 5].forEach(mult => {
+            const targetTotal = Math.round(tableBet * mult);
+            presets.push({ label: `${mult}X`, targetTotal });
         });
     } else if (!isFirstRound) {
         // Postflop: pot percentage buttons
         [0.33, 0.66, 1.0, 1.5].forEach(pct => {
-            const amount = Math.round(pot * pct);
-            presets.push({ label: `${Math.round(pct * 100)}%`, amount });
+            const targetTotal = Math.round(pot * pct) + tableBet;
+            presets.push({ label: `${Math.round(pct * 100)}%`, targetTotal });
         });
     }
 
-    // Remove presets that exceed slider max (e.g. pot-limit cap)
-    const filtered = presets.filter(p => p.amount <= sliderMax && p.amount >= sliderMin);
+    // Remove presets that exceed slider limits
+    const filtered = presets.filter(p => {
+        const outOfPocket = p.targetTotal - sliderOffset;
+        return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
+    });
     if (filtered.length === 0) return;
 
     for (const p of filtered) {
@@ -1061,9 +1092,11 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
         btn.className = 'btn-preset';
         btn.textContent = p.label;
         btn.addEventListener('click', () => {
+            const outOfPocket = p.targetTotal - sliderOffset;
             const slider = document.getElementById('bet-slider');
-            slider.value = p.amount;
-            document.getElementById('bet-amount-display').textContent = p.amount + sliderOffset;
+            if(slider) slider.value = outOfPocket;
+            const input = document.getElementById('bet-amount-input');
+            if(input) input.value = p.targetTotal;
         });
         presetsDiv.appendChild(btn);
     }
@@ -1076,7 +1109,8 @@ function setupSlider(min, max, currentBet) {
     slider.min = min; slider.max = max; slider.value = min;
     slider.step = Math.max(Math.floor(min / 2), 10);
     sliderOffset = currentBet || 0;
-    document.getElementById('bet-amount-display').textContent = min + sliderOffset;
+    const input = document.getElementById('bet-amount-input');
+    if(input) input.value = min + sliderOffset;
 }
 
 function sendActionAndHide(action) {
