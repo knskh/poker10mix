@@ -1,31 +1,31 @@
-/* === CSS Variables (Modern Light Blue Glass Theme) === */
+/* === CSS Variables (Neon Glassmorphism Theme) === */
 :root {
-    --bg-grad: linear-gradient(135deg, #0b1120 0%, #0f172a 100%);
-    --bg: #0f172a;
-    --felt: #0c4a6e;
-    --felt-light: #0284c7;
-    --felt-border: #082f49;
-    --rail: #1e293b;
-    --rail-inner: #334155;
+    --bg-grad: radial-gradient(circle at top, #142130 0%, #070a13 100%);
+    --bg: #070a13;
+    --felt: #082c47;
+    --felt-light: #0f4b7a;
+    --felt-border: #041220;
+    --rail: #111a2c;
+    --rail-inner: #192742;
     --card-bg: #ffffff;
-    --text: #f0f9ff;
+    --text: #e0f2fe;
     --text-dim: #94a3b8;
-    --gold: #38bdf8;
-    --accent: #7dd3fc;
+    --gold: #00e5ff; /* Cyan neon glow */
+    --accent: #00bfff;
     --green: #2dd4bf;
     --red: #f43f5e;
-    --btn-primary: #0ea5e9;
+    --btn-primary: #00e5ff;
     --btn-fold: rgba(255,255,255,0.1);
     --btn-check: #0284c7;
-    --btn-bet: #38bdf8;
-    --btn-raise: #0284c7;
-    --seat-bg: rgba(15, 23, 42, 0.5);
-    --seat-active: rgba(14, 165, 233, 0.25);
-    --seat-border: rgba(56, 189, 248, 0.4);
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-blur: blur(12px);
-    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    --btn-bet: #00e5ff;
+    --btn-raise: #00bfff;
+    --seat-bg: rgba(7, 10, 19, 0.6);
+    --seat-active: rgba(0, 229, 255, 0.15);
+    --seat-border: rgba(0, 229, 255, 0.4);
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(0, 229, 255, 0.2);
+    --glass-blur: blur(16px);
+    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -54,15 +54,24 @@ body {
 }
 @keyframes pulse { 50% { opacity: 0.6; } }
 
+/* === Logos === */
+.site-logo { max-width: 240px; margin-bottom: -10px; filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.3)); }
+.site-logo-lobby { height: 36px; filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.4)); margin-right: 8px; }
+
 /* === Buttons === */
 .btn-primary {
     padding: 12px 36px; font-size: 18px;
-    background: linear-gradient(135deg, var(--btn-primary), #0284c7); color: #fff;
-    border: none; border-radius: 8px; cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-weight: bold;
-    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+    background: linear-gradient(135deg, rgba(0,229,255,0.2), rgba(2,132,199,0.3)); color: #fff;
+    border: 1px solid rgba(0,229,255,0.4); border-radius: 8px; font-weight: bold; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
 }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4); }
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 229, 255, 0.6);
+    background: linear-gradient(135deg, rgba(0,229,255,0.4), rgba(2,132,199,0.5));
+}
 .btn-large { padding: 14px 48px; font-size: 20px; }
 
 .btn-small {
@@ -89,11 +98,7 @@ body {
     background: var(--bg-grad);
 }
 
-#login-screen h1 {
-    font-size: 42px; color: var(--gold);
-    text-shadow: 0 0 20px rgba(56, 189, 248, 0.5); letter-spacing: 2px;
-    font-weight: 900;
-}
+/* Removed old h1 for login screen since we use logo img */
 
 .login-box {
     background: var(--glass-bg);
