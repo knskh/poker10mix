@@ -467,6 +467,8 @@ function onGameStarted(data) {
 
     document.getElementById('game-log').innerHTML = '';
     currentHandLogs = [];
+    currentHandGameName = currentState ? currentState.gameName : '';
+    currentHandGameType = currentState ? currentState.gameType : '';
     ui.addLog('ゲーム開始！', 'important');
 
     // Show/hide zoom-specific UI
@@ -490,6 +492,8 @@ function onHandStart() {
     cardSnapshots = [];
     showdownPlayers = null;
     lastHandResult = null;
+    currentHandGameName = currentState ? currentState.gameName : '';
+    currentHandGameType = currentState ? currentState.gameType : '';
 }
 
 function onHandResult(data) {
@@ -498,6 +502,8 @@ function onHandResult(data) {
 
 function onGameState(state) {
     currentState = state;
+    if (!currentHandGameName && state.gameName) currentHandGameName = state.gameName;
+    if (!currentHandGameType && state.gameType) currentHandGameType = state.gameType;
     if (state.zoom) {
         document.getElementById('zoom-waiting-overlay').classList.add('hidden');
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
@@ -600,9 +606,12 @@ const RANK_D = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',
 const SUIT_D = { s:'♠', h:'♥', d:'♦', c:'♣' };
 function cardStr(c) { return (RANK_D[c.rank] || c.rank) + (SUIT_D[c.suit] || c.suit); }
 
+let currentHandGameName = '';
+let currentHandGameType = '';
+
 function saveCurrentHand() {
     if (currentHandLogs.length > 1) {
-        const gameName = currentState ? currentState.gameName : '';
+        const gameName = currentHandGameName || (currentState ? currentState.gameName : '');
         let myCards = '';
         let myCardObjs = [];
         let communityCards = '';
@@ -636,7 +645,7 @@ function saveCurrentHand() {
                 else { copy.hand = s.hand; }
                 return copy;
             }) : [],
-            gameType: currentState ? currentState.gameType : '',
+            gameType: currentHandGameType || (currentState ? currentState.gameType : ''),
             showdownPlayers: showdownPlayers ? [...showdownPlayers] : null,
             handResult: lastHandResult ? {
                 gameName: lastHandResult.gameName,
