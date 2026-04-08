@@ -1586,7 +1586,6 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     html += `<div class="stats-tabs-bar">`;
     html += `<button class="stats-tab active" data-tab="total">全体</button>`;
     html += `<button class="stats-tab" data-tab="game">ゲーム別</button>`;
-    html += `<button class="stats-tab" data-tab="position">ポジション別</button>`;
     html += `<button class="stats-tab" data-tab="graph" data-player="${pName.replace(/"/g, '&quot;')}">グラフ</button>`;
     html += `</div>`;
 
@@ -1605,46 +1604,6 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
         for (const [gid, gs] of gameEntries) {
             html += `<div class="stats-dropdown-content" data-game="${gid}"${gid !== gameEntries[0][0] ? ' style="display:none"' : ''}>`;
             html += renderStatsTable(gs);
-            html += `</div>`;
-        }
-    } else {
-        html += '<p style="color:var(--text-dim)">データなし</p>';
-    }
-    html += `</div>`;
-
-    // Position tab (with dropdown + per-game sub-dropdown)
-    html += `<div class="stats-tab-content hidden" data-tab="position">`;
-    if (c.byPosition && Object.keys(c.byPosition).length > 0) {
-        const posOrder = ['BTN', 'SB', 'BB', 'CO', 'HJ', 'EP'];
-        const posEntries = Object.entries(c.byPosition)
-            .filter(([, ps]) => ps.hands > 0)
-            .sort((a, b) => posOrder.indexOf(a[0]) - posOrder.indexOf(b[0]));
-        html += `<select class="stats-dropdown stats-pos-select">`;
-        for (const [pos, ps] of posEntries) {
-            html += `<option value="${pos}">${pos} (${ps.hands}h)</option>`;
-        }
-        html += `</select>`;
-        for (const [pos, ps] of posEntries) {
-            html += `<div class="stats-dropdown-content" data-pos="${pos}"${pos !== posEntries[0][0] ? ' style="display:none"' : ''}>`;
-            html += renderStatsTable(ps);
-            // Per-game sub-dropdown within position
-            if (ps.byGame && Object.keys(ps.byGame).length > 0) {
-                const posGameEntries = Object.entries(ps.byGame).filter(([, gs]) => gs.hands > 0);
-                if (posGameEntries.length > 0) {
-                    html += `<h5 class="stats-sub-sub-header" style="margin-top:8px">ゲーム別</h5>`;
-                    html += `<select class="stats-dropdown stats-pos-game-select" data-pos="${pos}">`;
-                    html += `<option value="">-- 選択 --</option>`;
-                    for (const [gid, gs] of posGameEntries) {
-                        html += `<option value="${gid}">${GAME_NAMES[gid] || gid} (${gs.hands}h)</option>`;
-                    }
-                    html += `</select>`;
-                    for (const [gid, gs] of posGameEntries) {
-                        html += `<div class="stats-dropdown-content" data-pos-game="${pos}-${gid}" style="display:none">`;
-                        html += renderStatsTable(gs);
-                        html += `</div>`;
-                    }
-                }
-            }
             html += `</div>`;
         }
     } else {
