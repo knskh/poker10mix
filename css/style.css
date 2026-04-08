@@ -1,33 +1,39 @@
-/* === CSS Variables (PokerStars Dark Theme) === */
+/* === CSS Variables (Modern Light Blue Glass Theme) === */
 :root {
-    --bg: #1a1d24;
-    --felt: #264d3a;
-    --felt-light: #2f5e47;
-    --felt-border: #1a3328;
-    --rail: #2a2d35;
-    --rail-inner: #3a3d45;
-    --card-bg: #fff;
-    --text: #e0e0e0;
-    --text-dim: #7a8090;
-    --gold: #f0c040;
-    --accent: #4fc3f7;
-    --green: #4caf50;
-    --red: #eb2225;
-    --btn-primary: #2e7d32;
-    --btn-fold: #555;
-    --btn-check: #2e7d32;
-    --btn-bet: #f57f17;
-    --btn-raise: #e65100;
-    --seat-bg: #2a2d35;
-    --seat-active: #3a4050;
-    --seat-border: #444;
+    --bg-grad: linear-gradient(135deg, #0b1120 0%, #0f172a 100%);
+    --bg: #0f172a;
+    --felt: #0c4a6e;
+    --felt-light: #0284c7;
+    --felt-border: #082f49;
+    --rail: #1e293b;
+    --rail-inner: #334155;
+    --card-bg: #ffffff;
+    --text: #f0f9ff;
+    --text-dim: #94a3b8;
+    --gold: #38bdf8;
+    --accent: #7dd3fc;
+    --green: #2dd4bf;
+    --red: #f43f5e;
+    --btn-primary: #0ea5e9;
+    --btn-fold: rgba(255,255,255,0.1);
+    --btn-check: #0284c7;
+    --btn-bet: #38bdf8;
+    --btn-raise: #0284c7;
+    --seat-bg: rgba(15, 23, 42, 0.5);
+    --seat-active: rgba(14, 165, 233, 0.25);
+    --seat-border: rgba(56, 189, 248, 0.4);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: blur(12px);
+    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
-    background: var(--bg);
+    font-family: 'Outfit', 'Inter', sans-serif;
+    background: var(--bg-grad) !important;
+    background-color: var(--bg);
     color: var(--text);
     overflow: hidden;
     height: 100dvh;
@@ -51,11 +57,12 @@ body {
 /* === Buttons === */
 .btn-primary {
     padding: 12px 36px; font-size: 18px;
-    background: var(--btn-primary); color: #fff;
+    background: linear-gradient(135deg, var(--btn-primary), #0284c7); color: #fff;
     border: none; border-radius: 8px; cursor: pointer;
-    transition: all 0.2s; font-weight: bold;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-weight: bold;
+    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
 }
-.btn-primary:hover { background: #388e3c; transform: scale(1.02); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4); }
 .btn-large { padding: 14px 48px; font-size: 20px; }
 
 .btn-small {
@@ -79,20 +86,22 @@ body {
 #login-screen {
     display: flex; flex-direction: column; align-items: center;
     justify-content: center; height: 100dvh; gap: 24px;
-    background: radial-gradient(ellipse at center, #1e2a3a 0%, #0d1117 100%);
+    background: var(--bg-grad);
 }
 
 #login-screen h1 {
-    font-size: 42px; color: var(--red);
-    text-shadow: 0 2px 12px rgba(235,34,37,0.3); letter-spacing: 2px;
+    font-size: 42px; color: var(--gold);
+    text-shadow: 0 0 20px rgba(56, 189, 248, 0.5); letter-spacing: 2px;
     font-weight: 900;
 }
 
 .login-box {
-    background: #22262e;
-    padding: 28px 32px; border-radius: 14px; width: 360px;
-    border: 1px solid #333; text-align: center;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    padding: 28px 32px; border-radius: 16px; width: 360px;
+    border: 1px solid var(--glass-border); text-align: center;
+    box-shadow: var(--shadow);
 }
 
 .login-hint { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
@@ -101,10 +110,11 @@ body {
 .login-box input[type="email"],
 .login-box input[type="password"] {
     width: 100%; padding: 12px; margin-bottom: 12px;
-    background: #181b22; border: 1px solid #3a3d45;
-    border-radius: 6px; color: var(--text); font-size: 15px; outline: none; text-align: center;
+    background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border);
+    border-radius: 8px; color: var(--text); font-size: 15px; outline: none; text-align: center;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
-.login-box input:focus { border-color: var(--accent); }
+.login-box input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(56,189,248,0.3); }
 .login-box .btn-primary { width: 100%; }
 
 .login-tabs {
@@ -378,15 +388,15 @@ body {
 #table-felt {
     position: relative; width: 700px; height: 300px;
     background:
-        radial-gradient(ellipse at 50% 40%, #2f5e47 0%, #264d3a 50%, #1e402f 80%, #173525 100%);
+        radial-gradient(ellipse at 50% 40%, var(--felt-light) 0%, var(--felt) 50%, #072e4a 80%, #051e33 100%);
     border-radius: 160px;
-    border: 8px solid #2a2d35;
+    border: 8px solid var(--rail);
     box-shadow:
-        0 0 0 4px #1a1d24,
-        0 0 0 12px #333640,
-        0 0 0 14px #1a1d24,
-        inset 0 0 40px rgba(0,0,0,0.4),
-        0 4px 24px rgba(0,0,0,0.5);
+        0 0 0 4px #0f172a,
+        0 0 0 12px #1e293b,
+        0 0 0 14px #0f172a,
+        inset 0 0 40px rgba(0,0,0,0.5),
+        0 8px 32px rgba(14, 165, 233, 0.2);
     margin: 50px 0 10px; flex-shrink: 0;
 }
 
@@ -470,17 +480,20 @@ body {
 .seat {
     position: absolute;
     background: var(--seat-bg);
-    border-radius: 12px;
+    backdrop-filter: var(--glass-blur);
+    border-radius: 14px;
     padding: 6px 10px;
     min-width: 110px;
     text-align: center;
-    border: 2px solid var(--seat-border);
-    transition: all 0.3s;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    border: 1px solid var(--glass-border);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
 .seat.active-turn {
-    border-color: var(--gold);
-    box-shadow: 0 0 12px rgba(240,192,64,0.4), 0 2px 8px rgba(0,0,0,0.4);
+    background: var(--seat-active);
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 4px 16px rgba(0,0,0,0.3);
+    transform: translateY(-4px);
 }
 .seat.folded { opacity: 0.35; }
 .seat.disconnected { opacity: 0.25; }

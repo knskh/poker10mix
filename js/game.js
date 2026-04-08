@@ -413,6 +413,9 @@ class GameState {
         const gc = this.gameConfig;
         let best = -1;
         let bestValue = null;
+        let bestHighestSuit = -1;
+
+        const suitOrder = { c: 0, d: 1, h: 2, s: 3 };
 
         for (const p of this.players) {
             if (p.folded || p.allIn) continue;
@@ -420,20 +423,50 @@ class GameState {
             if (upHand.length === 0) continue;
 
             let value;
+            let highestSuit = -1;
+
             if (gc.lowOnly) {
                 // Razz: lowest visible hand acts first
                 value = upHand.map(c => c.rank === 14 ? 1 : c.rank).sort((a, b) => a - b);
-                if (!bestValue || compareArrays(value, bestValue) < 0) {
+                
+                let maxCard = upHand[0];
+                for (const c of upHand) {
+                    const r1 = maxCard.rank === 14 ? 1 : maxCard.rank;
+                    const r2 = c.rank === 14 ? 1 : c.rank;
+                    if (r2 > r1 || (r2 === r1 && suitOrder[c.suit] > suitOrder[maxCard.suit])) {
+                        maxCard = c;
+                    }
+                }
+                highestSuit = suitOrder[maxCard.suit];
+
+                let cmp = bestValue ? compareArrays(value, bestValue) : 0;
+                if (!bestValue || cmp < 0 || (cmp === 0 && highestSuit < bestHighestSuit)) {
                     best = p.id;
                     bestValue = value;
+                    bestHighestSuit = highestSuit;
                 }
             } else {
                 // Stud: highest visible hand acts first
-                const hand = bestHighHand(upHand.length >= 5 ? upHand : upHand);
+                const padded = [...upHand];
+                let dummy = -1;
+                while (padded.length < 5) padded.push({ rank: dummy--, suit: 'c' });
+                
+                const hand = bestHighHand(padded);
                 value = hand ? hand.value : [0];
-                if (!bestValue || compareArrays(value, bestValue) > 0) {
+
+                let maxCard = upHand[0];
+                for (const c of upHand) {
+                    if (c.rank > maxCard.rank || (c.rank === maxCard.rank && suitOrder[c.suit] > suitOrder[maxCard.suit])) {
+                        maxCard = c;
+                    }
+                }
+                highestSuit = suitOrder[maxCard.suit];
+
+                let cmp = bestValue ? compareArrays(value, bestValue) : 0;
+                if (!bestValue || cmp > 0 || (cmp === 0 && highestSuit > bestHighestSuit)) {
                     best = p.id;
                     bestValue = value;
+                    bestHighestSuit = highestSuit;
                 }
             }
         }
@@ -623,7 +656,13 @@ class GameState {
                 if (canRaise && player.chips > callAmount) {
                     if (gc.betting === 'limit') {
                         const size = limitBetSize || gc.smallBet;
-                        const raiseTotal = this.currentBet + size;
+                        let raiseTotal = this.currentBet + size;
+                        
+                        // For stud 3rd street, the first raise is a "Complete" to the small bet
+                        if (this.isFirstRound && gc.type === 'stud' && raiseCount === 0) {
+                            raiseTotal = size;
+                        }
+
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', amount: Math.min(size, player.chips) });
                         } else {
