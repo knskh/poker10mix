@@ -272,8 +272,11 @@ function renderRoomList(data) {
     for (const r of rooms) {
         const tr = document.createElement('tr');
         const canJoin = r.playerCount < 6;
-        const gameDisplay = r.playing && r.gameName
-            ? ` <span style="font-size:11px;color:var(--gold);margin-left:4px;">[${r.gameName}]</span>` : '';
+        const currentGameMark = r.playing && r.gameName
+            ? ` <span style="font-size:10px;color:var(--gold);">[${r.gameName}]</span>` : '';
+        const mergedNames = (r.mergedGames || []).map(i => GAME_LIST[i]?.shortName || '').filter(Boolean);
+        const gamesStr = mergedNames.length > 0
+            ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${mergedNames.join(' ')}</div>` : '';
         let statusHtml;
         if (!r.playing) {
             statusHtml = '<span style="color:#4f4">待機中</span>';
@@ -282,7 +285,7 @@ function renderRoomList(data) {
         } else {
             statusHtml = '<span style="color:#f44">進行中</span>';
         }
-        tr.innerHTML = `<td>${r.id}${gameDisplay}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${statusHtml}</td>`;
+        tr.innerHTML = `<td>${r.id}${currentGameMark}${gamesStr}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${statusHtml}</td>`;
         if (canJoin) {
             tr.style.cursor = 'pointer';
             tr.addEventListener('click', () => client.joinRoom(r.id));

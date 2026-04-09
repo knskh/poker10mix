@@ -245,7 +245,8 @@ function broadcastRoomList() {
     const list = [...rooms.values()].map(r => ({
         id: r.id, hostName: r.members[0]?.name || '???',
         playerCount: r.members.length, playing: r.playing,
-        gameName: r.game?.gameConfig?.name || ''
+        gameName: r.game?.gameConfig?.name || '',
+        mergedGames: r.getMergedGames()
     }));
     for (const [ws] of clients) {
         send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
