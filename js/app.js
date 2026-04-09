@@ -271,8 +271,19 @@ function renderRoomList(data) {
     }
     for (const r of rooms) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.id}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${r.playing ? '<span style="color:#f44">進行中</span>' : '<span style="color:#4f4">待機中</span>'}</td>`;
-        if (!r.playing && r.playerCount < 6) {
+        const canJoin = r.playerCount < 6;
+        const gameDisplay = r.playing && r.gameName
+            ? ` <span style="font-size:11px;color:var(--gold);margin-left:4px;">[${r.gameName}]</span>` : '';
+        let statusHtml;
+        if (!r.playing) {
+            statusHtml = '<span style="color:#4f4">待機中</span>';
+        } else if (canJoin) {
+            statusHtml = '<span style="color:#f44">進行中</span> <span style="font-size:10px;color:#4af">途中参加可</span>';
+        } else {
+            statusHtml = '<span style="color:#f44">進行中</span>';
+        }
+        tr.innerHTML = `<td>${r.id}${gameDisplay}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${statusHtml}</td>`;
+        if (canJoin) {
             tr.style.cursor = 'pointer';
             tr.addEventListener('click', () => client.joinRoom(r.id));
         }
@@ -1152,15 +1163,25 @@ function stopTurnTimer() {
 
 function onGameOver(data) {
     stopTurnTimer();
-    if (isInZoom) {
-        ui.addLog(`${data.winner} が勝利！`, 'important');
-        saveCurrentHand();
-        return;
-    }
-    ui.addLog(`ゲーム終了！ ${data.winner} が優勝！`, 'important');
     saveCurrentHand();
+
+    const ranking = data.ranking || [];
+    const rankingText = ranking.map((p, i) => {
+        const sign = p.totalWin >= 0 ? '+' : '';
+        return `${i + 1}位 ${p.name}  ${sign}${p.totalWin}`;
+    }).join('\n');
+
+    ui.addLog('ゲーム終了！ Total Win ランキング：', 'important');
+    ranking.forEach((p, i) => {
+        const sign = p.totalWin >= 0 ? '+' : '';
+        ui.addLog(`${i + 1}位 ${p.name}: ${sign}${p.totalWin}`, i === 0 ? 'important' : '');
+    });
+
+    if (isInZoom) return;
+
     setTimeout(() => {
-        if (confirm(`ゲーム終了！ ${data.winner} が優勝！\nロビーに戻りますか？`)) {
+        const msg = `ゲーム終了！\n\n【Total Win ランキング】\n${rankingText}\n\nロビーに戻りますか？`;
+        if (confirm(msg)) {
             client.leaveRoom();
             showScreen('lobby');
         }

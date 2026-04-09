@@ -227,6 +227,7 @@ function broadcastRoomList() {
     const list = [...rooms.values()].map(r => ({
         id: r.id, hostName: r.members[0]?.name || '???',
         playerCount: r.members.length, playing: r.playing,
+        gameName: r.game?.gameConfig?.name || ''
     }));
     for (const [ws] of clients) {
         send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
@@ -416,10 +417,49 @@ function handleMessage(ws, client, msg) {
             if (client.roomId) leaveRoom(client);
             const room = rooms.get(msg.roomId);
             if (!room) { send(ws, { type: 'error', message: 'ルームが見つかりません' }); return; }
-            if (room.playing) { send(ws, { type: 'error', message: 'ゲーム進行中です' }); return; }
             if (room.members.length >= 6) { send(ws, { type: 'error', message: 'ルームが満員です' }); return; }
             room.members.push({ clientId: client.id, name: client.name, ws });
             client.roomId = room.id;
+
+            if (room.playing && room.game) {
+                let seatIdx = room.game.players.findIndex(p => !p.connected && p.chips <= 0);
+                if (seatIdx < 0) seatIdx = room.game.players.findIndex(p => !p.connected);
+
+                if (seatIdx >= 0) {
+                    let p = room.game.players[seatIdx];
+                    p.name = client.name;
+                    p.chips = MID_JOIN_CHIPS;
+                    p.connected = true;
+                    p.folded = true;
+                    p.id = seatIdx;
+                } else {
+                    seatIdx = room.game.players.length;
+                    room.game.players.push({
+                        id: seatIdx,
+                        name: client.name,
+                        chips: MID_JOIN_CHIPS,
+                        isHuman: true,
+                        connected: true,
+                        hand: [],
+                        folded: true,
+                        allIn: false,
+                        currentBet: 0,
+                        seatBet: 0,
+                        upCards: [],
+                        downCards: [],
+                        lastAction: '',
+                    });
+                    room.game.playerCount = room.game.players.length;
+                }
+                // Record initial chips for end-of-game ranking
+                if (!room.initialChips) room.initialChips = {};
+                room.initialChips[client.name] = MID_JOIN_CHIPS;
+                room.seatMap[client.id] = seatIdx;
+                broadcastGameState(room);
+                send(ws, { type: 'log', message: `${client.name} が途中参加しました（${MID_JOIN_CHIPS}チップ）`, cls: 'important' });
+                broadcastToRoom(room, { type: 'log', message: `${client.name} が途中参加しました`, cls: 'important' });
+            }
+
             send(ws, { type: 'room_joined', room: room.toJSON() });
             broadcastRoomUpdate(room);
             broadcastRoomList();
@@ -571,11 +611,16 @@ function handleDisconnect(client) {
 // ============================================
 // Start Game
 // ============================================
+const MID_JOIN_CHIPS = 10000; // 100BB of NLHE (BB=100)
+
 function startGame(room) {
     const names = room.members.map(m => m.name);
     const filteredGames = room.settings.selectedGames.map(i => GAME_LIST[i]);
 
     const game = new GameState(names, room.settings.startingChips);
+    // Record each player's starting chips for end-of-game ranking
+    room.initialChips = {};
+    names.forEach(n => { room.initialChips[n] = room.settings.startingChips; });
     game.filteredGames = filteredGames;
     game.delay = (ms) => new Promise(r => setTimeout(r, Math.min(ms, 800)));
 
@@ -727,12 +772,20 @@ async function runGameLoop(room) {
     room.playing = false;
     broadcastGameState(room);
 
-    const winner = game.players.filter(p => p.chips > 0);
-    const winnerName = winner.length > 0 ? winner[0].name : '???';
+    const initialChips = room.initialChips || {};
+    const ranking = game.players
+        .filter(p => p.name)
+        .map(p => ({
+            name: p.name,
+            finalChips: p.chips,
+            initialChips: initialChips[p.name] || room.settings.startingChips,
+            totalWin: p.chips - (initialChips[p.name] || room.settings.startingChips),
+        }))
+        .sort((a, b) => b.totalWin - a.totalWin);
+
     broadcastToRoom(room, {
         type: 'game_over',
-        winner: winnerName,
-        finalChips: game.players.map(p => ({ name: p.name, chips: p.chips })),
+        ranking,
     });
     broadcastRoomList();
 }
