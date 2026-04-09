@@ -681,7 +681,7 @@ body {
 #bottom-area {
     display: flex; flex-direction: row; flex-shrink: 0;
     background: #111318; border-top: 1px solid #2a2d35;
-    height: 160px;
+    height: 200px;
 }
 #log-panel {
     width: 200px; flex-shrink: 0;
@@ -695,45 +695,69 @@ body {
 }
 
 #action-bar {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 8px; padding: 8px; flex: 1; justify-content: center;
+    display: flex; flex-direction: column;
+    gap: 5px; padding: 8px 12px; flex: 1; justify-content: flex-end;
 }
-#action-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+#action-buttons {
+    display: flex; flex-direction: column; gap: 5px; width: 100%;
+}
 
+/* Action button — full-width vertical stack */
 .btn-action {
-    padding: 10px 20px; font-size: 15px; border: none; border-radius: 6px;
-    cursor: pointer; font-weight: bold; color: #fff; transition: all 0.15s; min-width: 80px;
+    padding: 13px 20px; font-size: 15px; border: none; border-radius: 8px;
+    cursor: pointer; font-weight: bold; color: #fff; transition: all 0.15s;
+    width: 100%; text-align: center; letter-spacing: 0.3px;
 }
-.btn-action:hover { transform: scale(1.05); filter: brightness(1.15); }
-.btn-fold { background: #555; }
-.btn-check { background: var(--btn-check); }
-.btn-call { background: #1976d2; }
-.btn-bet { background: var(--btn-bet); }
-.btn-raise { background: var(--btn-raise); }
+.btn-action:hover { filter: brightness(1.12); }
+.btn-action:active { transform: scale(0.98); }
+.btn-fold  { background: #37474f; }
+.btn-check { background: #2e7d32; }
+.btn-call  { background: #2e7d32; }
+.btn-bet   { background: #c62828; }
+.btn-raise { background: #c62828; }
 .btn-allin { background: #6a1b9a; }
 
-#bet-presets { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-.btn-preset {
-    padding: 5px 12px; font-size: 13px; border: 1px solid var(--gold); border-radius: 4px;
-    background: transparent; color: var(--gold); cursor: pointer; font-weight: bold;
-    transition: all 0.15s;
+/* Raise/Bet row: button + amount input side by side */
+.action-raise-row {
+    display: flex; gap: 6px; width: 100%; align-items: stretch;
 }
-.btn-preset:hover { background: var(--gold); color: #111; }
+.action-raise-row .btn-action { flex: 1; }
+.bet-raise-input {
+    width: 70px; flex-shrink: 0;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; color: #fff; font-size: 14px; font-weight: bold;
+    text-align: center; padding: 0 8px; font-family: inherit; outline: none;
+    transition: border-color 0.2s;
+}
+.bet-raise-input:focus { border-color: var(--accent); box-shadow: 0 0 6px rgba(56,189,248,0.3); }
+.bet-raise-input::-webkit-outer-spin-button,
+.bet-raise-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
-#bet-slider-area { display: flex; align-items: center; gap: 12px; }
+/* Bet presets row */
+#bet-presets { display: flex; gap: 5px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 2px; }
+.btn-preset {
+    padding: 4px 10px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
+    background: rgba(255,255,255,0.07); color: #ccc; cursor: pointer; font-weight: 600;
+    transition: all 0.12s; white-space: nowrap;
+}
+.btn-preset:hover { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.4); }
+.btn-preset.active { background: rgba(0,229,255,0.2); color: var(--gold); border-color: var(--gold); }
+
+/* Slider: hidden but functional */
+#bet-slider-area { display: none; }
 #bet-slider { width: 200px; accent-color: var(--gold); }
-.bet-numpad-input { 
-    font-size: 16px; color: var(--gold); font-weight: bold; 
-    width: 80px; text-align: right; 
-    background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); 
+
+/* Legacy input (unused in new layout but kept for compat) */
+.bet-numpad-input {
+    font-size: 16px; color: var(--gold); font-weight: bold;
+    width: 80px; text-align: right;
+    background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border);
     border-radius: 6px; padding: 4px 8px; font-family: inherit;
     outline: none; transition: border-color 0.2s;
 }
-.bet-numpad-input:focus { border-color: var(--accent); box-shadow: 0 0 8px rgba(56,189,248,0.4); }
 .bet-numpad-input::-webkit-outer-spin-button,
-.bet-numpad-input::-webkit-inner-spin-button {
-  -webkit-appearance: none; margin: 0;
-}
+.bet-numpad-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .bet-numpad-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Draw Action Bar */
@@ -1096,7 +1120,9 @@ body {
     /* Game Log */
     #game-log { height: auto; padding: 4px 8px; font-size: 10px; }
     #log-panel { width: 160px; }
-    #bottom-area { height: 140px; }
+    #bottom-area { height: 185px; }
+    .btn-action { padding: 11px 16px; font-size: 14px; }
+    .bet-raise-input { width: 58px; font-size: 13px; }
 
     /* Chat */
     .chat-bar { padding: 6px 8px; gap: 6px; }
@@ -1163,7 +1189,8 @@ body {
     #player-hand { height: 66px; margin-top: 36px; }
     #game-log { height: auto; font-size: 9px; }
     #log-panel { width: 130px; }
-    #bottom-area { height: 130px; }
+    #bottom-area { height: 170px; }
+    .btn-action { padding: 9px 12px; font-size: 13px; }
 }
 
 /* ============================================================
@@ -1175,6 +1202,8 @@ body {
     #game-rotation { font-size: 10px; }
     #player-hand { height: 60px; padding: 1px 0; margin-top: 28px; }
     #player-cards .card { width: 34px; height: 46px; }
+    #bottom-area { height: 160px; }
+    .btn-action { padding: 8px 10px; font-size: 12px; }
     #player-cards .card-rank { font-size: 14px; }
     #player-cards .card-suit { font-size: 12px; }
     #game-log { height: auto; font-size: 9px; }

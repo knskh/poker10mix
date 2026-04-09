@@ -63,6 +63,7 @@ let turnTimerStart = 0;
 let turnTimeLimit = 45;
 let loggedInAccount = null; // { name, email }
 let isInZoom = false;
+let currentTurnBB = 100; // bigBlind for current turn (for bb display in action buttons)
 let handHistory = loadHandHistory(); // last 30 hands [{gameName, logs:[]}]
 let currentHandLogs = []; // logs for current hand
 let startingHandCards = []; // starting hand card objects captured at hand start
@@ -495,32 +496,36 @@ function setupGameScreen() {
         document.getElementById('rules-modal').classList.add('hidden');
     });
 
-    // Bet slider and numpad sync
+    // Bet slider and raise-input sync (event delegation since inputs are created dynamically)
     const betSlider = document.getElementById('bet-slider');
-    const betInput = document.getElementById('bet-amount-input');
-    
+
     betSlider.addEventListener('input', (e) => {
-        if (!betInput) return;
-        betInput.value = parseInt(e.target.value) + sliderOffset;
+        const total = parseInt(e.target.value) + sliderOffset;
+        const betInput = document.getElementById('bet-amount-input');
+        if (betInput) betInput.value = total;
+        updateRaiseBtnText(total);
     });
-    
-    if (betInput) {
-        betInput.addEventListener('input', (e) => {
-            let val = parseInt(e.target.value) || 0;
-            let sliderVal = val - sliderOffset;
-            if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
-            if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
-            betSlider.value = sliderVal;
-        });
-        betInput.addEventListener('blur', (e) => {
-            let val = parseInt(e.target.value) || 0;
-            let sliderVal = val - sliderOffset;
-            if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
-            if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
-            betInput.value = sliderVal + sliderOffset;
-            betSlider.value = sliderVal;
-        });
-    }
+
+    document.addEventListener('input', (e) => {
+        if (e.target.id !== 'bet-amount-input') return;
+        let val = parseInt(e.target.value) || 0;
+        let sliderVal = val - sliderOffset;
+        if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
+        if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
+        betSlider.value = sliderVal;
+        updateRaiseBtnText(val);
+    });
+
+    document.addEventListener('blur', (e) => {
+        if (e.target.id !== 'bet-amount-input') return;
+        let val = parseInt(e.target.value) || 0;
+        let sliderVal = val - sliderOffset;
+        if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
+        if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
+        e.target.value = sliderVal + sliderOffset;
+        betSlider.value = sliderVal;
+        updateRaiseBtnText(e.target.value);
+    }, true);
 
     // Draw buttons
     document.getElementById('btn-draw').addEventListener('click', () => {
@@ -1112,82 +1117,122 @@ function onYourDraw(data) {
     if (currentState) ui.renderPlayerHand(currentState);
 }
 
+// Format chips as bb string for action buttons
+function fmtActionBB(chips) {
+    const bb = currentTurnBB || 100;
+    if (!bb) return chips.toLocaleString();
+    const v = chips / bb;
+    return Number.isInteger(v) ? `${v}bb` : `${parseFloat(v.toFixed(1))}bb`;
+}
+
+// Update the raise/bet button text dynamically as slider/input changes
+function updateRaiseBtnText(totalChips) {
+    const btn = document.getElementById('btn-raise-main');
+    if (!btn) return;
+    const parts = btn.textContent.split(' ');
+    const label = parts[0]; // レイズ or ベット
+    btn.textContent = `${label} ${fmtActionBB(totalChips)}`;
+}
+
 function showActionButtons(actions, turnData) {
     const bar = document.getElementById('action-bar');
     const btnDiv = document.getElementById('action-buttons');
-    const sliderArea = document.getElementById('bet-slider-area');
     const presetsDiv = document.getElementById('bet-presets');
     bar.classList.remove('hidden');
     btnDiv.innerHTML = '';
-    sliderArea.classList.add('hidden');
     presetsDiv.classList.add('hidden');
     presetsDiv.innerHTML = '';
+
+    currentTurnBB = turnData.bigBlind || 0;
+    const isStud = !currentTurnBB;
+
     let hasSlider = false;
-    let sliderAction = null; // 'bet' or 'raise'
+    let sliderAction = null;
     let sliderMin = 0, sliderMax = 0;
 
-    for (const action of actions) {
-        const btn = document.createElement('button');
-        btn.className = `btn-action btn-${action.type}`;
+    // Sort: raise/bet (top) → allin → call/check → fold (bottom)
+    const order = ['raise', 'bet', 'allin', 'call', 'check', 'fold'];
+    const sorted = [...actions].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
 
-        switch (action.type) {
-            case 'fold':
-                btn.textContent = 'フォールド';
-                btn.addEventListener('click', () => { sendActionAndHide({ type: 'fold' }); });
-                break;
-            case 'check':
-                btn.textContent = 'チェック';
-                btn.addEventListener('click', () => { sendActionAndHide({ type: 'check' }); });
-                break;
-            case 'call':
-                btn.textContent = `コール ${action.amount}`;
-                btn.addEventListener('click', () => { sendActionAndHide({ type: 'call', amount: action.amount }); });
-                break;
-            case 'bet':
-                if (action.min !== undefined) {
-                    btn.textContent = 'ベット';
-                    hasSlider = true;
-                    sliderAction = 'bet';
-                    sliderMin = action.min;
-                    sliderMax = action.max;
-                    btn.addEventListener('click', () => {
-                        const val = parseInt(document.getElementById('bet-slider').value);
-                        sendActionAndHide({ type: 'bet', amount: val });
-                    });
-                    setupSlider(action.min, action.max, 0);
-                } else {
-                    btn.textContent = `ベット ${action.amount}`;
-                    btn.addEventListener('click', () => { sendActionAndHide({ type: 'bet', amount: action.amount }); });
-                }
-                break;
-            case 'raise':
-                if (action.min !== undefined) {
-                    btn.textContent = 'レイズ';
-                    hasSlider = true;
-                    sliderAction = 'raise';
-                    sliderMin = action.min;
-                    sliderMax = action.max;
-                    const curBet = action.currentBet || 0;
-                    btn.addEventListener('click', () => {
-                        const val = parseInt(document.getElementById('bet-slider').value);
-                        sendActionAndHide({ type: 'raise', amount: val });
-                    });
-                    setupSlider(action.min, action.max, curBet);
-                } else {
-                    btn.textContent = `レイズ ${action.total || action.amount}`;
-                    btn.addEventListener('click', () => { sendActionAndHide({ type: 'raise', amount: action.amount }); });
-                }
-                break;
-            case 'allin':
-                btn.textContent = `オールイン ${action.total || action.amount}`;
-                btn.className = 'btn-action btn-allin';
-                btn.addEventListener('click', () => { sendActionAndHide({ type: 'allin', amount: action.amount }); });
-                break;
+    for (const action of sorted) {
+        if ((action.type === 'bet' || action.type === 'raise') && action.min !== undefined) {
+            // Variable raise/bet: row with button + amount input
+            hasSlider = true;
+            sliderAction = action.type;
+            sliderMin = action.min;
+            sliderMax = action.max;
+            const curBet = action.currentBet || 0;
+            setupSlider(action.min, action.max, curBet);
+
+            const initTotal = action.min + curBet;
+            const label = action.type === 'raise' ? 'レイズ' : 'ベット';
+
+            const row = document.createElement('div');
+            row.className = 'action-raise-row';
+
+            const btn = document.createElement('button');
+            btn.id = 'btn-raise-main';
+            btn.className = `btn-action btn-${action.type}`;
+            btn.textContent = `${label} ${fmtActionBB(initTotal)}`;
+            btn.addEventListener('click', () => {
+                const val = parseInt(document.getElementById('bet-slider').value);
+                sendActionAndHide({ type: action.type, amount: val });
+            });
+
+            const inp = document.createElement('input');
+            inp.type = 'number';
+            inp.id = 'bet-amount-input';
+            inp.className = 'bet-raise-input';
+            inp.inputMode = 'numeric';
+            inp.value = initTotal;
+            inp.placeholder = isStud ? '' : `${(initTotal / (currentTurnBB||100)).toFixed(1)}`;
+
+            row.appendChild(btn);
+            row.appendChild(inp);
+            btnDiv.appendChild(row);
+        } else {
+            const btn = document.createElement('button');
+            btn.className = `btn-action btn-${action.type}`;
+
+            switch (action.type) {
+                case 'fold':
+                    btn.textContent = 'フォールド';
+                    btn.addEventListener('click', () => sendActionAndHide({ type: 'fold' }));
+                    break;
+                case 'check':
+                    btn.textContent = 'チェック';
+                    btn.addEventListener('click', () => sendActionAndHide({ type: 'check' }));
+                    break;
+                case 'call':
+                    btn.textContent = isStud
+                        ? `コール ${action.amount.toLocaleString()}`
+                        : `コール ${fmtActionBB(action.amount)}`;
+                    btn.addEventListener('click', () => sendActionAndHide({ type: 'call', amount: action.amount }));
+                    break;
+                case 'bet':
+                    btn.textContent = isStud
+                        ? `ベット ${action.amount.toLocaleString()}`
+                        : `ベット ${fmtActionBB(action.amount)}`;
+                    btn.addEventListener('click', () => sendActionAndHide({ type: 'bet', amount: action.amount }));
+                    break;
+                case 'raise':
+                    btn.textContent = isStud
+                        ? `レイズ ${(action.total || action.amount).toLocaleString()}`
+                        : `レイズ ${fmtActionBB(action.total || action.amount)}`;
+                    btn.addEventListener('click', () => sendActionAndHide({ type: 'raise', amount: action.amount }));
+                    break;
+                case 'allin':
+                    btn.textContent = isStud
+                        ? `オールイン ${(action.total || action.amount).toLocaleString()}`
+                        : `オールイン ${fmtActionBB(action.total || action.amount)}`;
+                    btn.addEventListener('click', () => sendActionAndHide({ type: 'allin', amount: action.amount }));
+                    break;
+            }
+            btnDiv.appendChild(btn);
         }
-        btnDiv.appendChild(btn);
     }
+
     if (hasSlider) {
-        sliderArea.classList.remove('hidden');
         renderBetPresets(turnData, sliderAction, sliderMin, sliderMax);
     }
 }
@@ -1201,27 +1246,27 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
     const isFirstRound = turnData.isFirstRound;
     const tableBet = turnData.currentBet || 0;
 
-    // Preflop unopened: BB-based buttons (when currentBet <= bigBlind)
+    // Preflop unopened: BB-based buttons
     if (isFirstRound && tableBet <= bb) {
         [2, 2.5, 3, 3.5, 4].forEach(mult => {
             const targetTotal = Math.round(bb * mult);
-            presets.push({ label: `${mult}BB`, targetTotal });
+            presets.push({ label: `${mult}bb`, targetTotal });
         });
     } else if (isFirstRound && tableBet > bb) {
-        // Preflop facing a raise: 2X, 3X, 4X, 5X of the current bet
-        [2, 3, 4, 5].forEach(mult => {
+        // Preflop facing raise: multipliers of current bet
+        [2, 2.5, 3, 4].forEach(mult => {
             const targetTotal = Math.round(tableBet * mult);
-            presets.push({ label: `${mult}X`, targetTotal });
+            presets.push({ label: `${mult}x`, targetTotal });
         });
     } else if (!isFirstRound) {
-        // Postflop: pot percentage buttons
-        [0.33, 0.66, 1.0, 1.5].forEach(pct => {
+        // Postflop: pot percentages + multipliers
+        [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
             const targetTotal = Math.round(pot * pct) + tableBet;
-            presets.push({ label: `${Math.round(pct * 100)}%`, targetTotal });
+            presets.push({ label, targetTotal });
         });
     }
 
-    // Remove presets that exceed slider limits
+    // Filter out presets outside slider range
     const filtered = presets.filter(p => {
         const outOfPocket = p.targetTotal - sliderOffset;
         return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
@@ -1235,9 +1280,13 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
         btn.addEventListener('click', () => {
             const outOfPocket = p.targetTotal - sliderOffset;
             const slider = document.getElementById('bet-slider');
-            if(slider) slider.value = outOfPocket;
+            if (slider) slider.value = outOfPocket;
             const input = document.getElementById('bet-amount-input');
-            if(input) input.value = p.targetTotal;
+            if (input) input.value = p.targetTotal;
+            updateRaiseBtnText(p.targetTotal);
+            // Highlight active preset
+            presetsDiv.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
         });
         presetsDiv.appendChild(btn);
     }
@@ -1250,8 +1299,9 @@ function setupSlider(min, max, currentBet) {
     slider.min = min; slider.max = max; slider.value = min;
     slider.step = Math.max(Math.floor(min / 2), 10);
     sliderOffset = currentBet || 0;
+    // bet-amount-input is created dynamically in the raise row
     const input = document.getElementById('bet-amount-input');
-    if(input) input.value = min + sliderOffset;
+    if (input) input.value = min + sliderOffset;
 }
 
 function sendActionAndHide(action) {
