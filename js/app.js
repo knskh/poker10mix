@@ -294,10 +294,10 @@ function renderRoomList(data) {
 // ==========================================
 // Room Screen
 // ==========================================
-let selectedGames = new Set();
+let mySelectedGames = new Set(GAME_LIST.map((_, i) => i)); // my own selection
 
 function setupRoomScreen() {
-    // Build game checkboxes
+    // Build game checkboxes (all players can select)
     const container = document.getElementById('room-game-checkboxes');
     GAME_LIST.forEach((g, i) => {
         const label = document.createElement('label');
@@ -306,10 +306,9 @@ function setupRoomScreen() {
         cb.type = 'checkbox';
         cb.checked = true;
         cb.dataset.index = i;
-        selectedGames.add(i);
         cb.addEventListener('change', () => {
-            if (cb.checked) selectedGames.add(i); else selectedGames.delete(i);
-            client.updateSettings({ selectedGames: [...selectedGames] });
+            if (cb.checked) mySelectedGames.add(i); else mySelectedGames.delete(i);
+            client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames] });
         });
         label.appendChild(cb);
         label.appendChild(document.createTextNode(g.name));
@@ -329,6 +328,8 @@ function setupRoomScreen() {
 
 function onRoomJoined(room) {
     currentRoom = room;
+    // Send my current game selection to server on join
+    client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames] });
     showScreen('room');
     renderRoom(room);
 }
@@ -352,17 +353,32 @@ function renderRoom(room) {
         list.appendChild(li);
     }
 
-    // Show/hide host controls
+    // All players see the game selection (my own checkboxes)
+    const checkboxes = document.querySelectorAll('#room-game-checkboxes input');
+    checkboxes.forEach(cb => { cb.checked = mySelectedGames.has(parseInt(cb.dataset.index)); });
+
+    // Show merged game pool info
+    const merged = room.mergedGames || room.settings?.selectedGames || [];
+    let mergedDiv = document.getElementById('room-merged-games');
+    if (!mergedDiv) {
+        mergedDiv = document.createElement('div');
+        mergedDiv.id = 'room-merged-games';
+        mergedDiv.className = 'room-merged-games';
+        const cbContainer = document.getElementById('room-game-checkboxes');
+        cbContainer.parentNode.insertBefore(mergedDiv, cbContainer.nextSibling);
+    }
+    const mergedNames = merged.map(i => GAME_LIST[i]?.shortName || '').filter(Boolean);
+    mergedDiv.innerHTML = `<strong>プレイ予定ゲーム</strong>${mergedNames.join(' / ') || 'なし'}`;
+
+    // Host-only: starting chips + start button
     const isHost = room.hostId === client.clientId;
-    document.getElementById('room-host-controls').style.display = isHost ? 'block' : 'none';
+    document.getElementById('btn-start-game').style.display = isHost ? '' : 'none';
+    const chipsLabel = document.getElementById('room-starting-chips')?.closest('label');
+    if (chipsLabel) chipsLabel.style.display = isHost ? '' : 'none';
     document.getElementById('room-waiting-msg').style.display = isHost ? 'none' : 'block';
+    document.getElementById('room-host-controls').style.display = 'block';
 
-
-    // Update settings from room
     if (room.settings) {
-        selectedGames = new Set(room.settings.selectedGames);
-        const checkboxes = document.querySelectorAll('#room-game-checkboxes input');
-        checkboxes.forEach(cb => { cb.checked = selectedGames.has(parseInt(cb.dataset.index)); });
         document.getElementById('room-starting-chips').value = room.settings.startingChips;
     }
 }

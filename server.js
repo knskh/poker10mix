@@ -164,6 +164,7 @@ class Room {
         this.id = id;
         this.hostId = hostId;
         this.members = []; // [{ clientId, name, ws }]
+        this.playerGames = {}; // clientId -> [gameIndex, ...] (per-player selection)
         this.settings = {
             selectedGames: GAME_LIST.map((_, i) => i),
             startingChips: 10000,
@@ -173,6 +174,21 @@ class Room {
         this.pending = null; // { type, playerId, resolve, timer }
         this.seatMap = {};   // clientId -> seatIndex
         this.stats = new StatsTracker();
+    }
+
+    // Union of all members' selected games
+    getMergedGames() {
+        const union = new Set();
+        for (const m of this.members) {
+            const sel = this.playerGames[m.clientId];
+            if (sel && sel.length > 0) {
+                sel.forEach(i => union.add(i));
+            } else {
+                // Player with no selection: include all games
+                GAME_LIST.forEach((_, i) => union.add(i));
+            }
+        }
+        return [...union].sort((a, b) => a - b);
     }
 
     getMember(clientId) {
@@ -194,6 +210,8 @@ class Room {
             hostId: this.hostId,
             members: this.members.map(m => ({ clientId: m.clientId, name: m.name })),
             settings: this.settings,
+            playerGames: this.playerGames,
+            mergedGames: this.getMergedGames(),
             playing: this.playing,
             playerCount: this.members.length,
         };
@@ -460,6 +478,13 @@ function handleMessage(ws, client, msg) {
                 broadcastToRoom(room, { type: 'log', message: `${client.name} が途中参加しました`, cls: 'important' });
             }
 
+            // Recompute merged games after player joins
+            room.settings.selectedGames = room.getMergedGames();
+            if (room.playing && room.game) {
+                const newFiltered = room.settings.selectedGames.map(i => GAME_LIST[i]);
+                if (newFiltered.length > 0) room.game.filteredGames = newFiltered;
+            }
+
             send(ws, { type: 'room_joined', room: room.toJSON() });
             broadcastRoomUpdate(room);
             broadcastRoomList();
@@ -474,10 +499,33 @@ function handleMessage(ws, client, msg) {
 
         case 'update_settings': {
             const room = rooms.get(client.roomId);
-            if (!room || room.hostId !== client.id || room.playing) return;
+            if (!room || room.playing) return;
             if (msg.settings) {
-                if (msg.settings.selectedGames) room.settings.selectedGames = msg.settings.selectedGames;
-                if (msg.settings.startingChips) room.settings.startingChips = msg.settings.startingChips;
+                // Only host can change startingChips
+                if (msg.settings.startingChips && room.hostId === client.id) {
+                    room.settings.startingChips = msg.settings.startingChips;
+                }
+            }
+            broadcastRoomUpdate(room);
+            break;
+        }
+
+        case 'update_game_selection': {
+            const room = rooms.get(client.roomId);
+            if (!room) return;
+            room.playerGames[client.id] = msg.selectedGames || [];
+            // Update merged game list
+            room.settings.selectedGames = room.getMergedGames();
+            // If game running, update filteredGames live
+            if (room.playing && room.game) {
+                const newFiltered = room.settings.selectedGames.map(i => GAME_LIST[i]);
+                if (newFiltered.length > 0) {
+                    room.game.filteredGames = newFiltered;
+                    if (room.game.currentGameIndex >= newFiltered.length) {
+                        room.game.currentGameIndex = 0;
+                    }
+                }
+                broadcastGameState(room);
             }
             broadcastRoomUpdate(room);
             break;
@@ -570,7 +618,20 @@ function leaveRoom(client) {
     if (!room) { client.roomId = null; return; }
 
     room.members = room.members.filter(m => m.clientId !== client.id);
+    delete room.playerGames[client.id];
     client.roomId = null;
+
+    // Recompute merged games after player leaves
+    if (room.members.length > 0) {
+        room.settings.selectedGames = room.getMergedGames();
+        if (room.playing && room.game) {
+            const newFiltered = room.settings.selectedGames.map(i => GAME_LIST[i]);
+            if (newFiltered.length > 0) {
+                room.game.filteredGames = newFiltered;
+                if (room.game.currentGameIndex >= newFiltered.length) room.game.currentGameIndex = 0;
+            }
+        }
+    }
 
     // Mark player as disconnected in active game
     if (room.playing) {
