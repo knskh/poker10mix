@@ -185,15 +185,41 @@ class PokerUI {
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';
 
-        // Pot
-        document.getElementById('pot-display').textContent = s.pot > 0 ? `ポット: ${s.pot}` : '';
+        // Pot display (large, gold)
+        const fmt = n => n.toLocaleString();
+        const potEl = document.getElementById('pot-display');
+        if (s.pot > 0) {
+            potEl.innerHTML = `<span class="pot-label">POT</span><span class="pot-amount">${fmt(s.pot)}</span>`;
+        } else {
+            potEl.innerHTML = '';
+        }
 
-        // Table info (current bet level)
+        // Current bet (below pot)
         const tableInfo = document.getElementById('table-info');
         if (tableInfo) {
-            const parts = [];
-            if (s.currentBet > 0) parts.push(`ベット: ${s.currentBet}`);
-            tableInfo.textContent = parts.join(' | ');
+            tableInfo.innerHTML = s.currentBet > 0
+                ? `<span class="bet-label">BET</span><span class="bet-amount">${fmt(s.currentBet)}</span>`
+                : '';
+        }
+
+        // Blind / Ante info (bottom-right of table, always visible)
+        let blindInfoEl = document.getElementById('blind-info');
+        if (!blindInfoEl) {
+            blindInfoEl = document.createElement('div');
+            blindInfoEl.id = 'blind-info';
+            blindInfoEl.className = 'blind-info';
+            document.getElementById('table-felt').appendChild(blindInfoEl);
+        }
+        if (s.gameType === 'stud') {
+            blindInfoEl.innerHTML =
+                `<span class="blind-item">ANTE <b>${fmt(s.ante || 0)}</b></span>` +
+                `<span class="blind-sep">/</span>` +
+                `<span class="blind-item">BI <b>${fmt(s.bringIn || 0)}</b></span>`;
+        } else {
+            blindInfoEl.innerHTML =
+                `<span class="blind-item">SB <b>${fmt(s.smallBlind || 0)}</b></span>` +
+                `<span class="blind-sep">/</span>` +
+                `<span class="blind-item">BB <b>${fmt(s.bigBlind || 0)}</b></span>`;
         }
 
         // Community cards
@@ -274,6 +300,14 @@ class PokerUI {
         if (s.currentPlayer === idx) el.classList.add('active-turn');
         else el.classList.remove('active-turn');
 
+        // Seat bet (shown first so it appears above avatar for bottom seats)
+        if (p.seatBet > 0) {
+            const betDiv = document.createElement('div');
+            betDiv.className = 'seat-bet';
+            betDiv.textContent = p.seatBet.toLocaleString();
+            el.appendChild(betDiv);
+        }
+
         // Dealer button
         if (s.dealerSeat === idx) {
             const btn = document.createElement('div');
@@ -335,14 +369,6 @@ class PokerUI {
                 }
             }
             el.appendChild(cardsDiv);
-        }
-
-        // Seat bet
-        if (p.seatBet > 0) {
-            const betDiv = document.createElement('div');
-            betDiv.className = 'seat-bet';
-            betDiv.textContent = `${p.seatBet}`;
-            el.appendChild(betDiv);
         }
 
         // Last action

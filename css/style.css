@@ -444,9 +444,6 @@ body {
 #table-felt.felt-high::before {
     background: repeating-radial-gradient(ellipse at center, transparent 0px, rgba(0,0,0,0.01) 1px, transparent 2px);
 }
-#table-felt.felt-high #pot-display,
-#table-felt.felt-high #table-info { color: #333; text-shadow: 0 1px 2px rgba(255,255,255,0.5); }
-
 /* Lowball games (TD, SD, Razz, Badugi) - dark/black felt */
 #table-felt.felt-low {
     background: radial-gradient(ellipse at 50% 40%, #2a2a2a 0%, #1e1e1e 50%, #141414 80%, #0a0a0a 100%);
@@ -455,8 +452,6 @@ body {
 #table-felt.felt-low::before {
     background: repeating-radial-gradient(ellipse at center, transparent 0px, rgba(255,255,255,0.015) 1px, transparent 2px);
 }
-#table-felt.felt-low #pot-display { color: #ccc; }
-#table-felt.felt-low #table-info { color: #999; }
 
 /* Hi-Lo games (O8, Stud8) - gray felt */
 #table-felt.felt-hilo {
@@ -466,8 +461,6 @@ body {
 #table-felt.felt-hilo::before {
     background: repeating-radial-gradient(ellipse at center, transparent 0px, rgba(255,255,255,0.01) 1px, transparent 2px);
 }
-#table-felt.felt-hilo #pot-display { color: #e0e0e0; }
-#table-felt.felt-hilo #table-info { color: #bbb; }
 
 /* Game type rail colors */
 #table-felt.rail-draw { border-color: #1565c0; box-shadow: 0 0 0 4px #1a1d24, 0 0 0 12px #1565c0, 0 0 0 14px #1a1d24, inset 0 0 40px rgba(0,0,0,0.4), 0 4px 24px rgba(21,101,192,0.3); }
@@ -495,16 +488,46 @@ body {
 }
 
 #pot-display {
-    position: absolute; top: 28%; left: 50%; transform: translate(-50%, -50%);
-    font-size: 15px; color: #ddd; font-weight: bold;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.8); text-align: center;
+    position: absolute; top: 26%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.pot-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    color: rgba(255,200,0,0.7); text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+}
+.pot-amount {
+    font-size: 22px; font-weight: 800; color: var(--gold);
+    text-shadow: 0 0 12px rgba(255,200,0,0.5), 0 2px 6px rgba(0,0,0,0.9);
+    line-height: 1;
 }
 #table-info {
-    position: absolute; top: 36%; left: 50%; transform: translate(-50%, -50%);
-    font-size: 12px; color: #aab; font-weight: normal;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8); text-align: center;
-    background: rgba(0,0,0,0.25); padding: 4px 14px; border-radius: 12px;
+    position: absolute; top: 37%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; display: flex; align-items: center; gap: 5px;
+    background: #0d3060; border: 1px solid #1a5cb0;
+    padding: 3px 12px; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
 }
+.bet-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #7ab4e8;
+}
+.bet-amount {
+    font-size: 14px; font-weight: 800; color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+}
+.blind-info {
+    position: absolute; top: 8%; right: 10%;
+    display: flex; align-items: center; gap: 4px;
+    background: #0d3060; border: 1px solid #1a5cb0;
+    border-radius: 8px; padding: 4px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+.blind-item {
+    font-size: 10px; color: #90bce8; letter-spacing: 0.3px;
+}
+.blind-item b { color: #fff; font-weight: 800; }
+.blind-sep { font-size: 10px; color: #4477aa; }
+#table-felt.felt-high .pot-amount { color: #1a3a6b; text-shadow: 0 1px 2px rgba(255,255,255,0.4); }
+#table-felt.felt-high .pot-label { color: rgba(10,40,90,0.6); }
 
 #community-cards {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -612,12 +635,12 @@ body {
 .card.suit-c { background: #2e7d32; color: #fff; }
 
 /* Player hand (own cards, larger) */
-#player-hand { display: flex; justify-content: center; align-items: center; padding: 4px 0; height: 90px; flex-shrink: 0; }
+#player-hand { display: flex; justify-content: center; align-items: center; padding: 4px 0; height: 76px; flex-shrink: 0; }
 #player-cards { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; align-items: center; }
 .hand-rank-label { width: 100%; text-align: center; font-size: 11px; color: var(--gold); margin-top: 1px; letter-spacing: 0.5px; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
-#player-cards .card { width: 50px; height: 68px; border-radius: 5px; }
-#player-cards .card-rank { font-size: 18px; }
-#player-cards .card-suit { font-size: 17px; }
+#player-cards .card { width: 44px; height: 60px; border-radius: 5px; }
+#player-cards .card-rank { font-size: 16px; }
+#player-cards .card-suit { font-size: 15px; }
 
 /* Community cards (medium) */
 #community-cards .card { width: 48px; height: 66px; border-radius: 5px; }
