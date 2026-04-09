@@ -124,7 +124,7 @@ class PokerClient {
     }
 
     setName(name) { this.name = name; this.send({ type: 'set_name', name }); }
-    createRoom(selectedGames) { this.send({ type: 'create_room', selectedGames }); }
+    createRoom() { this.send({ type: 'create_room' }); }
     joinZoom() { this.send({ type: 'join_zoom' }); }
     leaveZoom() { this.send({ type: 'leave_zoom' }); }
     zoomSitout() { this.send({ type: 'zoom_sitout' }); }

@@ -176,19 +176,19 @@ class Room {
         this.stats = new StatsTracker();
     }
 
-    // Union of all members' selected games
+    // Intersection of all members' selected games (only games everyone wants)
     getMergedGames() {
-        const union = new Set();
+        let result = new Set(GAME_LIST.map((_, i) => i));
         for (const m of this.members) {
             const sel = this.playerGames[m.clientId];
             if (sel && sel.length > 0) {
-                sel.forEach(i => union.add(i));
-            } else {
-                // Player with no selection: include all games
-                GAME_LIST.forEach((_, i) => union.add(i));
+                result = new Set([...result].filter(i => sel.includes(i)));
             }
+            // No selection = all games OK, no filtering needed
         }
-        return [...union].sort((a, b) => a - b);
+        // Fallback: if intersection is empty, use all games
+        if (result.size === 0) result = new Set(GAME_LIST.map((_, i) => i));
+        return [...result].sort((a, b) => a - b);
     }
 
     getMember(clientId) {
@@ -425,10 +425,6 @@ function handleMessage(ws, client, msg) {
             const roomId = generateRoomId();
             const room = new Room(roomId, client.id, client.name);
             room.members.push({ clientId: client.id, name: client.name, ws });
-            if (msg.selectedGames && msg.selectedGames.length > 0) {
-                room.playerGames[client.id] = msg.selectedGames;
-                room.settings.selectedGames = room.getMergedGames();
-            }
             rooms.set(roomId, room);
             client.roomId = roomId;
             send(ws, { type: 'room_joined', room: room.toJSON() });

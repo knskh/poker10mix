@@ -292,23 +292,6 @@ body {
 .room-chat-name { color: var(--gold); font-weight: bold; margin-right: 4px; }
 .room-chat .chat-bar { border-top: 1px solid #2a2d35; }
 
-/* === Create Room Modal === */
-.modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
-    display: flex; align-items: center; justify-content: center; z-index: 300;
-}
-.modal-box {
-    background: #22262e; border: 1px solid #444;
-    border-radius: 14px; padding: 28px 24px; width: 90%; max-width: 440px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.7);
-}
-.modal-box h2 { color: var(--gold); margin-bottom: 6px; font-size: 18px; }
-.modal-hint { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; }
-.create-room-checkboxes {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 20px;
-}
-.modal-actions { display: flex; gap: 10px; }
-.modal-actions .btn-primary { flex: 1; }
 
 /* === Stats Modal === */
 #stats-modal {
