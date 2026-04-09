@@ -1977,4 +1977,13 @@ function setupChat() {
 
 function onChat(data) {
     ui.addLog(`[${data.from}] ${data.message}`, 'chat');
+    // Also show in room chat log (waiting room)
+    const roomLog = document.getElementById('room-chat-log');
+    if (roomLog) {
+        const div = document.createElement('div');
+        div.className = 'room-chat-msg';
+        div.innerHTML = `<span class="room-chat-name">${data.from}:</span> ${data.message}`;
+        roomLog.appendChild(div);
+        roomLog.scrollTop = roomLog.scrollHeight;
+    }
 }
