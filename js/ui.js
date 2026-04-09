@@ -1,5 +1,25 @@
 // js/ui.js - UI Rendering (Multiplayer)
 
+// Position label helper
+function getPositionLabel(players, dealerSeat, targetIdx) {
+    const seated = [];
+    for (let i = 0; i < players.length; i++) {
+        const si = (dealerSeat + i) % players.length;
+        if (players[si].name) seated.push(si);
+    }
+    const n = seated.length;
+    const posNames = {
+        2: ['SB', 'BB'],
+        3: ['BTN', 'SB', 'BB'],
+        4: ['BTN', 'SB', 'BB', 'UTG'],
+        5: ['BTN', 'SB', 'BB', 'HJ', 'CO'],
+        6: ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO'],
+    };
+    const labels = posNames[Math.min(n, 6)] || posNames[6];
+    const orderIdx = seated.indexOf(targetIdx);
+    return orderIdx >= 0 ? (labels[orderIdx] || '') : '';
+}
+
 // Card constants for client-side rendering
 const RANK_DISPLAY = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
 const SUIT_DISPLAY = { s:'\u2660', h:'\u2665', d:'\u2666', c:'\u2663' };
@@ -185,24 +205,31 @@ class PokerUI {
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';
 
-        // Pot display (large, gold)
-        const fmt = n => n.toLocaleString();
+        // BB formatter helper
+        const bb = s.bigBlind || 100;
+        const fmtBB = n => {
+            if (!n) return '0bb';
+            const v = n / bb;
+            return (Number.isInteger(v) ? v : parseFloat(v.toFixed(1))) + 'bb';
+        };
+
+        // Pot display: "Pot 1.5bb" style
         const potEl = document.getElementById('pot-display');
         if (s.pot > 0) {
-            potEl.innerHTML = `<span class="pot-label">POT</span><span class="pot-amount">${fmt(s.pot)}</span>`;
+            potEl.innerHTML = `<span class="pot-label">Pot</span><span class="pot-amount">${fmtBB(s.pot)}</span>`;
         } else {
             potEl.innerHTML = '';
         }
 
-        // Current bet (below pot)
+        // Current bet
         const tableInfo = document.getElementById('table-info');
         if (tableInfo) {
             tableInfo.innerHTML = s.currentBet > 0
-                ? `<span class="bet-label">BET</span><span class="bet-amount">${fmt(s.currentBet)}</span>`
+                ? `<span class="bet-label">Bet</span><span class="bet-amount">${fmtBB(s.currentBet)}</span>`
                 : '';
         }
 
-        // Blind / Ante info (bottom-right of table, always visible)
+        // Blind info (small, top-left of table)
         let blindInfoEl = document.getElementById('blind-info');
         if (!blindInfoEl) {
             blindInfoEl = document.createElement('div');
@@ -212,14 +239,14 @@ class PokerUI {
         }
         if (s.gameType === 'stud') {
             blindInfoEl.innerHTML =
-                `<span class="blind-item">ANTE <b>${fmt(s.ante || 0)}</b></span>` +
+                `<span class="blind-item">ANTE <b>${s.ante || 0}</b></span>` +
                 `<span class="blind-sep">/</span>` +
-                `<span class="blind-item">BI <b>${fmt(s.bringIn || 0)}</b></span>`;
+                `<span class="blind-item">BI <b>${s.bringIn || 0}</b></span>`;
         } else {
             blindInfoEl.innerHTML =
-                `<span class="blind-item">SB <b>${fmt(s.smallBlind || 0)}</b></span>` +
+                `<span class="blind-item">${fmtBB(s.smallBlind || 0)}</span>` +
                 `<span class="blind-sep">/</span>` +
-                `<span class="blind-item">BB <b>${fmt(s.bigBlind || 0)}</b></span>`;
+                `<span class="blind-item">${fmtBB(s.bigBlind || 0)}</span>`;
         }
 
         // Community cards
@@ -300,11 +327,18 @@ class PokerUI {
         if (s.currentPlayer === idx) el.classList.add('active-turn');
         else el.classList.remove('active-turn');
 
-        // Seat bet (shown first so it appears above avatar for bottom seats)
+        // BB formatter
+        const bb = s.bigBlind || 100;
+        const fmtBB = n => {
+            const v = n / bb;
+            return (Number.isInteger(v) ? v : parseFloat(v.toFixed(1))) + 'bb';
+        };
+
+        // Seat bet pill (shown first = visually toward table center for bottom seats)
         if (p.seatBet > 0) {
             const betDiv = document.createElement('div');
             betDiv.className = 'seat-bet';
-            betDiv.textContent = p.seatBet.toLocaleString();
+            betDiv.textContent = s.gameType === 'stud' ? p.seatBet : fmtBB(p.seatBet);
             el.appendChild(betDiv);
         }
 
@@ -333,11 +367,22 @@ class PokerUI {
         nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '');
         el.appendChild(nameDiv);
 
-        // Chips
+        // Chips in BB units (raw for stud)
         const chipsDiv = document.createElement('div');
         chipsDiv.className = 'seat-chips';
-        chipsDiv.textContent = `${p.chips.toLocaleString()}`;
+        chipsDiv.textContent = s.gameType === 'stud' ? p.chips.toLocaleString() : fmtBB(p.chips);
         el.appendChild(chipsDiv);
+
+        // Position badge
+        if (s.gameType !== 'stud') {
+            const pos = getPositionLabel(s.players, s.dealerSeat, idx);
+            if (pos) {
+                const badge = document.createElement('span');
+                badge.className = `pos-badge pos-${pos.toLowerCase()}`;
+                badge.textContent = pos;
+                el.appendChild(badge);
+            }
+        }
 
         // Cards in seat (mini)
         if (s.gameType === 'stud' && !p.folded) {
