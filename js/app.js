@@ -2020,27 +2020,35 @@ function drawStatsGraph(canvas, playerName, selectedKeys, filters) {
 // Chat
 // ==========================================
 function setupChat() {
-    const input = document.getElementById('chat-input');
-    const send = document.getElementById('btn-chat-send');
-    if (!input || !send) return;
-    send.addEventListener('click', () => {
-        const msg = input.value.trim();
-        if (msg) { client.sendChat(msg); input.value = ''; }
-    });
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') send.click();
-    });
+    function hookChatInput(inputId, sendId) {
+        const input = document.getElementById(inputId);
+        const send = document.getElementById(sendId);
+        if (!input || !send) return;
+        send.addEventListener('click', () => {
+            const msg = input.value.trim();
+            if (msg) { client.sendChat(msg); input.value = ''; }
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') send.click();
+        });
+    }
+    hookChatInput('lobby-chat-input', 'btn-lobby-chat-send');
+    hookChatInput('room-chat-input', 'btn-room-chat-send');
+    hookChatInput('game-chat-input', 'btn-game-chat-send');
+}
+
+function appendChatMsg(logId, from, message) {
+    const log = document.getElementById(logId);
+    if (!log) return;
+    const div = document.createElement('div');
+    div.className = 'room-chat-msg';
+    div.innerHTML = `<span class="room-chat-name">${from}:</span> ${message}`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
 }
 
 function onChat(data) {
     ui.addLog(`[${data.from}] ${data.message}`, 'chat');
-    // Also show in room chat log (waiting room)
-    const roomLog = document.getElementById('room-chat-log');
-    if (roomLog) {
-        const div = document.createElement('div');
-        div.className = 'room-chat-msg';
-        div.innerHTML = `<span class="room-chat-name">${data.from}:</span> ${data.message}`;
-        roomLog.appendChild(div);
-        roomLog.scrollTop = roomLog.scrollHeight;
-    }
+    appendChatMsg('lobby-chat-log', data.from, data.message);
+    appendChatMsg('room-chat-log', data.from, data.message);
 }

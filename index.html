@@ -72,6 +72,13 @@
                     </table>
                 </div>
             </div>
+            <div class="room-chat">
+                <div id="lobby-chat-log" class="room-chat-log"></div>
+                <div class="chat-bar">
+                    <input type="text" id="lobby-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                    <button id="btn-lobby-chat-send" class="btn-small">送信</button>
+                </div>
+            </div>
         </div>
 
         <!-- Room Screen (Waiting Room) -->
@@ -108,8 +115,8 @@
             <div class="room-chat">
                 <div id="room-chat-log" class="room-chat-log"></div>
                 <div class="chat-bar">
-                    <input type="text" id="chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                    <button id="btn-chat-send" class="btn-small">送信</button>
+                    <input type="text" id="room-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                    <button id="btn-room-chat-send" class="btn-small">送信</button>
                 </div>
             </div>
         </div>
@@ -233,6 +240,10 @@
             </div>
 
             <div id="game-log"></div>
+            <div class="chat-bar game-chat-bar">
+                <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                <button id="btn-game-chat-send" class="btn-small">送信</button>
+            </div>
         </div>
     </div>
 

@@ -637,15 +637,9 @@ function leaveRoom(client) {
     client.roomId = null;
 
     // Recompute merged games after player leaves
-    if (room.members.length > 0) {
+    // During an active game, keep filteredGames unchanged so the rotation continues as-is
+    if (room.members.length > 0 && !room.playing) {
         room.settings.selectedGames = room.getMergedGames();
-        if (room.playing && room.game) {
-            const newFiltered = room.settings.selectedGames.map(i => GAME_LIST[i]);
-            if (newFiltered.length > 0) {
-                room.game.filteredGames = newFiltered;
-                if (room.game.currentGameIndex >= newFiltered.length) room.game.currentGameIndex = 0;
-            }
-        }
     }
 
     // Mark player as disconnected in active game
@@ -654,6 +648,7 @@ function leaveRoom(client) {
         if (seat !== undefined && room.game) {
             room.game.players[seat].connected = false;
             room.game.players[seat].folded = true;
+            if (room.missedHands) room.missedHands[seat] = 0; // start counting from next hand
             // If it was this player's turn, auto-resolve
             if (room.pending && room.pending.playerId === seat) {
                 clearTimeout(room.pending.timer);
@@ -671,8 +666,8 @@ function leaveRoom(client) {
         if (room.pending) clearTimeout(room.pending.timer);
         rooms.delete(room.id);
     } else {
-        // Transfer host if needed
-        if (room.hostId === client.id) {
+        // Transfer host only when game is not active
+        if (room.hostId === client.id && !room.playing) {
             room.hostId = room.members[0].clientId;
         }
         broadcastRoomUpdate(room);
@@ -703,6 +698,9 @@ function startGame(room) {
     // Seat map: member index = seat index
     room.seatMap = {};
     room.members.forEach((m, i) => { room.seatMap[m.clientId] = i; });
+
+    // Track consecutive missed hands per seat (for sit-out eviction)
+    room.missedHands = {};
 
     // Stats
     room.stats = new StatsTracker();
@@ -772,6 +770,19 @@ function startGame(room) {
 
     // Stats hooks
     game.onHandStart = () => {
+        // Evict players who have been absent for 3+ consecutive hands
+        game.players.forEach((p, seat) => {
+            if (!p.connected && p.chips > 0) {
+                room.missedHands[seat] = (room.missedHands[seat] || 0) + 1;
+                if (room.missedHands[seat] >= 3) {
+                    p.chips = 0;
+                    p.folded = true;
+                    broadcastLog(room, `${p.name} が3ゲーム離席のため空席になりました`, 'important');
+                }
+            } else if (p.connected) {
+                room.missedHands[seat] = 0; // reset on reconnect
+            }
+        });
         room.stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
         broadcastToRoom(room, { type: 'hand_start' });
     };
@@ -846,6 +857,14 @@ async function runGameLoop(room) {
 
     // Game over
     room.playing = false;
+
+    // Now that game ended, transfer host if original host left during play
+    if (!room.members.find(m => m.clientId === room.hostId) && room.members.length > 0) {
+        room.hostId = room.members[0].clientId;
+    }
+    // Recompute merged games with current members
+    room.settings.selectedGames = room.getMergedGames();
+
     broadcastGameState(room);
 
     const initialChips = room.initialChips || {};
