@@ -602,9 +602,19 @@ function handleMessage(ws, client, msg) {
             break;
 
         case 'chat': {
-            const room = rooms.get(client.roomId);
-            if (!room) return;
-            broadcastToRoom(room, { type: 'chat', from: client.name, message: (msg.message || '').slice(0, 200) });
+            const text = (msg.message || '').slice(0, 200);
+            if (client.roomId) {
+                // Room/game chat: broadcast to room members only
+                const room = rooms.get(client.roomId);
+                if (room) broadcastToRoom(room, { type: 'chat', from: client.name, message: text });
+            } else {
+                // Lobby chat: broadcast to all lobby users
+                for (const [ws, c] of clients) {
+                    if (!c.roomId && !c.inZoom) {
+                        send(ws, { type: 'lobby_chat', from: client.name, message: text });
+                    }
+                }
+            }
             break;
         }
 

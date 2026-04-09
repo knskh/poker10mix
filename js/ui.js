@@ -249,6 +249,29 @@ class PokerUI {
                 `<span class="blind-item">${fmtBB(s.bigBlind || 0)}</span>`;
         }
 
+        // Floating bet chips on table (between each seat and center)
+        const tableFelt = document.getElementById('table-felt');
+        tableFelt.querySelectorAll('.table-bet-chip').forEach(el => el.remove());
+        // Positions: [left%, top%] for each seat index (0-5)
+        const betPos = [
+            [50, 73], // seat-0 bottom
+            [24, 67], // seat-1 bottom-left
+            [24, 33], // seat-2 top-left
+            [50, 18], // seat-3 top
+            [76, 33], // seat-4 top-right
+            [76, 67], // seat-5 bottom-right
+        ];
+        s.players.forEach((p, i) => {
+            if (p.seatBet > 0 && i < betPos.length) {
+                const chip = document.createElement('div');
+                chip.className = 'table-bet-chip';
+                chip.textContent = s.gameType === 'stud' ? p.seatBet.toLocaleString() : fmtBB(p.seatBet);
+                chip.style.left = betPos[i][0] + '%';
+                chip.style.top = betPos[i][1] + '%';
+                tableFelt.appendChild(chip);
+            }
+        });
+
         // Community cards
         const ccDiv = document.getElementById('community-cards');
         ccDiv.innerHTML = '';
@@ -333,14 +356,6 @@ class PokerUI {
             const v = n / bb;
             return (Number.isInteger(v) ? v : parseFloat(v.toFixed(1))) + 'bb';
         };
-
-        // Seat bet pill (shown first = visually toward table center for bottom seats)
-        if (p.seatBet > 0) {
-            const betDiv = document.createElement('div');
-            betDiv.className = 'seat-bet';
-            betDiv.textContent = s.gameType === 'stud' ? p.seatBet : fmtBB(p.seatBet);
-            el.appendChild(betDiv);
-        }
 
         // Dealer button
         if (s.dealerSeat === idx) {

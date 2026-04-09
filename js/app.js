@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentHandLogs.push(d.message);
     });
     client.on('chat', onChat);
+    client.on('lobby_chat', onLobbyChat);
     client.on('game_over', onGameOver);
     client.on('stats_data', renderStats);
     client.on('hand_result', onHandResult);
@@ -2111,7 +2112,12 @@ function appendChatMsg(logId, from, message) {
 }
 
 function onChat(data) {
+    // Room/game chat only (not lobby)
     ui.addLog(`[${data.from}] ${data.message}`, 'chat');
-    appendChatMsg('lobby-chat-log', data.from, data.message);
     appendChatMsg('room-chat-log', data.from, data.message);
+}
+
+function onLobbyChat(data) {
+    // Lobby chat only
+    appendChatMsg('lobby-chat-log', data.from, data.message);
 }
