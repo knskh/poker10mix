@@ -342,8 +342,21 @@ function onRoomJoined(room) {
     currentRoom = room;
     // Send my current game selection to server on join
     client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames] });
-    showScreen('room');
-    renderRoom(room);
+
+    if (room.playing) {
+        // Mid-game join: go directly to game screen
+        showScreen('game');
+        document.getElementById('zoom-waiting-overlay').classList.add('hidden');
+        document.getElementById('zoom-sitout-overlay').classList.add('hidden');
+        document.getElementById('btn-back-room').classList.remove('hidden');
+        document.getElementById('btn-zoom-exit').classList.add('hidden');
+        document.getElementById('btn-zoom-sitout').classList.add('hidden');
+        document.getElementById('game-log').innerHTML = '';
+        currentHandLogs = [];
+    } else {
+        showScreen('room');
+        renderRoom(room);
+    }
 }
 
 function onRoomUpdated(room) {

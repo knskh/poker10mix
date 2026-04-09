@@ -440,6 +440,7 @@ function handleMessage(ws, client, msg) {
             room.members.push({ clientId: client.id, name: client.name, ws });
             client.roomId = room.id;
 
+            let midJoinSeat = undefined;
             if (room.playing && room.game) {
                 let seatIdx = room.game.players.findIndex(p => !p.connected && p.chips <= 0);
                 if (seatIdx < 0) seatIdx = room.game.players.findIndex(p => !p.connected);
@@ -474,9 +475,7 @@ function handleMessage(ws, client, msg) {
                 if (!room.initialChips) room.initialChips = {};
                 room.initialChips[client.name] = MID_JOIN_CHIPS;
                 room.seatMap[client.id] = seatIdx;
-                broadcastGameState(room);
-                send(ws, { type: 'log', message: `${client.name} が途中参加しました（${MID_JOIN_CHIPS}チップ）`, cls: 'important' });
-                broadcastToRoom(room, { type: 'log', message: `${client.name} が途中参加しました`, cls: 'important' });
+                midJoinSeat = seatIdx;
             }
 
             // Recompute merged games after player joins
@@ -486,7 +485,22 @@ function handleMessage(ws, client, msg) {
                 if (newFiltered.length > 0) room.game.filteredGames = newFiltered;
             }
 
+            // Send room_joined first so client can switch to game screen
             send(ws, { type: 'room_joined', room: room.toJSON() });
+
+            if (midJoinSeat !== undefined) {
+                // Send current game state to new joiner after room_joined
+                send(ws, { type: 'game_state', state: getStateForPlayer(room.game, room, midJoinSeat) });
+                // Broadcast to others (excluding new joiner)
+                for (const m of room.members) {
+                    if (m.clientId !== client.id && room.seatMap[m.clientId] !== undefined) {
+                        send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, room.seatMap[m.clientId]) });
+                    }
+                }
+                send(ws, { type: 'log', message: `${client.name} が途中参加しました（${MID_JOIN_CHIPS}チップ）`, cls: 'important' });
+                broadcastToRoom(room, { type: 'log', message: `${client.name} が途中参加しました`, cls: 'important' });
+            }
+
             broadcastRoomUpdate(room);
             broadcastRoomList();
             break;
