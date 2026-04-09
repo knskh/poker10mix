@@ -187,19 +187,30 @@
                 </div>
             </div>
 
-            <div id="action-bar" class="hidden">
-                <div id="action-buttons"></div>
-                <div id="bet-presets" class="hidden"></div>
-                <div id="bet-slider-area" class="hidden">
-                    <input type="range" id="bet-slider" min="0" max="10000" step="50">
-                    <input type="number" id="bet-amount-input" class="bet-numpad-input" inputmode="numeric">
+            <!-- Bottom area: log (left) + actions (right) -->
+            <div id="bottom-area">
+                <div id="log-panel">
+                    <div id="game-log"></div>
+                    <div class="chat-bar game-chat-bar">
+                        <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                        <button id="btn-game-chat-send" class="btn-small">送信</button>
+                    </div>
                 </div>
-            </div>
-
-            <div id="draw-action-bar" class="hidden">
-                <div class="draw-hint">交換するカードをクリックして選択</div>
-                <button id="btn-draw" class="btn-action">ドロー</button>
-                <button id="btn-stand-pat" class="btn-action">スタンドパット</button>
+                <div id="action-panel">
+                    <div id="action-bar" class="hidden">
+                        <div id="action-buttons"></div>
+                        <div id="bet-presets" class="hidden"></div>
+                        <div id="bet-slider-area" class="hidden">
+                            <input type="range" id="bet-slider" min="0" max="10000" step="50">
+                            <input type="number" id="bet-amount-input" class="bet-numpad-input" inputmode="numeric">
+                        </div>
+                    </div>
+                    <div id="draw-action-bar" class="hidden">
+                        <div class="draw-hint">交換するカードをクリックして選択</div>
+                        <button id="btn-draw" class="btn-action">ドロー</button>
+                        <button id="btn-stand-pat" class="btn-action">スタンドパット</button>
+                    </div>
+                </div>
             </div>
 
             <div id="zoom-waiting-overlay" class="hidden">
@@ -240,11 +251,6 @@
                 </div>
             </div>
 
-            <div id="game-log"></div>
-            <div class="chat-bar game-chat-bar">
-                <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                <button id="btn-game-chat-send" class="btn-small">送信</button>
-            </div>
         </div>
     </div>
 
