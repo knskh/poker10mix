@@ -424,6 +424,9 @@ function setupGameScreen() {
 
     // Draw buttons
     document.getElementById('btn-draw').addEventListener('click', () => {
+        if (ui.selectedCards.size === 0) {
+            if (!confirm('カードを選択していません。スタンドパット（交換なし）と同じですが、ドローしますか？')) return;
+        }
         client.sendDraw([...ui.selectedCards]);
         ui.selectedCards.clear();
         document.getElementById('draw-action-bar').classList.add('hidden');
