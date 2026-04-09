@@ -1,6 +1,61 @@
 // js/app.js - Multiplayer Application Controller
 const client = new PokerClient();
 const ui = new PokerUI();
+
+// ==========================================
+// Sound System (Web Audio API)
+// ==========================================
+const sound = (() => {
+    let ctx = null;
+    let enabled = localStorage.getItem('poker10mix_sound') !== 'off';
+
+    function getCtx() {
+        if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+        return ctx;
+    }
+
+    function playTone(freq, startTime, duration, gain = 0.35, type = 'sine') {
+        const ac = getCtx();
+        const osc = ac.createOscillator();
+        const gainNode = ac.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ac.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
+        gainNode.gain.setValueAtTime(gain, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+    }
+
+    return {
+        isEnabled: () => enabled,
+        toggle() {
+            enabled = !enabled;
+            localStorage.setItem('poker10mix_sound', enabled ? 'on' : 'off');
+            return enabled;
+        },
+        // 2-tone ascending chime: your turn to act
+        yourTurn() {
+            if (!enabled) return;
+            try {
+                const ac = getCtx();
+                const t = ac.currentTime;
+                playTone(880, t, 0.3);        // A5
+                playTone(1318.5, t + 0.18, 0.5); // E6
+            } catch (e) {}
+        },
+        // Single soft tone: draw phase
+        yourDraw() {
+            if (!enabled) return;
+            try {
+                const ac = getCtx();
+                const t = ac.currentTime;
+                playTone(660, t, 0.4, 0.25);  // E5
+            } catch (e) {}
+        },
+    };
+})();
 let currentRoom = null;
 let currentState = null;
 let turnTimer = null;
@@ -425,6 +480,12 @@ function renderRoom(room) {
 // Game Screen
 // ==========================================
 function setupGameScreen() {
+    // Sound toggle button
+    const soundBtn = document.getElementById('btn-sound-toggle');
+    const updateSoundBtn = () => { soundBtn.textContent = sound.isEnabled() ? '🔔' : '🔕'; };
+    updateSoundBtn();
+    soundBtn.addEventListener('click', () => { sound.toggle(); updateSoundBtn(); });
+
     // Rules button
     document.getElementById('game-rules-btn').addEventListener('click', () => {
         document.getElementById('rules-modal').classList.toggle('hidden');
@@ -1035,11 +1096,13 @@ function getActionClass(log) {
 }
 
 function onYourTurn(data) {
+    sound.yourTurn();
     startTurnTimer(data.timeLimit || 45);
     showActionButtons(data.actions, data);
 }
 
 function onYourDraw(data) {
+    sound.yourDraw();
     startTurnTimer(data.timeLimit || 45);
     ui.pendingDraw = true;
     ui.selectedCards.clear();
