@@ -235,32 +235,36 @@ body {
 .room-waiting p { color: var(--text-dim); font-size: 16px; }
 
 #room-game-checkboxes {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;
-}
-.room-merged-games {
-    background: rgba(255,200,0,0.08);
-    border: 1px solid rgba(255,200,0,0.25);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 14px;
-    font-size: 12px;
-    color: var(--text-dim);
-}
-.room-merged-games strong {
-    color: var(--gold);
-    display: block;
-    margin-bottom: 4px;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px;
 }
 .game-checkbox-item {
-    display: flex; align-items: center; gap: 6px;
-    padding: 8px 12px; background: #2a2d35;
-    border-radius: 6px; cursor: pointer; transition: background 0.15s; font-size: 13px;
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 8px 10px; background: #2a2d35;
+    border-radius: 6px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    font-size: 13px; border: 1px solid transparent;
+}
+.game-checkbox-item > input { display: none; }
+.game-cb-name { display: flex; align-items: center; gap: 6px; }
+.game-cb-name::before {
+    content: ''; display: inline-block;
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 2px solid #666; flex-shrink: 0; transition: background 0.15s, border-color 0.15s;
+}
+.game-checkbox-item input:checked ~ .game-cb-name::before {
+    background: var(--gold); border-color: var(--gold);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23111' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-size: 10px; background-repeat: no-repeat; background-position: center;
+}
+.game-cb-selectors {
+    font-size: 10px; color: var(--text-dim); padding-left: 20px;
+    min-height: 13px; line-height: 1.3;
 }
 .game-checkbox-item:hover { background: #353840; }
-.game-checkbox-item input { accent-color: var(--gold); }
+.game-checkbox-item.game-all-selected {
+    border-color: var(--gold); background: rgba(255,200,0,0.08);
+}
+.game-checkbox-item.game-all-selected .game-cb-selectors { color: var(--gold); }
+.game-checkbox-item.game-none-selected { opacity: 0.45; }
 
 .lobby-options { margin: 12px 0 16px; font-size: 14px; }
 .lobby-options select {

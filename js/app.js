@@ -346,16 +346,27 @@ function setupRoomScreen() {
     GAME_LIST.forEach((g, i) => {
         const label = document.createElement('label');
         label.className = 'game-checkbox-item';
+        label.dataset.gameIndex = i;
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = true;
         cb.dataset.index = i;
         cb.addEventListener('change', () => {
+            if (!cb.checked && mySelectedGames.size <= 1) {
+                cb.checked = true;
+                return;
+            }
             if (cb.checked) mySelectedGames.add(i); else mySelectedGames.delete(i);
             client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames] });
         });
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'game-cb-name';
+        nameSpan.textContent = g.name;
+        const selectorsSpan = document.createElement('span');
+        selectorsSpan.className = 'game-cb-selectors';
         label.appendChild(cb);
-        label.appendChild(document.createTextNode(g.name));
+        label.appendChild(nameSpan);
+        label.appendChild(selectorsSpan);
         container.appendChild(label);
     });
 
@@ -397,22 +408,35 @@ function renderRoom(room) {
         list.appendChild(li);
     }
 
-    // All players see the game selection (my own checkboxes)
-    const checkboxes = document.querySelectorAll('#room-game-checkboxes input');
-    checkboxes.forEach(cb => { cb.checked = mySelectedGames.has(parseInt(cb.dataset.index)); });
-
-    // Show merged game pool info
-    const merged = room.mergedGames || room.settings?.selectedGames || [];
-    let mergedDiv = document.getElementById('room-merged-games');
-    if (!mergedDiv) {
-        mergedDiv = document.createElement('div');
-        mergedDiv.id = 'room-merged-games';
-        mergedDiv.className = 'room-merged-games';
-        const cbContainer = document.getElementById('room-game-checkboxes');
-        cbContainer.parentNode.insertBefore(mergedDiv, cbContainer.nextSibling);
+    // Build selectorsMap: gameIndex -> [playerName, ...]
+    const selectorsMap = {};
+    GAME_LIST.forEach((_, i) => { selectorsMap[i] = []; });
+    for (const m of room.members) {
+        const sel = room.playerGames?.[m.clientId];
+        if (sel && sel.length > 0) {
+            sel.forEach(i => { if (selectorsMap[i]) selectorsMap[i].push(m.name); });
+        } else {
+            GAME_LIST.forEach((_, i) => { selectorsMap[i].push(m.name); });
+        }
     }
-    const mergedNames = merged.map(i => GAME_LIST[i]?.shortName || '').filter(Boolean);
-    mergedDiv.innerHTML = `<strong>プレイ予定ゲーム</strong>${mergedNames.join(' / ') || 'なし'}`;
+    const totalMembers = room.members.length;
+
+    // Update checkboxes: checked state, highlight, selector names
+    document.querySelectorAll('#room-game-checkboxes label').forEach(label => {
+        const i = parseInt(label.dataset.gameIndex);
+        const cb = label.querySelector('input');
+        cb.checked = mySelectedGames.has(i);
+        const names = selectorsMap[i] || [];
+        label.querySelector('.game-cb-selectors').textContent = names.length ? names.join(', ') : '';
+        label.classList.remove('game-all-selected', 'game-some-selected', 'game-none-selected');
+        if (names.length === totalMembers && totalMembers > 0) {
+            label.classList.add('game-all-selected');
+        } else if (names.length > 0) {
+            label.classList.add('game-some-selected');
+        } else {
+            label.classList.add('game-none-selected');
+        }
+    });
 
     // Host-only: starting chips + start button
     const isHost = room.hostId === client.clientId;
