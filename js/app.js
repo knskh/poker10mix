@@ -238,10 +238,14 @@ function setupCreateRoomModal() {
         cb.checked = true;
         cb.dataset.index = i;
         cb.addEventListener('change', () => {
+            if (!cb.checked && createRoomSelection.size <= 1) { cb.checked = true; return; }
             if (cb.checked) createRoomSelection.add(i); else createRoomSelection.delete(i);
         });
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'game-cb-name';
+        nameSpan.textContent = g.name;
         label.appendChild(cb);
-        label.appendChild(document.createTextNode(g.name));
+        label.appendChild(nameSpan);
         container.appendChild(label);
     });
 
