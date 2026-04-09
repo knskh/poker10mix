@@ -224,10 +224,51 @@ function onAuthResult(data) {
 // ==========================================
 // Lobby Screen
 // ==========================================
-function setupLobbyScreen() {
-    document.getElementById('btn-create-room').addEventListener('click', () => {
-        client.createRoom();
+function setupCreateRoomModal() {
+    const modal = document.getElementById('create-room-modal');
+    const container = document.getElementById('create-room-game-checkboxes');
+    let createRoomSelection = new Set(GAME_LIST.map((_, i) => i));
+
+    // Build checkboxes
+    GAME_LIST.forEach((g, i) => {
+        const label = document.createElement('label');
+        label.className = 'game-checkbox-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.index = i;
+        cb.addEventListener('change', () => {
+            if (cb.checked) createRoomSelection.add(i); else createRoomSelection.delete(i);
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(g.name));
+        container.appendChild(label);
     });
+
+    document.getElementById('btn-create-room').addEventListener('click', () => {
+        // Reset all checkboxes to checked
+        createRoomSelection = new Set(GAME_LIST.map((_, i) => i));
+        container.querySelectorAll('input').forEach(cb => { cb.checked = true; });
+        modal.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-create-room-cancel').addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    document.getElementById('btn-create-room-confirm').addEventListener('click', () => {
+        if (createRoomSelection.size === 0) {
+            alert('最低1つのゲームを選択してください');
+            return;
+        }
+        mySelectedGames = new Set(createRoomSelection);
+        modal.classList.add('hidden');
+        client.createRoom([...createRoomSelection]);
+    });
+}
+
+function setupLobbyScreen() {
+    setupCreateRoomModal();
     document.getElementById('btn-join-zoom').addEventListener('click', () => {
         client.joinZoom();
     });

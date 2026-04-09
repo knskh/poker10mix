@@ -425,6 +425,10 @@ function handleMessage(ws, client, msg) {
             const roomId = generateRoomId();
             const room = new Room(roomId, client.id, client.name);
             room.members.push({ clientId: client.id, name: client.name, ws });
+            if (msg.selectedGames && msg.selectedGames.length > 0) {
+                room.playerGames[client.id] = msg.selectedGames;
+                room.settings.selectedGames = room.getMergedGames();
+            }
             rooms.set(roomId, room);
             client.roomId = roomId;
             send(ws, { type: 'room_joined', room: room.toJSON() });
