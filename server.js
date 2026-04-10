@@ -606,6 +606,21 @@ function handleMessage(ws, client, msg) {
             handleZoomRejoin(ws, client);
             break;
 
+        case 'emote': {
+            const emote = (msg.emote || '').slice(0, 4);
+            const room = rooms.get(client.roomId);
+            if (room) {
+                const seat = room.seatMap[client.id];
+                broadcastToRoom(room, { type: 'emote', seat, emote, from: client.name });
+            } else if (client.inZoom) {
+                // Zoom emote — broadcast to zoom table members
+                for (const [ws2, c2] of clients) {
+                    if (c2.inZoom) send(ws2, { type: 'emote', seat: -1, emote, from: client.name });
+                }
+            }
+            break;
+        }
+
         case 'rejoin_game': {
             const room = rooms.get(client.roomId);
             if (!room || !room.sitout) break;

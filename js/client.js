@@ -120,6 +120,9 @@ class PokerClient {
             case 'zoom_sitout':
                 this.emit('zoom_sitout');
                 break;
+            case 'emote':
+                this.emit('emote', { seat: msg.seat, emote: msg.emote, from: msg.from });
+                break;
             case 'auto_kicked':
                 this.emit('auto_kicked');
                 break;
@@ -143,6 +146,7 @@ class PokerClient {
     sendDraw(discards) { this.send({ type: 'draw', discards }); }
     sendChat(message) { this.send({ type: 'chat', message }); }
     rejoinGame() { this.send({ type: 'rejoin_game' }); }
+    sendEmote(emote) { this.send({ type: 'emote', emote }); }
     getStats() { this.send({ type: 'get_stats' }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
 }

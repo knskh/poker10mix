@@ -58,6 +58,7 @@ const sound = (() => {
 })();
 let currentRoom = null;
 let currentState = null;
+let preAction = null; // 'fold' | 'check-fold' | 'call' | null
 let turnTimer = null;
 let turnTimerStart = 0;
 let turnTimeLimit = 45;
@@ -94,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupGameScreen();
     setupStatsModal();
     setupChat();
+    setupPreActions();
+    setupEmotes();
 
     client.connect();
 
@@ -130,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('zoom_waiting', onZoomWaiting);
     client.on('zoom_left', onZoomLeft);
     client.on('zoom_sitout', onZoomSitout);
+    client.on('emote', onEmote);
     client.on('auto_kicked', () => {
         alert('10分間離席のため自動退室されました');
         showScreen('lobby');
@@ -665,6 +669,7 @@ function onHandStart() {
     lastHandResult = null;
     currentHandGameName = currentState ? currentState.gameName : '';
     currentHandGameType = currentState ? currentState.gameType : '';
+    clearPreAction();
 }
 
 function onHandResult(data) {
@@ -739,6 +744,8 @@ function onGameState(state) {
 
     // Show folded-state buttons when player is folded and not acting
     showFoldedButtons(state);
+    // Show pre-action checkboxes when waiting for turn
+    updatePreActionVisibility(state);
 }
 
 function onZoomJoined() {
@@ -1141,6 +1148,35 @@ function getActionClass(log) {
 }
 
 function onYourTurn(data) {
+    // Check pre-action before showing buttons
+    if (preAction) {
+        const actions = data.actions;
+        let executed = false;
+        if (preAction === 'fold') {
+            const fold = actions.find(a => a.type === 'fold');
+            if (fold) { client.sendAction({ type: 'fold' }); executed = true; }
+        } else if (preAction === 'check-fold') {
+            const check = actions.find(a => a.type === 'check');
+            if (check) { client.sendAction({ type: 'check' }); executed = true; }
+            else {
+                const fold = actions.find(a => a.type === 'fold');
+                if (fold) { client.sendAction({ type: 'fold' }); executed = true; }
+            }
+        } else if (preAction === 'call') {
+            const call = actions.find(a => a.type === 'call');
+            if (call) { client.sendAction({ type: 'call', amount: call.amount }); executed = true; }
+            else {
+                const check = actions.find(a => a.type === 'check');
+                if (check) { client.sendAction({ type: 'check' }); executed = true; }
+            }
+        }
+        clearPreAction();
+        if (executed) {
+            hidePreActionBar();
+            return;
+        }
+    }
+    hidePreActionBar();
     sound.yourTurn();
     startTurnTimer(data.timeLimit || 45);
     showActionButtons(data.actions, data);
@@ -1390,12 +1426,17 @@ function startTurnTimer(seconds) {
     turnTimeLimit = seconds;
     turnTimerStart = Date.now();
     const timerEl = document.getElementById('turn-timer');
+    const textEl = document.getElementById('turn-timer-text');
+    const fillEl = document.getElementById('turn-timer-fill');
     timerEl.classList.remove('hidden');
     turnTimer = setInterval(() => {
         const elapsed = (Date.now() - turnTimerStart) / 1000;
         const remaining = Math.max(0, Math.ceil(turnTimeLimit - elapsed));
-        timerEl.textContent = `⏱ ${remaining}s`;
-        timerEl.style.color = remaining <= 10 ? '#f44' : 'var(--gold)';
+        const pct = Math.max(0, (1 - elapsed / turnTimeLimit) * 100);
+        textEl.textContent = `⏱ ${remaining}s`;
+        textEl.style.color = remaining <= 10 ? '#f44' : 'var(--gold)';
+        fillEl.style.width = pct + '%';
+        fillEl.classList.toggle('urgent', remaining <= 10);
         if (remaining <= 0) stopTurnTimer();
     }, 200);
 }
@@ -1405,6 +1446,49 @@ function stopTurnTimer() {
     document.getElementById('turn-timer').classList.add('hidden');
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('draw-action-bar').classList.add('hidden');
+}
+
+// ==========================================
+// Pre-action system
+// ==========================================
+function clearPreAction() {
+    preAction = null;
+    document.querySelectorAll('#pre-action-bar input').forEach(cb => cb.checked = false);
+}
+
+function hidePreActionBar() {
+    document.getElementById('pre-action-bar').classList.add('hidden');
+}
+
+function showPreActionBar() {
+    document.getElementById('pre-action-bar').classList.remove('hidden');
+}
+
+function setupPreActions() {
+    document.querySelectorAll('#pre-action-bar input').forEach(cb => {
+        cb.addEventListener('change', () => {
+            // Only one can be active — uncheck others
+            if (cb.checked) {
+                document.querySelectorAll('#pre-action-bar input').forEach(other => {
+                    if (other !== cb) other.checked = false;
+                });
+                preAction = cb.value;
+            } else {
+                preAction = null;
+            }
+        });
+    });
+}
+
+function updatePreActionVisibility(state) {
+    if (!state || !state.mySeatIndex && state.mySeatIndex !== 0) { hidePreActionBar(); return; }
+    const me = state.players[state.mySeatIndex];
+    // Show pre-actions when: not my turn, not folded, not sitout, game is active
+    if (me && !me.folded && !state.mySitout && state.currentPlayer !== state.mySeatIndex) {
+        showPreActionBar();
+    } else {
+        hidePreActionBar();
+    }
 }
 
 function showFoldedButtons(state) {
@@ -2307,4 +2391,55 @@ function onChat(data) {
 function onLobbyChat(data) {
     // Lobby chat only
     appendChatMsg('lobby-chat-log', data.from, data.message);
+}
+
+// ==========================================
+// Emote Reactions
+// ==========================================
+function setupEmotes() {
+    document.querySelectorAll('.emote-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const emote = btn.dataset.emote;
+            client.sendEmote(emote);
+        });
+    });
+}
+
+function onEmote(data) {
+    // Show floating emote on the table near the player's seat
+    const tableFelt = document.getElementById('table-felt');
+    if (!tableFelt) return;
+
+    const emoteEl = document.createElement('div');
+    emoteEl.className = 'emote-float';
+    emoteEl.textContent = data.emote;
+
+    // Position near the seat if possible
+    if (data.seat >= 0 && currentState) {
+        const seatEl = document.getElementById(`seat-${data.seat}`);
+        if (seatEl) {
+            const seatClass = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat');
+            const posMap = {
+                'seat-bottom': [50, 65],
+                'seat-bottom-left': [20, 60],
+                'seat-top-left': [20, 35],
+                'seat-top': [50, 25],
+                'seat-top-right': [80, 35],
+                'seat-bottom-right': [80, 60],
+            };
+            const pos = posMap[seatClass] || [50, 50];
+            emoteEl.style.left = pos[0] + '%';
+            emoteEl.style.top = pos[1] + '%';
+        }
+    } else {
+        emoteEl.style.left = '50%';
+        emoteEl.style.top = '50%';
+    }
+
+    tableFelt.appendChild(emoteEl);
+    // Remove after animation
+    setTimeout(() => emoteEl.remove(), 2000);
+
+    // Also log it
+    ui.addLog(`${data.from}: ${data.emote}`, 'chat');
 }
