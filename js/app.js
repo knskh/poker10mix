@@ -732,6 +732,9 @@ function onGameState(state) {
         if (players.length > 0) showdownPlayers = players;
     }
     ui.renderFromServer(state);
+
+    // Show folded-state buttons when player is folded and not acting
+    showFoldedButtons(state);
 }
 
 function onZoomJoined() {
@@ -1398,6 +1401,43 @@ function stopTurnTimer() {
     document.getElementById('turn-timer').classList.add('hidden');
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('draw-action-bar').classList.add('hidden');
+}
+
+function showFoldedButtons(state) {
+    const actionBar = document.getElementById('action-bar');
+    const btnDiv = document.getElementById('action-buttons');
+    const presetsDiv = document.getElementById('bet-presets');
+
+    // Only show when player is folded AND action bar is hidden (not their turn)
+    if (!state.mySeatIndex && state.mySeatIndex !== 0) return;
+    const me = state.players[state.mySeatIndex];
+    if (!me || !me.folded) return;
+    if (!actionBar.classList.contains('hidden')) return; // still acting
+
+    // Show folded-state UI
+    actionBar.classList.remove('hidden');
+    btnDiv.innerHTML = '';
+    presetsDiv.innerHTML = '';
+    presetsDiv.classList.add('hidden');
+
+    // Folded message
+    const msg = document.createElement('div');
+    msg.className = 'folded-msg';
+    msg.textContent = 'フォールド済み — 次のハンドを待っています';
+    btnDiv.appendChild(msg);
+
+    // Leave room button
+    const leaveBtn = document.createElement('button');
+    leaveBtn.className = 'btn-action btn-fold';
+    leaveBtn.textContent = '退室';
+    leaveBtn.addEventListener('click', () => {
+        if (isInZoom) {
+            client.leaveZoom();
+        } else {
+            client.leaveRoom();
+        }
+    });
+    btnDiv.appendChild(leaveBtn);
 }
 
 function onGameOver(data) {
