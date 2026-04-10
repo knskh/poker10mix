@@ -234,12 +234,12 @@ class PokerUI {
         // Between seat edge and table center, shifted inward for clarity
         // Bet chip positions keyed by visual seat class
         const betPosByClass = {
-            'seat-bottom':       [50, 80],
-            'seat-bottom-left':  [22, 75],
-            'seat-top-left':     [22, 22],
-            'seat-top':          [50, 12],
-            'seat-top-right':    [78, 22],
-            'seat-bottom-right': [78, 75],
+            'seat-bottom':       [50, 72],
+            'seat-bottom-left':  [28, 68],
+            'seat-top-left':     [28, 30],
+            'seat-top':          [50, 20],
+            'seat-top-right':    [72, 30],
+            'seat-bottom-right': [72, 68],
         };
         s.players.forEach((p, i) => {
             if (p.seatBet > 0) {

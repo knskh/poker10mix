@@ -489,15 +489,15 @@ body {
 
 /* Pot display */
 #pot-display {
-    position: absolute; top: 26%; left: 50%; transform: translate(-50%, -50%);
-    text-align: center; display: flex; align-items: baseline; gap: 5px;
+    position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; display: flex; align-items: baseline; gap: 4px;
 }
 .pot-label {
-    font-size: 12px; font-style: italic; color: rgba(255,255,255,0.55);
+    font-size: 10px; font-style: italic; color: rgba(255,255,255,0.55);
     text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 }
 .pot-amount {
-    font-size: 16px; font-weight: 700; color: #fff;
+    font-size: 14px; font-weight: 700; color: #fff;
     text-shadow: 0 1px 4px rgba(0,0,0,0.9);
 }
 /* Current bet display */
@@ -531,8 +531,8 @@ body {
     transform: translate(-50%, -50%);
     background: rgba(20,20,28,0.88);
     border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 20px; padding: 3px 11px;
-    font-size: 11px; color: #e0e0e0; font-weight: 600;
+    border-radius: 20px; padding: 2px 8px;
+    font-size: 10px; color: #e0e0e0; font-weight: 600;
     box-shadow: 0 2px 6px rgba(0,0,0,0.6);
     white-space: nowrap; pointer-events: none;
     z-index: 5;
@@ -604,8 +604,8 @@ body {
     font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: bold;
 }
 .seat-action-label {
-    font-size: 10px; color: #aaa; margin-top: 1px;
-    font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;
+    font-size: 9px; color: #aaa; margin-top: 1px;
+    font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;
 }
 
 .seat-dealer-btn {
@@ -1135,7 +1135,10 @@ body {
             inset 0 0 20px rgba(0,0,0,0.4),
             0 2px 12px rgba(0,0,0,0.5);
     }
-    #pot-display { font-size: 12px; padding: 3px 10px; }
+    #pot-display { font-size: 11px; padding: 2px 8px; }
+    .pot-label { font-size: 9px; }
+    .pot-amount { font-size: 12px; }
+    .table-bet-chip { font-size: 9px; padding: 2px 6px; }
     #table-info { font-size: 10px; top: 38%; }
 
     /* Bet Presets */
