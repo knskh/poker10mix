@@ -586,25 +586,18 @@ body {
 .seat-top-right { top: 25px; right: -20px; }
 .seat-bottom-right { bottom: 25px; right: -20px; }
 
-/* Avatar placeholder */
-.seat-avatar {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: #444;
-    margin: 0 auto 3px;
-    border: 2px solid #555;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; color: #888;
-}
-.seat.active-turn .seat-avatar { border-color: var(--gold); }
-
+/* No avatar circle — name + info row only */
 .seat-name {
-    font-size: 11px; font-weight: bold; margin-bottom: 1px;
-    white-space: nowrap; color: #ddd;
+    font-size: 11px; font-weight: bold; margin-bottom: 2px;
+    white-space: nowrap; color: #bbb;
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
+/* Position badge + chips on one horizontal row */
+.seat-info-row {
+    display: flex; align-items: center; gap: 5px; justify-content: center;
+}
 .seat-chips {
-    font-size: 10px; color: var(--gold); margin-bottom: 2px; font-weight: bold;
+    font-size: 11px; color: #e0e0e0; font-weight: bold;
 }
 .seat-cards { display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; }
 .seat-bet {
@@ -1137,7 +1130,7 @@ body {
 
     /* Seats */
     .seat { min-width: 70px; padding: 3px 5px; border-radius: 8px; border-width: 1.5px; }
-    .seat-avatar { width: 26px; height: 26px; font-size: 12px; margin-bottom: 2px; border-width: 1.5px; }
+
     .seat-name { font-size: 10px; }
     .seat-chips { font-size: 9px; margin-bottom: 1px; }
     .seat-bet { font-size: 9px; }
@@ -1226,7 +1219,7 @@ body {
     .login-box { padding: 16px 12px; }
     .lobby-header h1 { font-size: 15px; }
     .seat { min-width: 60px; padding: 2px 4px; }
-    .seat-avatar { width: 22px; height: 22px; font-size: 10px; }
+
     .seat-name { font-size: 9px; }
     .seat-chips { font-size: 8px; }
     .btn-action { padding: 10px 10px; font-size: 13px; min-width: 60px; }
@@ -1258,7 +1251,7 @@ body {
     #log-panel { width: 110px; }
     #bottom-area { height: 120px; }
     #table-felt { margin: 10px 0 2px; }
-    .seat-avatar { width: 22px; height: 22px; font-size: 10px; margin-bottom: 1px; }
+
     .btn-action { padding: 8px 12px; font-size: 13px; }
     #action-bar { padding: 3px 4px; gap: 3px; }
     #draw-action-bar { padding: 4px; gap: 6px; }

@@ -252,14 +252,15 @@ class PokerUI {
         // Floating bet chips on table — placed on the table-side of each seat icon
         const tableFelt = document.getElementById('table-felt');
         tableFelt.querySelectorAll('.table-bet-chip').forEach(el => el.remove());
-        // Positions: [left%, top%] within table-felt, close to each seat on the table side
+        // Positions: [left%, top%] within table-felt
+        // Between seat edge and table center, shifted inward for clarity
         const betPos = [
-            [50, 60], // seat-0 bottom-center  → just inside table above seat
-            [20, 70], // seat-1 bottom-left    → to the right of seat (toward center)
-            [20, 30], // seat-2 top-left       → to the right and below seat
-            [50, 13], // seat-3 top-center     → just inside table below seat
-            [80, 30], // seat-4 top-right      → to the left and below seat
-            [80, 70], // seat-5 bottom-right   → to the left of seat (toward center)
+            [50, 65], // seat-0 bottom-center  → above seat, toward center
+            [24, 70], // seat-1 bottom-left    → right of seat, toward center
+            [24, 30], // seat-2 top-left       → right of seat, toward center
+            [50, 27], // seat-3 top-center     → below seat, toward center
+            [76, 30], // seat-4 top-right      → left of seat, toward center
+            [76, 70], // seat-5 bottom-right   → left of seat, toward center
         ];
         s.players.forEach((p, i) => {
             if (p.seatBet > 0 && i < betPos.length) {
@@ -365,30 +366,21 @@ class PokerUI {
             el.appendChild(btn);
         }
 
-        // Avatar (clickable for stats)
-        const avatar = document.createElement('div');
-        avatar.className = 'seat-avatar';
-        avatar.textContent = (p.name || '?')[0].toUpperCase();
-        avatar.style.cursor = 'pointer';
-        avatar.addEventListener('click', (e) => {
+        // Name (clickable for stats — no avatar circle)
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'seat-name';
+        nameDiv.style.cursor = 'pointer';
+        nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '');
+        nameDiv.addEventListener('click', (e) => {
             e.stopPropagation();
             if (typeof showPlayerStats === 'function') showPlayerStats(p.name);
         });
-        el.appendChild(avatar);
-
-        // Name
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'seat-name';
-        nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '');
         el.appendChild(nameDiv);
 
-        // Chips display (chip amounts)
-        const chipsDiv = document.createElement('div');
-        chipsDiv.className = 'seat-chips';
-        chipsDiv.textContent = p.chips.toLocaleString();
-        el.appendChild(chipsDiv);
+        // Position badge + chips on one row
+        const infoRow = document.createElement('div');
+        infoRow.className = 'seat-info-row';
 
-        // Position badge
         if (s.gameType !== 'stud') {
             const pos = getPositionLabel(s.players, s.dealerSeat, idx);
             if (pos) {
@@ -396,9 +388,15 @@ class PokerUI {
                 const cssPos = pos.replace('/', '').toLowerCase(); // 'SB/BTN' → 'sbtn'
                 badge.className = `pos-badge pos-${cssPos}`;
                 badge.textContent = pos;
-                el.appendChild(badge);
+                infoRow.appendChild(badge);
             }
         }
+
+        const chipsSpan = document.createElement('span');
+        chipsSpan.className = 'seat-chips';
+        chipsSpan.textContent = p.chips.toLocaleString();
+        infoRow.appendChild(chipsSpan);
+        el.appendChild(infoRow);
 
         // Cards in seat (mini)
         if (s.gameType === 'stud' && !p.folded) {
