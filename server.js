@@ -848,6 +848,13 @@ function startGame(room) {
             }
         });
 
+        // Fold sitout players so they don't get dealt cards
+        game.players.forEach((p, seat) => {
+            if (room.sitout[seat] && p.chips > 0) {
+                p.folded = true;
+            }
+        });
+
         // Auto-kick sitout players after 10 minutes
         const TEN_MINUTES = 10 * 60 * 1000;
         game.players.forEach((p, seat) => {
