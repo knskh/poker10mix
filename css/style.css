@@ -677,18 +677,49 @@ body {
 }
 
 /* === Action Bar === */
-/* === Bottom Area: log (left) + actions (right) === */
+/* === Bottom Area: log/chat (left 50%) + actions (right 50%) === */
 #bottom-area {
     display: flex; flex-direction: row; flex-shrink: 0;
     background: #111318; border-top: 1px solid #2a2d35;
     height: 200px;
 }
 #log-panel {
-    width: 200px; flex-shrink: 0;
+    flex: 0 0 50%;
     display: flex; flex-direction: column;
     border-right: 1px solid #2a2d35;
     overflow: hidden;
+    transition: flex-basis 0.2s ease, opacity 0.2s ease;
 }
+#log-panel.collapsed {
+    flex-basis: 0; border-right: none; opacity: 0; pointer-events: none;
+}
+
+/* Tab bar */
+#log-tab-bar {
+    display: flex; align-items: center; flex-shrink: 0;
+    background: #0d1018; border-bottom: 1px solid #1e2430;
+    padding: 4px 6px; gap: 2px;
+}
+.log-tab {
+    padding: 3px 10px; font-size: 11px; font-weight: 600;
+    border: 1px solid transparent; border-radius: 4px;
+    background: transparent; color: var(--text-dim);
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.log-tab:hover:not(.active) { background: rgba(255,255,255,0.07); color: #fff; }
+.log-tab.active {
+    background: rgba(0,229,255,0.12); color: var(--gold);
+    border-color: rgba(0,229,255,0.25);
+}
+.log-tab-close { margin-left: auto; color: #555; font-size: 12px; }
+.log-tab-close:hover { background: rgba(255,60,60,0.15); color: #f44; border-color: rgba(255,60,60,0.3); }
+.log-tab-close.active { background: rgba(255,60,60,0.15); color: #f44; border-color: rgba(255,60,60,0.3); }
+
+/* Log content area */
+#log-content {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
+}
+
 #action-panel {
     flex: 1; display: flex; flex-direction: column;
     justify-content: center; overflow: hidden;
@@ -1119,10 +1150,11 @@ body {
 
     /* Game Log */
     #game-log { height: auto; padding: 4px 8px; font-size: 10px; }
-    #log-panel { width: 160px; }
+    #log-panel { flex-basis: 45%; }
     #bottom-area { height: 185px; }
     .btn-action { padding: 11px 16px; font-size: 14px; }
     .bet-raise-input { width: 58px; font-size: 13px; }
+    .log-tab { padding: 2px 7px; font-size: 10px; }
 
     /* Chat */
     .chat-bar { padding: 6px 8px; gap: 6px; }
@@ -1188,9 +1220,10 @@ body {
     #player-cards .card-suit { font-size: 12px; }
     #player-hand { height: 66px; margin-top: 36px; }
     #game-log { height: auto; font-size: 9px; }
-    #log-panel { width: 130px; }
+    #log-panel { flex-basis: 42%; }
     #bottom-area { height: 170px; }
     .btn-action { padding: 9px 12px; font-size: 13px; }
+    .log-tab { padding: 2px 6px; font-size: 9px; }
 }
 
 /* ============================================================

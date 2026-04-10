@@ -482,6 +482,25 @@ function renderRoom(room) {
 // Game Screen
 // ==========================================
 function setupGameScreen() {
+    // Log/Chat tab switching
+    document.querySelectorAll('.log-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const mode = tab.dataset.tab;
+            document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const logPanel = document.getElementById('log-panel');
+            const gameLog = document.getElementById('game-log');
+            const chatBar = document.querySelector('.game-chat-bar');
+            if (mode === 'none') {
+                logPanel.classList.add('collapsed');
+            } else {
+                logPanel.classList.remove('collapsed');
+                gameLog.classList.toggle('hidden', mode === 'chat');
+                chatBar.classList.toggle('hidden', mode === 'log');
+            }
+        });
+    });
+
     // Sound toggle button
     const soundBtn = document.getElementById('btn-sound-toggle');
     const updateSoundBtn = () => { soundBtn.textContent = sound.isEnabled() ? '🔔' : '🔕'; };
@@ -1117,21 +1136,13 @@ function onYourDraw(data) {
     if (currentState) ui.renderPlayerHand(currentState);
 }
 
-// Format chips as bb string for action buttons
-function fmtActionBB(chips) {
-    const bb = currentTurnBB || 100;
-    if (!bb) return chips.toLocaleString();
-    const v = chips / bb;
-    return Number.isInteger(v) ? `${v}bb` : `${parseFloat(v.toFixed(1))}bb`;
-}
-
 // Update the raise/bet button text dynamically as slider/input changes
 function updateRaiseBtnText(totalChips) {
     const btn = document.getElementById('btn-raise-main');
     if (!btn) return;
     const parts = btn.textContent.split(' ');
     const label = parts[0]; // レイズ or ベット
-    btn.textContent = `${label} ${fmtActionBB(totalChips)}`;
+    btn.textContent = `${label} ${Number(totalChips).toLocaleString()}`;
 }
 
 function showActionButtons(actions, turnData) {
@@ -1173,7 +1184,7 @@ function showActionButtons(actions, turnData) {
             const btn = document.createElement('button');
             btn.id = 'btn-raise-main';
             btn.className = `btn-action btn-${action.type}`;
-            btn.textContent = `${label} ${fmtActionBB(initTotal)}`;
+            btn.textContent = `${label} ${initTotal.toLocaleString()}`;
             btn.addEventListener('click', () => {
                 const val = parseInt(document.getElementById('bet-slider').value);
                 sendActionAndHide({ type: action.type, amount: val });
@@ -1185,7 +1196,6 @@ function showActionButtons(actions, turnData) {
             inp.className = 'bet-raise-input';
             inp.inputMode = 'numeric';
             inp.value = initTotal;
-            inp.placeholder = isStud ? '' : `${(initTotal / (currentTurnBB||100)).toFixed(1)}`;
 
             row.appendChild(btn);
             row.appendChild(inp);
@@ -1204,27 +1214,19 @@ function showActionButtons(actions, turnData) {
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'check' }));
                     break;
                 case 'call':
-                    btn.textContent = isStud
-                        ? `コール ${action.amount.toLocaleString()}`
-                        : `コール ${fmtActionBB(action.amount)}`;
+                    btn.textContent = `コール ${action.amount.toLocaleString()}`;
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'call', amount: action.amount }));
                     break;
                 case 'bet':
-                    btn.textContent = isStud
-                        ? `ベット ${action.amount.toLocaleString()}`
-                        : `ベット ${fmtActionBB(action.amount)}`;
+                    btn.textContent = `ベット ${action.amount.toLocaleString()}`;
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'bet', amount: action.amount }));
                     break;
                 case 'raise':
-                    btn.textContent = isStud
-                        ? `レイズ ${(action.total || action.amount).toLocaleString()}`
-                        : `レイズ ${fmtActionBB(action.total || action.amount)}`;
+                    btn.textContent = `レイズ ${(action.total || action.amount).toLocaleString()}`;
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'raise', amount: action.amount }));
                     break;
                 case 'allin':
-                    btn.textContent = isStud
-                        ? `オールイン ${(action.total || action.amount).toLocaleString()}`
-                        : `オールイン ${fmtActionBB(action.total || action.amount)}`;
+                    btn.textContent = `オールイン ${(action.total || action.amount).toLocaleString()}`;
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'allin', amount: action.amount }));
                     break;
             }

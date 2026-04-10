@@ -187,13 +187,21 @@
                 </div>
             </div>
 
-            <!-- Bottom area: log (left) + actions (right) -->
+            <!-- Bottom area: log/chat (left) + actions (right) -->
             <div id="bottom-area">
                 <div id="log-panel">
-                    <div id="game-log"></div>
-                    <div class="chat-bar game-chat-bar">
-                        <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                        <button id="btn-game-chat-send" class="btn-small">送信</button>
+                    <div id="log-tab-bar">
+                        <button class="log-tab active" data-tab="log">ログ</button>
+                        <button class="log-tab" data-tab="chat">チャット</button>
+                        <button class="log-tab" data-tab="both">両方</button>
+                        <button class="log-tab log-tab-close" data-tab="none">✕</button>
+                    </div>
+                    <div id="log-content">
+                        <div id="game-log"></div>
+                        <div class="chat-bar game-chat-bar hidden">
+                            <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                            <button id="btn-game-chat-send" class="btn-small">送信</button>
+                        </div>
                     </div>
                 </div>
                 <div id="action-panel">
