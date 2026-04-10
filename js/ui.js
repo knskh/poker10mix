@@ -349,14 +349,17 @@ class PokerUI {
             el.appendChild(btn);
         }
 
-        // Name (clickable for stats — no avatar circle)
+        // Name (clickable — shows enlarged hand popup)
         const nameDiv = document.createElement('div');
         nameDiv.className = 'seat-name';
         nameDiv.style.cursor = 'pointer';
         nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '');
+        const playerData = p;
+        const gameState = s;
+        const seatIdx = idx;
         nameDiv.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (typeof showPlayerStats === 'function') showPlayerStats(p.name);
+            this.showSeatPopup(playerData, gameState, seatIdx);
         });
         el.appendChild(nameDiv);
 
@@ -422,6 +425,101 @@ class PokerUI {
             actionDiv.textContent = names[p.lastAction] || p.lastAction;
             el.appendChild(actionDiv);
         }
+    }
+
+    showSeatPopup(p, s, idx) {
+        // Remove existing popup
+        const existing = document.getElementById('seat-popup');
+        if (existing) existing.remove();
+
+        const popup = document.createElement('div');
+        popup.id = 'seat-popup';
+        popup.className = 'seat-popup-overlay';
+
+        const inner = document.createElement('div');
+        inner.className = 'seat-popup-inner';
+
+        // Player name header
+        const header = document.createElement('div');
+        header.className = 'seat-popup-header';
+        header.textContent = p.name;
+        inner.appendChild(header);
+
+        // Enlarged cards
+        const cardsDiv = document.createElement('div');
+        cardsDiv.className = 'seat-popup-cards';
+
+        let hasCards = false;
+        if (s.gameType === 'stud' && !p.folded) {
+            // Down cards
+            for (let d = 0; d < (p.downCount || 0); d++) {
+                cardsDiv.appendChild(this.createCardEl(null, true));
+                hasCards = true;
+            }
+            // Up cards
+            if (p.upCards) {
+                for (const card of p.upCards) {
+                    cardsDiv.appendChild(this.createCardEl(card, false));
+                    hasCards = true;
+                }
+            }
+        } else if (!p.folded && p.cardCount > 0) {
+            if (s.isShowdown && p.hand && p.hand.length > 0) {
+                for (const card of p.hand) {
+                    cardsDiv.appendChild(this.createCardEl(card, false));
+                    hasCards = true;
+                }
+            } else if (idx === s.mySeatIndex) {
+                const me = s.players[s.mySeatIndex];
+                const myCards = s.gameType === 'stud'
+                    ? [...(me.downCards || []), ...(me.upCards || [])]
+                    : (me.hand || []);
+                for (const card of myCards) {
+                    cardsDiv.appendChild(this.createCardEl(card, false));
+                    hasCards = true;
+                }
+            } else {
+                for (let c = 0; c < p.cardCount; c++) {
+                    cardsDiv.appendChild(this.createCardEl(null, true));
+                    hasCards = true;
+                }
+            }
+        }
+
+        if (hasCards) {
+            inner.appendChild(cardsDiv);
+        } else if (p.folded) {
+            const foldMsg = document.createElement('div');
+            foldMsg.className = 'seat-popup-fold';
+            foldMsg.textContent = 'フォールド済み';
+            inner.appendChild(foldMsg);
+        }
+
+        // Info line (position + chips)
+        const info = document.createElement('div');
+        info.className = 'seat-popup-info';
+        info.textContent = `${p.chips.toLocaleString()} chips`;
+        inner.appendChild(info);
+
+        // Stats button
+        const statsBtn = document.createElement('button');
+        statsBtn.className = 'btn-small seat-popup-stats-btn';
+        statsBtn.textContent = 'Stats';
+        statsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            popup.remove();
+            if (typeof showPlayerStats === 'function') showPlayerStats(p.name);
+        });
+        inner.appendChild(statsBtn);
+
+        popup.appendChild(inner);
+
+        // Close on overlay click
+        popup.addEventListener('click', (e) => {
+            if (e.target === popup) popup.remove();
+        });
+
+        document.getElementById('game-screen').appendChild(popup);
     }
 
     renderPlayerHand(s) {
