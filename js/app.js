@@ -1163,11 +1163,22 @@ function showActionButtons(actions, turnData) {
     let sliderAction = null;
     let sliderMin = 0, sliderMax = 0;
 
-    // Sort: raise/bet (top) → allin → call/check → fold (bottom)
-    const order = ['raise', 'bet', 'allin', 'call', 'check', 'fold'];
-    const sorted = [...actions].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+    // Sort: raise/bet (top) → call/check → fold (bottom); allin goes to presets
+    const order = ['raise', 'bet', 'call', 'check', 'fold'];
+    const sorted = [...actions].sort((a, b) => {
+        const ai = order.indexOf(a.type), bi = order.indexOf(b.type);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+    let allInAction = null; // collected separately → shown as preset
 
     for (const action of sorted) {
+        // Allin: skip button, save for preset
+        if (action.type === 'allin') {
+            allInAction = action;
+            continue;
+        }
+
         if ((action.type === 'bet' || action.type === 'raise') && action.min !== undefined) {
             // Variable raise/bet: row with button + amount input
             hasSlider = true;
@@ -1227,74 +1238,85 @@ function showActionButtons(actions, turnData) {
                     btn.textContent = `レイズ ${(action.total || action.amount).toLocaleString()}`;
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'raise', amount: action.amount }));
                     break;
-                case 'allin':
-                    btn.textContent = `オールイン ${(action.total || action.amount).toLocaleString()}`;
-                    btn.addEventListener('click', () => sendActionAndHide({ type: 'allin', amount: action.amount }));
-                    break;
             }
             btnDiv.appendChild(btn);
         }
     }
 
-    if (hasSlider) {
-        renderBetPresets(turnData, sliderAction, sliderMin, sliderMax);
+    if (hasSlider || allInAction) {
+        renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction);
     }
 }
 
-function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax) {
+function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction) {
     const presetsDiv = document.getElementById('bet-presets');
-    if (!turnData) return;
+    presetsDiv.innerHTML = '';
     const presets = [];
-    const bb = turnData.bigBlind || 100;
-    const pot = turnData.pot || 0;
-    const isFirstRound = turnData.isFirstRound;
-    const tableBet = turnData.currentBet || 0;
+    const bb = (turnData && turnData.bigBlind) || 100;
+    const pot = (turnData && turnData.pot) || 0;
+    const isFirstRound = turnData && turnData.isFirstRound;
+    const tableBet = (turnData && turnData.currentBet) || 0;
 
-    // Preflop unopened: BB-based buttons
-    if (isFirstRound && tableBet <= bb) {
-        [2, 2.5, 3, 3.5, 4].forEach(mult => {
-            const targetTotal = Math.round(bb * mult);
-            presets.push({ label: `${mult}bb`, targetTotal });
+    if (sliderAction) {
+        // Preflop unopened: BB-based buttons
+        if (isFirstRound && tableBet <= bb) {
+            [2, 2.5, 3, 3.5, 4].forEach(mult => {
+                const targetTotal = Math.round(bb * mult);
+                presets.push({ label: `${mult}bb`, targetTotal });
+            });
+        } else if (isFirstRound && tableBet > bb) {
+            // Preflop facing raise: multipliers of current bet
+            [2, 2.5, 3, 4].forEach(mult => {
+                const targetTotal = Math.round(tableBet * mult);
+                presets.push({ label: `${mult}x`, targetTotal });
+            });
+        } else if (!isFirstRound) {
+            // Postflop: pot percentages
+            [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
+                const targetTotal = Math.round(pot * pct) + tableBet;
+                presets.push({ label, targetTotal });
+            });
+        }
+
+        // Filter out presets outside slider range
+        const filtered = presets.filter(p => {
+            const outOfPocket = p.targetTotal - sliderOffset;
+            return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
         });
-    } else if (isFirstRound && tableBet > bb) {
-        // Preflop facing raise: multipliers of current bet
-        [2, 2.5, 3, 4].forEach(mult => {
-            const targetTotal = Math.round(tableBet * mult);
-            presets.push({ label: `${mult}x`, targetTotal });
-        });
-    } else if (!isFirstRound) {
-        // Postflop: pot percentages + multipliers
-        [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
-            const targetTotal = Math.round(pot * pct) + tableBet;
-            presets.push({ label, targetTotal });
-        });
+
+        for (const p of filtered) {
+            const btn = document.createElement('button');
+            btn.className = 'btn-preset';
+            btn.textContent = p.label;
+            btn.addEventListener('click', () => {
+                const outOfPocket = p.targetTotal - sliderOffset;
+                const slider = document.getElementById('bet-slider');
+                if (slider) slider.value = outOfPocket;
+                const input = document.getElementById('bet-amount-input');
+                if (input) input.value = p.targetTotal;
+                updateRaiseBtnText(p.targetTotal);
+                presetsDiv.querySelectorAll('.btn-preset:not(.btn-preset-allin)').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+            presetsDiv.appendChild(btn);
+        }
     }
 
-    // Filter out presets outside slider range
-    const filtered = presets.filter(p => {
-        const outOfPocket = p.targetTotal - sliderOffset;
-        return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
-    });
-    if (filtered.length === 0) return;
-
-    for (const p of filtered) {
+    // All-in preset button (last, distinct style)
+    if (allInAction) {
+        const amount = allInAction.total || allInAction.amount;
         const btn = document.createElement('button');
-        btn.className = 'btn-preset';
-        btn.textContent = p.label;
+        btn.className = 'btn-preset btn-preset-allin';
+        btn.textContent = `All-In ${amount.toLocaleString()}`;
         btn.addEventListener('click', () => {
-            const outOfPocket = p.targetTotal - sliderOffset;
-            const slider = document.getElementById('bet-slider');
-            if (slider) slider.value = outOfPocket;
-            const input = document.getElementById('bet-amount-input');
-            if (input) input.value = p.targetTotal;
-            updateRaiseBtnText(p.targetTotal);
-            // Highlight active preset
-            presetsDiv.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            sendActionAndHide({ type: 'allin', amount: allInAction.amount });
         });
         presetsDiv.appendChild(btn);
     }
-    presetsDiv.classList.remove('hidden');
+
+    if (presetsDiv.children.length > 0) {
+        presetsDiv.classList.remove('hidden');
+    }
 }
 
 let sliderOffset = 0; // currentBet to add for total display

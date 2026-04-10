@@ -775,14 +775,20 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 1px; }
+#bet-presets { display: flex; gap: 5px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 2px; }
 .btn-preset {
-    padding: 3px 8px; font-size: 11px; border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
-    background: rgba(255,255,255,0.07); color: #ccc; cursor: pointer; font-weight: 600;
-    transition: all 0.12s; white-space: nowrap;
+    padding: 6px 13px; font-size: 13px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
+    background: rgba(255,255,255,0.09); color: #ddd; cursor: pointer; font-weight: 600;
+    transition: all 0.12s; white-space: nowrap; flex: 1; min-width: 0;
 }
-.btn-preset:hover { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.4); }
+.btn-preset:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4); }
 .btn-preset.active { background: rgba(0,229,255,0.2); color: var(--gold); border-color: var(--gold); }
+/* All-in preset: distinct purple */
+.btn-preset-allin {
+    background: rgba(106,27,154,0.35); border-color: rgba(156,39,176,0.5);
+    color: #ce93d8; flex: none; min-width: fit-content;
+}
+.btn-preset-allin:hover { background: rgba(106,27,154,0.6); color: #fff; border-color: #9c27b0; }
 
 /* Slider: hidden but functional */
 #bet-slider-area { display: none; }
