@@ -90,6 +90,9 @@ class PokerClient {
             case 'chat':
                 this.emit('chat', { from: msg.from, message: msg.message });
                 break;
+            case 'lobby_chat':
+                this.emit('lobby_chat', { from: msg.from, message: msg.message });
+                break;
             case 'game_over':
                 this.emit('game_over', msg);
                 break;
