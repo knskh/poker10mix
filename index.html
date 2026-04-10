@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=17">
+    <link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
     <div id="app">
@@ -150,6 +150,13 @@
 
         <!-- Game Screen -->
         <div id="game-screen" class="hidden">
+            <div id="game-change-overlay" class="hidden">
+                <div class="gc-inner">
+                    <div class="gc-label">ゲームチェンジ</div>
+                    <div class="gc-name"></div>
+                    <div class="gc-badges"></div>
+                </div>
+            </div>
             <div id="top-bar">
                 <div id="game-name"></div>
                 <div id="game-rotation"></div>
@@ -176,6 +183,7 @@
             <div id="table-area">
                 <div id="table-container">
                     <div id="table-felt">
+                        <div id="table-game-banner"></div>
                         <div id="pot-display"></div>
                         <div id="table-info"></div>
                         <div id="community-cards" class="card-row"></div>
@@ -204,6 +212,7 @@
                     </div>
                     <div id="log-content">
                         <div id="game-log"></div>
+                        <div id="chat-log" class="hidden"></div>
                         <div class="chat-bar game-chat-bar hidden">
                             <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
                             <button id="btn-game-chat-send" class="btn-small">送信</button>
@@ -286,7 +295,7 @@
     <script src="js/evaluator.js"></script>
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
-    <script src="js/ui.js?v=17"></script>
-    <script src="js/app.js?v=17"></script>
+    <script src="js/ui.js?v=20"></script>
+    <script src="js/app.js?v=20"></script>
 </body>
 </html>

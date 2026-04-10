@@ -510,18 +510,85 @@ body {
     );
 }
 
+/* Game name banner on table */
+#table-game-banner {
+    position: absolute; top: 8%; left: 50%; transform: translateX(-50%);
+    text-align: center; z-index: 8; pointer-events: none;
+    font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px; padding: 2px 14px;
+    white-space: nowrap; letter-spacing: 0.5px;
+    transition: opacity 0.3s, transform 0.3s;
+}
+#table-game-banner .banner-badges {
+    display: inline-flex; gap: 3px; margin-left: 5px; vertical-align: middle;
+}
+#table-game-banner.banner-highlight {
+    color: #fff;
+    background: rgba(0,0,0,0.7); border-color: rgba(255,215,0,0.4);
+    animation: banner-pulse 1.5s ease-out;
+}
+@keyframes banner-pulse {
+    0% { transform: translateX(-50%) scale(1.15); border-color: rgba(255,215,0,0.8); }
+    100% { transform: translateX(-50%) scale(1); border-color: rgba(255,255,255,0.12); }
+}
+
+/* Game change fullscreen overlay */
+#game-change-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.8);
+    display: flex; align-items: center; justify-content: center;
+    animation: gc-fade-in 0.2s ease-out;
+}
+#game-change-overlay.hidden { display: none; }
+#game-change-overlay.gc-out {
+    animation: gc-fade-out 0.4s ease-in forwards;
+}
+.gc-inner {
+    text-align: center;
+    animation: gc-zoom-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.gc-label {
+    font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 8px;
+}
+.gc-name {
+    font-size: 32px; font-weight: 800; color: #fff;
+    text-shadow: 0 0 20px rgba(255,215,0,0.4), 0 2px 8px rgba(0,0,0,0.9);
+    margin-bottom: 12px;
+}
+.gc-badges {
+    display: flex; gap: 8px; justify-content: center;
+}
+.gc-badges .game-type-badge {
+    font-size: 13px; padding: 4px 12px;
+}
+@keyframes gc-fade-in {
+    from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes gc-fade-out {
+    from { opacity: 1; } to { opacity: 0; }
+}
+@keyframes gc-zoom-in {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
 /* Pot display */
 #pot-display {
     position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%);
-    text-align: center; display: flex; align-items: baseline; gap: 4px;
+    text-align: center; display: flex; align-items: baseline; gap: 5px;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 20px; padding: 3px 14px;
 }
 .pot-label {
-    font-size: 10px; font-style: italic; color: rgba(255,255,255,0.55);
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    font-size: 10px; font-style: italic; color: rgba(255,215,0,0.7);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
 }
 .pot-amount {
-    font-size: 14px; font-weight: 700; color: #fff;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+    font-size: 15px; font-weight: 700; color: #ffd700;
+    text-shadow: 0 0 8px rgba(255,215,0,0.35), 0 1px 4px rgba(0,0,0,0.9);
 }
 /* Current bet display */
 #table-info {
@@ -531,10 +598,10 @@ body {
     padding: 2px 10px; border-radius: 20px;
 }
 .bet-label {
-    font-size: 10px; color: rgba(255,255,255,0.45); font-style: italic;
+    font-size: 10px; color: rgba(255,255,255,0.55); font-style: italic;
 }
 .bet-amount {
-    font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8);
+    font-size: 12px; font-weight: 600; color: #e0e0e0;
 }
 /* Blind info pill (top-left of table) */
 .blind-info {
@@ -552,12 +619,20 @@ body {
 .table-bet-chip {
     position: absolute;
     transform: translate(-50%, -50%);
-    background: rgba(20,20,28,0.88);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 20px; padding: 2px 8px;
-    font-size: 10px; color: #e0e0e0; font-weight: 600;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(56,189,248,0.25);
+    border-radius: 20px; padding: 2px 10px 2px 6px;
+    font-size: 11px; color: #7dd3fc; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.7);
     white-space: nowrap; pointer-events: none;
+    display: flex; align-items: center; gap: 3px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+.chip-icon {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #7dd3fc, #0284c7);
+    border: 1px solid rgba(255,255,255,0.3);
+    flex-shrink: 0;
     z-index: 5;
 }
 
@@ -613,15 +688,16 @@ body {
 /* No avatar circle — name + info row only */
 .seat-name {
     font-size: 11px; font-weight: bold; margin-bottom: 2px;
-    white-space: nowrap; color: #bbb;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    white-space: nowrap; color: #e0e0e0;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
 }
 /* Position badge + chips on one horizontal row */
 .seat-info-row {
     display: flex; align-items: center; gap: 5px; justify-content: center;
 }
 .seat-chips {
-    font-size: 11px; color: #e0e0e0; font-weight: bold;
+    font-size: 11px; font-weight: 700; color: #ffd700;
+    text-shadow: 0 0 6px rgba(255,215,0,0.4), 0 1px 3px rgba(0,0,0,0.9);
 }
 .seat-cards {
     display: flex; gap: 1px; justify-content: center; flex-wrap: nowrap;
@@ -683,12 +759,23 @@ body {
 }
 
 .seat-bet {
-    font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: bold;
+    font-size: 11px; margin-top: 2px; font-weight: bold;
+    color: #7dd3fc;
+    text-shadow: 0 0 4px rgba(56,189,248,0.4), 0 1px 2px rgba(0,0,0,0.9);
 }
 .seat-action-label {
-    font-size: 9px; color: #aaa; margin-top: 1px;
-    font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;
+    font-size: 10px; margin-top: 2px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 1px 6px; border-radius: 4px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    color: #aaa;
 }
+.action-fold { color: #ef4444; background: rgba(239,68,68,0.15); }
+.action-check { color: #a3e635; background: rgba(163,230,53,0.12); }
+.action-call { color: #4ade80; background: rgba(74,222,128,0.15); }
+.action-raise { color: #fbbf24; background: rgba(251,191,36,0.15); }
+.action-bet { color: #fbbf24; background: rgba(251,191,36,0.15); }
+.action-allin { color: #f472b6; background: rgba(244,114,182,0.2); border: 1px solid rgba(244,114,182,0.3); }
 
 /* ===== Bubble Turn Timer ===== */
 .bubble-timer-wrap {
@@ -1054,6 +1141,20 @@ body {
 #game-log .log-action { color: var(--accent); }
 #game-log .log-chat { color: #81c784; }
 
+/* Chat Log (separate tab) */
+#chat-log {
+    flex: 1; overflow-y: auto; padding: 6px 10px;
+    font-size: 11px; color: var(--text-dim);
+    background: #111318; line-height: 1.5;
+    display: flex; flex-direction: column; justify-content: flex-end;
+}
+#chat-log .chat-entry { padding: 2px 0; }
+#chat-log .chat-msg { color: #81c784; }
+#chat-log .chat-quiz { color: #67e8f9; font-weight: 600; }
+#chat-log .chat-quiz-hint { color: #94a3b8; font-size: 0.85em; }
+#chat-log .chat-quiz-correct { color: #4ade80; font-weight: 600; }
+#chat-log .chat-quiz-end { color: #94a3b8; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -1335,10 +1436,13 @@ body {
             inset 0 0 20px rgba(0,0,0,0.4),
             0 2px 12px rgba(0,0,0,0.5);
     }
+    #table-game-banner { font-size: 10px; padding: 2px 10px; top: 5%; }
     #pot-display { font-size: 11px; padding: 2px 8px; }
     .pot-label { font-size: 9px; }
     .pot-amount { font-size: 12px; }
     .table-bet-chip { font-size: 9px; padding: 2px 6px; }
+    .gc-name { font-size: 22px; }
+    .gc-label { font-size: 12px; }
     #table-info { font-size: 10px; top: 38%; }
 
     /* Bet Presets */
@@ -1368,7 +1472,7 @@ body {
     .seat-name { font-size: 10px; }
     .seat-chips { font-size: 9px; margin-bottom: 1px; }
     .seat-bet { font-size: 9px; }
-    .seat-action-label { font-size: 8px; }
+    .seat-action-label { font-size: 8px; padding: 1px 4px; }
     .seat-dealer-btn { width: 16px; height: 16px; font-size: 8px; top: -4px; right: -4px; }
     .seat-bottom { bottom: -32px; }
     .seat-bottom-left { bottom: 15px; left: -10px; }

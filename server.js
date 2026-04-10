@@ -762,11 +762,9 @@ function handleMessage(ws, client, msg) {
                 midJoinSeat = seatIdx;
             }
 
-            // Recompute merged games after player joins
-            room.settings.selectedGames = room.getMergedGames();
-            if (room.playing && room.game) {
-                const newFiltered = room.settings.selectedGames.map(i => GAME_LIST[i]);
-                if (newFiltered.length > 0) room.game.filteredGames = newFiltered;
+            // Recompute merged games only when not playing (game list is locked during play)
+            if (!room.playing) {
+                room.settings.selectedGames = room.getMergedGames();
             }
 
             // Send room_joined first so client can switch to game screen
@@ -813,18 +811,9 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(client.roomId);
             if (!room) return;
             room.playerGames[client.id] = msg.selectedGames || [];
-            // Update merged game list
-            room.settings.selectedGames = room.getMergedGames();
-            // If game running, update filteredGames live
-            if (room.playing && room.game) {
-                const newFiltered = room.settings.selectedGames.map(i => GAME_LIST[i]);
-                if (newFiltered.length > 0) {
-                    room.game.filteredGames = newFiltered;
-                    if (room.game.currentGameIndex >= newFiltered.length) {
-                        room.game.currentGameIndex = 0;
-                    }
-                }
-                broadcastGameState(room);
+            // Update merged game list only when not playing (game list is locked during play)
+            if (!room.playing) {
+                room.settings.selectedGames = room.getMergedGames();
             }
             broadcastRoomUpdate(room);
             break;

@@ -197,10 +197,16 @@ class PokerUI {
         const catBadge = GAME_CATEGORY_LABELS[getGameCategory(s.gameId)];
         const gameNameEl = document.getElementById('game-name');
         const betBadge = BETTING_TYPE_LABELS[getBettingType(s.gameId)];
-        gameNameEl.innerHTML = s.gameName
-            + ` <span class="game-type-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
+        const badgesHtml = ` <span class="game-type-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
             + ` <span class="game-type-badge" style="background:${catBadge.color};color:${catBadge.textColor};border:1px solid #555">${catBadge.label}</span>`
             + ` <span class="game-type-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
+        gameNameEl.innerHTML = s.gameName + badgesHtml;
+
+        // Table game banner (persistent on felt)
+        const banner = document.getElementById('table-game-banner');
+        if (banner) {
+            banner.innerHTML = s.gameName + `<span class="banner-badges">${badgesHtml}</span>`;
+        }
         document.getElementById('game-rotation').textContent =
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';
@@ -249,7 +255,7 @@ class PokerUI {
                 if (!pos) return;
                 const chip = document.createElement('div');
                 chip.className = 'table-bet-chip';
-                chip.textContent = p.seatBet.toLocaleString();
+                chip.innerHTML = `<span class="chip-icon"></span>${p.seatBet.toLocaleString()}`;
                 chip.style.left = pos[0] + '%';
                 chip.style.top = pos[1] + '%';
                 tableFelt.appendChild(chip);
@@ -420,7 +426,8 @@ class PokerUI {
         // Last action
         if (p.lastAction) {
             const actionDiv = document.createElement('div');
-            actionDiv.className = 'seat-action-label';
+            const actionClass = { fold:'action-fold', check:'action-check', call:'action-call', bet:'action-bet', raise:'action-raise', allin:'action-allin' };
+            actionDiv.className = 'seat-action-label' + (actionClass[p.lastAction] ? ' ' + actionClass[p.lastAction] : '');
             const names = { fold:'フォールド', check:'チェック', call:'コール', bet:'ベット', raise:'レイズ', allin:'オールイン' };
             actionDiv.textContent = names[p.lastAction] || p.lastAction;
             el.appendChild(actionDiv);

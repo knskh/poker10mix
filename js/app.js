@@ -54,10 +54,22 @@ const sound = (() => {
                 playTone(660, t, 0.4, 0.25);  // E5
             } catch (e) {}
         },
+        // 3-tone fanfare: game change
+        gameChange() {
+            if (!enabled) return;
+            try {
+                const ac = getCtx();
+                const t = ac.currentTime;
+                playTone(523.25, t, 0.2, 0.3);       // C5
+                playTone(659.25, t + 0.15, 0.2, 0.3); // E5
+                playTone(783.99, t + 0.3, 0.4, 0.35); // G5
+            } catch (e) {}
+        },
     };
 })();
 let currentRoom = null;
 let currentState = null;
+let lastGameId = null; // Track game changes for overlay/sound
 let preAction = null; // 'fold' | 'check-fold' | 'call' | null
 let turnTimer = null;
 let turnTimerStart = 0;
@@ -498,6 +510,7 @@ function setupGameScreen() {
             const mode = tab.dataset.tab;
             const logPanel = document.getElementById('log-panel');
             const gameLog = document.getElementById('game-log');
+            const chatLog = document.getElementById('chat-log');
             const chatBar = document.querySelector('.game-chat-bar');
 
             if (mode === 'none') {
@@ -512,14 +525,28 @@ function setupGameScreen() {
                 const logTab = document.querySelector('.log-tab[data-tab="log"]');
                 logTab.classList.add('active');
                 gameLog.classList.remove('hidden');
+                chatLog.classList.add('hidden');
                 chatBar.classList.add('hidden');
             } else {
                 // Normal tab switch
                 logPanel.classList.remove('collapsed');
                 document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                gameLog.classList.toggle('hidden', mode === 'chat');
-                chatBar.classList.toggle('hidden', mode === 'log');
+
+                if (mode === 'log') {
+                    gameLog.classList.remove('hidden');
+                    chatLog.classList.add('hidden');
+                    chatBar.classList.add('hidden');
+                } else if (mode === 'chat') {
+                    gameLog.classList.add('hidden');
+                    chatLog.classList.remove('hidden');
+                    chatBar.classList.remove('hidden');
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                } else if (mode === 'both') {
+                    gameLog.classList.remove('hidden');
+                    chatLog.classList.add('hidden');
+                    chatBar.classList.remove('hidden');
+                }
             }
         });
     });
@@ -661,6 +688,7 @@ function onGameStarted(data) {
     showScreen('game');
     document.getElementById('zoom-waiting-overlay').classList.add('hidden');
     document.getElementById('zoom-sitout-overlay').classList.add('hidden');
+    lastGameId = null; // Reset so first game doesn't trigger overlay
 
     // Save previous hand to history
     saveCurrentHand();
@@ -704,6 +732,14 @@ function onGameState(state) {
     currentState = state;
     if (!currentHandGameName && state.gameName) currentHandGameName = state.gameName;
     if (!currentHandGameType && state.gameType) currentHandGameType = state.gameType;
+
+    // Detect game change → overlay + sound + banner highlight
+    if (state.gameId && lastGameId !== null && state.gameId !== lastGameId) {
+        showGameChangeOverlay(state);
+        sound.gameChange();
+    }
+    lastGameId = state.gameId;
+
     if (state.zoom) {
         document.getElementById('zoom-waiting-overlay').classList.add('hidden');
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
@@ -2395,10 +2431,22 @@ function appendChatMsg(logId, from, message) {
     log.scrollTop = log.scrollHeight;
 }
 
+function addChatEntry(text, cls) {
+    const log = document.getElementById('chat-log');
+    if (!log) return;
+    const entry = document.createElement('div');
+    entry.className = 'chat-entry' + (cls ? ` chat-${cls}` : '');
+    entry.textContent = text;
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+    while (log.children.length > 200) log.removeChild(log.firstChild);
+}
+
 function onChat(data) {
     // Room/game chat only (not lobby)
     ui.addLog(`[${data.from}] ${data.message}`, 'chat');
     appendChatMsg('room-chat-log', data.from, data.message);
+    addChatEntry(`[${data.from}] ${data.message}`, 'msg');
 }
 
 function onLobbyChat(data) {
@@ -2485,16 +2533,65 @@ function onQuizStart(data) {
     ui.addLog(`🧩 【${data.category}】`, 'quiz');
     ui.addLog(`　　${displayStr}`, 'quiz-word');
     ui.addLog('　　チャットで回答！', 'quiz-hint');
+    // Also show in chat tab
+    addChatEntry(`🧩 【${data.category}】 ${displayStr}`, 'quiz');
+    addChatEntry('　　チャットで回答！', 'quiz-hint');
 }
 
 function onQuizCorrect(data) {
     activeQuiz = null;
     ui.addLog(`🎉 ${data.winner} さん正解！「${data.answer}」 +${data.bonus}チップ`, 'quiz-correct');
+    addChatEntry(`🎉 ${data.winner} さん正解！「${data.answer}」 +${data.bonus}チップ`, 'quiz-correct');
 }
 
 function onQuizEnd(data) {
     activeQuiz = null;
     if (data.answer) {
         ui.addLog(`🧩 答え: ${data.answer}`, 'quiz-end');
+        addChatEntry(`🧩 答え: ${data.answer}`, 'quiz-end');
+    }
+}
+
+// ==========================================
+// Game Change Overlay + Banner
+// ==========================================
+let gameChangeTimer = null;
+
+function showGameChangeOverlay(state) {
+    const overlay = document.getElementById('game-change-overlay');
+    if (!overlay) return;
+
+    // Build badges
+    const gameType = getGameType(state.gameId);
+    const typeBadge = GAME_TYPE_LABELS[gameType];
+    const catBadge = GAME_CATEGORY_LABELS[getGameCategory(state.gameId)];
+    const betBadge = BETTING_TYPE_LABELS[getBettingType(state.gameId)];
+
+    overlay.querySelector('.gc-name').textContent = state.gameName;
+    overlay.querySelector('.gc-badges').innerHTML =
+        `<span class="game-type-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
+        + `<span class="game-type-badge" style="background:${catBadge.color};color:${catBadge.textColor};border:1px solid #555">${catBadge.label}</span>`
+        + `<span class="game-type-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
+
+    // Show overlay
+    overlay.classList.remove('hidden', 'gc-out');
+    if (gameChangeTimer) clearTimeout(gameChangeTimer);
+
+    // Fade out after 1.8s
+    gameChangeTimer = setTimeout(() => {
+        overlay.classList.add('gc-out');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('gc-out');
+        }, 400);
+    }, 1800);
+
+    // Highlight banner
+    const banner = document.getElementById('table-game-banner');
+    if (banner) {
+        banner.classList.remove('banner-highlight');
+        void banner.offsetWidth; // force reflow for re-animation
+        banner.classList.add('banner-highlight');
+        setTimeout(() => banner.classList.remove('banner-highlight'), 1500);
     }
 }
