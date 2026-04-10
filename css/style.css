@@ -794,11 +794,11 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 5px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 4px; }
+#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: nowrap; margin-bottom: 4px; overflow: hidden; }
 .btn-preset {
-    padding: 8px 14px; font-size: 13px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
+    padding: 7px 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
     background: rgba(255,255,255,0.09); color: #ddd; cursor: pointer; font-weight: 600;
-    transition: all 0.12s; white-space: nowrap; flex: 1; min-width: 0;
+    transition: all 0.12s; white-space: nowrap; flex: 1; min-width: 0; text-align: center;
     -webkit-user-select: none; user-select: none; touch-action: manipulation;
 }
 .btn-preset:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4); }
@@ -806,7 +806,7 @@ body {
 /* All-in preset: distinct purple */
 .btn-preset-allin {
     background: rgba(106,27,154,0.35); border-color: rgba(156,39,176,0.5);
-    color: #ce93d8; flex: none; min-width: fit-content;
+    color: #ce93d8; flex: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 .btn-preset-allin:hover { background: rgba(106,27,154,0.6); color: #fff; border-color: #9c27b0; }
 
@@ -1139,8 +1139,8 @@ body {
     #table-info { font-size: 10px; top: 38%; }
 
     /* Bet Presets */
-    #bet-presets { gap: 4px; }
-    .btn-preset { padding: 7px 8px; font-size: 12px; }
+    #bet-presets { gap: 3px; }
+    .btn-preset { padding: 6px 4px; font-size: 11px; }
 
     /* Cards */
     .card { width: 26px; height: 36px; border-radius: 3px; }

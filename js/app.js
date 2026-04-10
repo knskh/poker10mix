@@ -1230,7 +1230,7 @@ function showActionButtons(actions, turnData) {
 
             switch (action.type) {
                 case 'fold': {
-                    btn.textContent = 'フォールド';
+                    btn.textContent = 'フォールド（長押し）';
                     // Long-press (0.4s) to prevent accidental fold
                     let foldTimer = null;
                     let foldFired = false;
