@@ -134,6 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('zoom_left', onZoomLeft);
     client.on('zoom_sitout', onZoomSitout);
     client.on('emote', onEmote);
+    client.on('quiz_start', onQuizStart);
+    client.on('quiz_correct', onQuizCorrect);
+    client.on('quiz_end', onQuizEnd);
     client.on('auto_kicked', () => {
         alert('10分間離席のため自動退室されました');
         showScreen('lobby');
@@ -687,6 +690,7 @@ function onHandStart() {
     cardSnapshots = [];
     showdownPlayers = null;
     lastHandResult = null;
+    activeQuiz = null;
     currentHandGameName = currentState ? currentState.gameName : '';
     currentHandGameType = currentState ? currentState.gameType : '';
     clearPreAction();
@@ -2467,4 +2471,30 @@ function onEmote(data) {
 
     // Also log it
     ui.addLog(`${data.from}: ${data.emote}`, 'chat');
+}
+
+// ==========================================
+// Hiragana Quiz
+// ==========================================
+let activeQuiz = null;
+
+function onQuizStart(data) {
+    activeQuiz = data;
+    // Build display string: show chars or ＿ for blanks
+    const displayStr = data.display.map(ch => ch === null ? '＿' : ch).join('');
+    ui.addLog(`🧩 【${data.category}】`, 'quiz');
+    ui.addLog(`　　${displayStr}`, 'quiz-word');
+    ui.addLog('　　チャットで回答！', 'quiz-hint');
+}
+
+function onQuizCorrect(data) {
+    activeQuiz = null;
+    ui.addLog(`🎉 ${data.winner} さん正解！「${data.answer}」 +${data.bonus}チップ`, 'quiz-correct');
+}
+
+function onQuizEnd(data) {
+    activeQuiz = null;
+    if (data.answer) {
+        ui.addLog(`🧩 答え: ${data.answer}`, 'quiz-end');
+    }
 }

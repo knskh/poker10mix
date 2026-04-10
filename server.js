@@ -22,6 +22,282 @@ const { GAME_LIST, GameState } = require('./js/game');
 const { StatsTracker } = require('./js/stats');
 
 // ============================================
+// Hiragana Quiz System
+// ============================================
+const QUIZ_WORDS = [
+    // ポーカー用語 (17)
+    { word: 'てきさすほーるでむ', category: 'ポーカー用語' },
+    { word: 'おまはほーるでむ', category: 'ポーカー用語' },
+    { word: 'せぶんかーどすたっど', category: 'ポーカー用語' },
+    { word: 'ふぁいぶかーどどろー', category: 'ポーカー用語' },
+    { word: 'のーりみっと', category: 'ポーカー用語' },
+    { word: 'ぽっとりみっと', category: 'ポーカー用語' },
+    { word: 'しょーだうん', category: 'ポーカー用語' },
+    { word: 'ぶらいんど', category: 'ポーカー用語' },
+    { word: 'でぃーらーぼたん', category: 'ポーカー用語' },
+    { word: 'こみゅにてぃかーど', category: 'ポーカー用語' },
+    { word: 'ばりゅーべっと', category: 'ポーカー用語' },
+    { word: 'ちぇっくれいず', category: 'ポーカー用語' },
+    { word: 'すろーぷれい', category: 'ポーカー用語' },
+    { word: 'ぶらふきゃっちゃー', category: 'ポーカー用語' },
+    { word: 'ぽじしょん', category: 'ポーカー用語' },
+    { word: 'ばんくろーる', category: 'ポーカー用語' },
+    { word: 'とーなめんと', category: 'ポーカー用語' },
+    // ポーカー役 (10)
+    { word: 'ろいやるすとれーとふらっしゅ', category: 'ポーカー役' },
+    { word: 'すとれーとふらっしゅ', category: 'ポーカー役' },
+    { word: 'ふぉーかーど', category: 'ポーカー役' },
+    { word: 'ふるはうす', category: 'ポーカー役' },
+    { word: 'ふらっしゅ', category: 'ポーカー役' },
+    { word: 'すとれーと', category: 'ポーカー役' },
+    { word: 'すりーかーど', category: 'ポーカー役' },
+    { word: 'つーぺあ', category: 'ポーカー役' },
+    { word: 'わんぺあ', category: 'ポーカー役' },
+    { word: 'はいかーど', category: 'ポーカー役' },
+    // アクション (4)
+    { word: 'おーるいん', category: 'アクション' },
+    { word: 'こんてぃにゅえーしょんべっと', category: 'アクション' },
+    { word: 'すりーべっと', category: 'アクション' },
+    { word: 'ちぇっくこーる', category: 'アクション' },
+    // 食べ物 (40)
+    { word: 'たこやき', category: '食べ物' },
+    { word: 'おこのみやき', category: '食べ物' },
+    { word: 'からあげ', category: '食べ物' },
+    { word: 'すきやき', category: '食べ物' },
+    { word: 'てんぷら', category: '食べ物' },
+    { word: 'やきにく', category: '食べ物' },
+    { word: 'おにぎり', category: '食べ物' },
+    { word: 'らーめん', category: '食べ物' },
+    { word: 'うどん', category: '食べ物' },
+    { word: 'ぎょうざ', category: '食べ物' },
+    { word: 'しゃぶしゃぶ', category: '食べ物' },
+    { word: 'かれーらいす', category: '食べ物' },
+    { word: 'はんばーぐ', category: '食べ物' },
+    { word: 'おむらいす', category: '食べ物' },
+    { word: 'やきとり', category: '食べ物' },
+    { word: 'おでん', category: '食べ物' },
+    { word: 'そうめん', category: '食べ物' },
+    { word: 'みそしる', category: '食べ物' },
+    { word: 'ちゃーはん', category: '食べ物' },
+    { word: 'かつどん', category: '食べ物' },
+    { word: 'てんどん', category: '食べ物' },
+    { word: 'おやこどん', category: '食べ物' },
+    { word: 'ぴざ', category: '食べ物' },
+    { word: 'ぱすた', category: '食べ物' },
+    { word: 'ぐらたん', category: '食べ物' },
+    { word: 'さんどいっち', category: '食べ物' },
+    { word: 'はんばーがー', category: '食べ物' },
+    { word: 'ほっとどっぐ', category: '食べ物' },
+    { word: 'ちょこれーと', category: '食べ物' },
+    { word: 'あいすくりーむ', category: '食べ物' },
+    { word: 'どーなつ', category: '食べ物' },
+    { word: 'ぷりん', category: '食べ物' },
+    { word: 'しゅーくりーむ', category: '食べ物' },
+    { word: 'くろわっさん', category: '食べ物' },
+    { word: 'たいやき', category: '食べ物' },
+    { word: 'だんご', category: '食べ物' },
+    { word: 'わたあめ', category: '食べ物' },
+    { word: 'ちーずけーき', category: '食べ物' },
+    { word: 'なべりょうり', category: '食べ物' },
+    { word: 'もんじゃやき', category: '食べ物' },
+    // 動物 (45)
+    { word: 'きりん', category: '動物' },
+    { word: 'らいおん', category: '動物' },
+    { word: 'ぺんぎん', category: '動物' },
+    { word: 'いるか', category: '動物' },
+    { word: 'かめれおん', category: '動物' },
+    { word: 'ふらみんご', category: '動物' },
+    { word: 'かぶとむし', category: '動物' },
+    { word: 'こうもり', category: '動物' },
+    { word: 'ちんぱんじー', category: '動物' },
+    { word: 'ごりら', category: '動物' },
+    { word: 'おらんうーたん', category: '動物' },
+    { word: 'かんがるー', category: '動物' },
+    { word: 'こあら', category: '動物' },
+    { word: 'ひょう', category: '動物' },
+    { word: 'ちーたー', category: '動物' },
+    { word: 'しまうま', category: '動物' },
+    { word: 'かば', category: '動物' },
+    { word: 'さい', category: '動物' },
+    { word: 'ぞう', category: '動物' },
+    { word: 'わに', category: '動物' },
+    { word: 'かめ', category: '動物' },
+    { word: 'とかげ', category: '動物' },
+    { word: 'いぐあな', category: '動物' },
+    { word: 'はりねずみ', category: '動物' },
+    { word: 'りす', category: '動物' },
+    { word: 'うさぎ', category: '動物' },
+    { word: 'はむすたー', category: '動物' },
+    { word: 'あるぱか', category: '動物' },
+    { word: 'らっこ', category: '動物' },
+    { word: 'あざらし', category: '動物' },
+    { word: 'せいうち', category: '動物' },
+    { word: 'くじら', category: '動物' },
+    { word: 'しゃち', category: '動物' },
+    { word: 'まんた', category: '動物' },
+    { word: 'くらげ', category: '動物' },
+    { word: 'たつのおとしご', category: '動物' },
+    { word: 'だちょう', category: '動物' },
+    { word: 'おうむ', category: '動物' },
+    { word: 'くじゃく', category: '動物' },
+    { word: 'つる', category: '動物' },
+    { word: 'はやぶさ', category: '動物' },
+    { word: 'みみずく', category: '動物' },
+    { word: 'かわうそ', category: '動物' },
+    { word: 'みーあきゃっと', category: '動物' },
+    { word: 'れっさーぱんだ', category: '動物' },
+    // 国・地域 (40)
+    { word: 'おーすとらりあ', category: '国・地域' },
+    { word: 'ぶらじる', category: '国・地域' },
+    { word: 'あめりか', category: '国・地域' },
+    { word: 'にほん', category: '国・地域' },
+    { word: 'ふらんす', category: '国・地域' },
+    { word: 'いぎりす', category: '国・地域' },
+    { word: 'いたりあ', category: '国・地域' },
+    { word: 'すぺいん', category: '国・地域' },
+    { word: 'どいつ', category: '国・地域' },
+    { word: 'かなだ', category: '国・地域' },
+    { word: 'めきしこ', category: '国・地域' },
+    { word: 'あるぜんちん', category: '国・地域' },
+    { word: 'ころんびあ', category: '国・地域' },
+    { word: 'ぺるー', category: '国・地域' },
+    { word: 'ちり', category: '国・地域' },
+    { word: 'えじぷと', category: '国・地域' },
+    { word: 'けにあ', category: '国・地域' },
+    { word: 'みなみあふりか', category: '国・地域' },
+    { word: 'もろっこ', category: '国・地域' },
+    { word: 'ないじぇりあ', category: '国・地域' },
+    { word: 'いんど', category: '国・地域' },
+    { word: 'たい', category: '国・地域' },
+    { word: 'べとなむ', category: '国・地域' },
+    { word: 'いんどねしあ', category: '国・地域' },
+    { word: 'ふぃりぴん', category: '国・地域' },
+    { word: 'まれーしあ', category: '国・地域' },
+    { word: 'しんがぽーる', category: '国・地域' },
+    { word: 'かんこく', category: '国・地域' },
+    { word: 'ちゅうごく', category: '国・地域' },
+    { word: 'ろしあ', category: '国・地域' },
+    { word: 'とるこ', category: '国・地域' },
+    { word: 'すいす', category: '国・地域' },
+    { word: 'おーすとりあ', category: '国・地域' },
+    { word: 'すうぇーでん', category: '国・地域' },
+    { word: 'のるうぇー', category: '国・地域' },
+    { word: 'ふぃんらんど', category: '国・地域' },
+    { word: 'ぽるとがる', category: '国・地域' },
+    { word: 'ぎりしゃ', category: '国・地域' },
+    { word: 'にゅーじーらんど', category: '国・地域' },
+    { word: 'さうじあらびあ', category: '国・地域' },
+    // スポーツ (40)
+    { word: 'ばすけっとぼーる', category: 'スポーツ' },
+    { word: 'さっかー', category: 'スポーツ' },
+    { word: 'ばどみんとん', category: 'スポーツ' },
+    { word: 'たっきゅう', category: 'スポーツ' },
+    { word: 'すけーとぼーど', category: 'スポーツ' },
+    { word: 'やきゅう', category: 'スポーツ' },
+    { word: 'てにす', category: 'スポーツ' },
+    { word: 'ばれーぼーる', category: 'スポーツ' },
+    { word: 'はんどぼーる', category: 'スポーツ' },
+    { word: 'らぐびー', category: 'スポーツ' },
+    { word: 'あめりかんふっとぼーる', category: 'スポーツ' },
+    { word: 'すいえい', category: 'スポーツ' },
+    { word: 'りくじょう', category: 'スポーツ' },
+    { word: 'まらそん', category: 'スポーツ' },
+    { word: 'じゅうどう', category: 'スポーツ' },
+    { word: 'けんどう', category: 'スポーツ' },
+    { word: 'からて', category: 'スポーツ' },
+    { word: 'すもう', category: 'スポーツ' },
+    { word: 'きょうどう', category: 'スポーツ' },
+    { word: 'ふぃぎゅあすけーと', category: 'スポーツ' },
+    { word: 'あいすほっけー', category: 'スポーツ' },
+    { word: 'すのーぼーど', category: 'スポーツ' },
+    { word: 'すきー', category: 'スポーツ' },
+    { word: 'さーふぃん', category: 'スポーツ' },
+    { word: 'ぼくしんぐ', category: 'スポーツ' },
+    { word: 'れすりんぐ', category: 'スポーツ' },
+    { word: 'ふぇんしんぐ', category: 'スポーツ' },
+    { word: 'あーちぇりー', category: 'スポーツ' },
+    { word: 'ごるふ', category: 'スポーツ' },
+    { word: 'くりけっと', category: 'スポーツ' },
+    { word: 'そふとぼーる', category: 'スポーツ' },
+    { word: 'たいそう', category: 'スポーツ' },
+    { word: 'とらんぽりん', category: 'スポーツ' },
+    { word: 'ぼーと', category: 'スポーツ' },
+    { word: 'かぬー', category: 'スポーツ' },
+    { word: 'せーりんぐ', category: 'スポーツ' },
+    { word: 'じてんしゃ', category: 'スポーツ' },
+    { word: 'とらいあすろん', category: 'スポーツ' },
+    { word: 'ほっけー', category: 'スポーツ' },
+    { word: 'くらいみんぐ', category: 'スポーツ' },
+];
+
+function generateQuiz() {
+    const item = QUIZ_WORDS[Math.floor(Math.random() * QUIZ_WORDS.length)];
+    const word = item.word;
+    // Blank out ~40% of characters at random positions
+    const blankCount = Math.max(1, Math.min(Math.floor(word.length * 0.4), word.length - 2));
+    const indices = Array.from({ length: word.length }, (_, i) => i);
+    // Shuffle and pick
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const blanks = indices.slice(0, blankCount).sort((a, b) => a - b);
+    return { word, category: item.category, blanks };
+}
+
+function startQuiz(room) {
+    if (room.quiz) return; // already active
+    const q = generateQuiz();
+    room.quiz = { word: q.word, category: q.category, blanks: q.blanks, solved: false };
+    broadcastToRoom(room, {
+        type: 'quiz_start',
+        category: q.category,
+        display: q.word.split('').map((ch, i) => q.blanks.includes(i) ? null : ch),
+        blanks: q.blanks,
+        wordLength: q.word.length
+    });
+    broadcastLog(room, '🧩 ひらがなクイズが出題されました！チャットで回答してください', 'quiz');
+}
+
+function endQuiz(room) {
+    if (!room.quiz) return;
+    if (!room.quiz.solved) {
+        broadcastToRoom(room, { type: 'quiz_end', answer: room.quiz.word });
+        broadcastLog(room, `🧩 クイズ終了 — 答え: ${room.quiz.word}`, 'quiz');
+    }
+    room.quiz = null;
+}
+
+function checkQuizAnswer(room, client, text) {
+    if (!room.quiz || room.quiz.solved) return false;
+    // Normalize: remove spaces, convert to lowercase hiragana
+    const normalized = text.replace(/\s/g, '').toLowerCase();
+    if (normalized === room.quiz.word) {
+        room.quiz.solved = true;
+        const seat = room.seatMap[client.id];
+        // Award bonus chips
+        if (seat !== undefined && room.game && room.game.players[seat]) {
+            room.game.players[seat].chips += 200;
+        }
+        broadcastToRoom(room, {
+            type: 'quiz_correct',
+            winner: client.name,
+            answer: room.quiz.word,
+            bonus: 200
+        });
+        broadcastLog(room, `🎉 ${client.name} さん正解！ +200 チップボーナス`, 'quiz-correct');
+        // Update game state (works for both regular rooms and zoom tables)
+        if (room.activeMemberIds) {
+            broadcastZoomTableState(room);
+        } else {
+            broadcastGameState(room);
+        }
+        return true;
+    }
+    return false;
+}
+
+// ============================================
 // Account System (Supabase + password hashing)
 // ============================================
 const crypto = require('crypto');
@@ -656,7 +932,13 @@ function handleMessage(ws, client, msg) {
             if (client.roomId) {
                 // Room/game chat: broadcast to room members only
                 const room = rooms.get(client.roomId);
-                if (room) broadcastToRoom(room, { type: 'chat', from: client.name, message: text });
+                if (room) {
+                    // Check quiz answer before broadcasting
+                    if (room.quiz && !room.quiz.solved) {
+                        checkQuizAnswer(room, client, text);
+                    }
+                    broadcastToRoom(room, { type: 'chat', from: client.name, message: text });
+                }
             } else {
                 // Lobby chat: broadcast to all lobby users
                 for (const [ws, c] of clients) {
@@ -782,6 +1064,10 @@ function startGame(room) {
             const seatIdx = player.id;
             const member = room.getClientBySeat(seatIdx);
 
+            // Set timer values BEFORE broadcasting so clients get correct turnRemaining
+            room.turnStartTime = Date.now();
+            room.turnTimeLimit = 45;
+
             broadcastGameState(room);
 
             // Auto-fold sitout players
@@ -822,8 +1108,6 @@ function startGame(room) {
                 resolve(auto);
             }, 45000);
 
-            room.turnStartTime = Date.now();
-            room.turnTimeLimit = 45;
             room.pending = { type: 'action', playerId: seatIdx, resolve, timer };
         });
     };
@@ -832,6 +1116,10 @@ function startGame(room) {
         return new Promise((resolve) => {
             const seatIdx = player.id;
             const member = room.getClientBySeat(seatIdx);
+
+            // Set timer values BEFORE broadcasting so clients get correct turnRemaining
+            room.turnStartTime = Date.now();
+            room.turnTimeLimit = 45;
 
             broadcastGameState(room);
 
@@ -861,8 +1149,6 @@ function startGame(room) {
                 resolve([]);
             }, 45000);
 
-            room.turnStartTime = Date.now();
-            room.turnTimeLimit = 45;
             room.pending = { type: 'draw', playerId: seatIdx, resolve, timer };
         });
     };
@@ -910,10 +1196,17 @@ function startGame(room) {
         });
 
         room.stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
+        endQuiz(room); // End any active quiz from previous hand
         broadcastToRoom(room, { type: 'hand_start' });
     };
     game.onFirstRoundEnd = () => room.stats.endFirstRound();
-    game.onPlayerAction = (player, action, isBlinds) => room.stats.recordAction(player, action, isBlinds);
+    game.onPlayerAction = (player, action, isBlinds) => {
+        room.stats.recordAction(player, action, isBlinds);
+        // Start quiz when a player folds (and no quiz active yet)
+        if (action.type === 'fold' && !room.quiz) {
+            startQuiz(room);
+        }
+    };
     game.onShowdown = (winnerIds) => room.stats.recordShowdown(winnerIds);
     game.onHandEnd = (hadShowdown) => {
         // Broadcast hand result with all players' cards
@@ -1167,7 +1460,9 @@ function createZoomTable(members) {
         }
     };
     game.onFirstRoundEnd = () => stats.endFirstRound();
-    game.onPlayerAction = (player, action, isBlinds) => stats.recordAction(player, action, isBlinds);
+    game.onPlayerAction = (player, action, isBlinds) => {
+        stats.recordAction(player, action, isBlinds);
+    };
     game.onShowdown = (winnerIds) => stats.recordShowdown(winnerIds);
     game.onHandEnd = (hadShowdown) => {
         const gc = game.gameConfig;
@@ -1208,6 +1503,12 @@ function createZoomTable(members) {
             const seatIdx = player.id;
             const member = getZoomMemberBySeat(table, seatIdx);
 
+            const timeLimit = table.game.isFirstRound ? 45 : 30;
+
+            // Set timer values BEFORE broadcasting so clients get correct turnRemaining
+            table.turnStartTime = Date.now();
+            table.turnTimeLimit = timeLimit;
+
             broadcastZoomTableState(table);
 
             if (!member || !member.ws || member.ws.readyState !== WebSocket.OPEN
@@ -1218,7 +1519,6 @@ function createZoomTable(members) {
                 return;
             }
 
-            const timeLimit = table.game.isFirstRound ? 45 : 30;
             const gc = game.gameConfig;
             send(member.ws, {
                 type: 'your_turn', actions, timeLimit,
@@ -1247,6 +1547,10 @@ function createZoomTable(members) {
         return new Promise((resolve) => {
             const seatIdx = player.id;
             const member = getZoomMemberBySeat(table, seatIdx);
+
+            // Set timer values BEFORE broadcasting so clients get correct turnRemaining
+            table.turnStartTime = Date.now();
+            table.turnTimeLimit = 30;
 
             broadcastZoomTableState(table);
 
@@ -1360,7 +1664,7 @@ function broadcastZoomTableState(table) {
         if (!table.activeMemberIds.has(m.clientId)) continue;
         const seat = table.seatMap[m.clientId];
         if (seat !== undefined) {
-            const state = getStateForPlayer(table.game, {}, seat);
+            const state = getStateForPlayer(table.game, table, seat);
             state.zoom = true;
             send(m.ws, { type: 'game_state', state });
         }
