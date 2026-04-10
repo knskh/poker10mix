@@ -486,17 +486,28 @@ function setupGameScreen() {
     document.querySelectorAll('.log-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const mode = tab.dataset.tab;
-            document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
             const logPanel = document.getElementById('log-panel');
             const gameLog = document.getElementById('game-log');
             const chatBar = document.querySelector('.game-chat-bar');
+
             if (mode === 'none') {
-                // Collapse: hide content, keep tab bar visible
+                // Collapse: hide content + tab labels, show only expand button
+                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
                 logPanel.classList.add('collapsed');
-            } else {
-                // Re-open from collapsed or just switch content
+            } else if (logPanel.classList.contains('collapsed') && mode === 'expand') {
+                // Expand from collapsed state — restore last active tab (default: log)
                 logPanel.classList.remove('collapsed');
+                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+                const logTab = document.querySelector('.log-tab[data-tab="log"]');
+                logTab.classList.add('active');
+                gameLog.classList.remove('hidden');
+                chatBar.classList.add('hidden');
+            } else {
+                // Normal tab switch
+                logPanel.classList.remove('collapsed');
+                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
                 gameLog.classList.toggle('hidden', mode === 'chat');
                 chatBar.classList.toggle('hidden', mode === 'log');
             }
@@ -1218,10 +1229,34 @@ function showActionButtons(actions, turnData) {
             btn.className = `btn-action btn-${action.type}`;
 
             switch (action.type) {
-                case 'fold':
+                case 'fold': {
                     btn.textContent = 'フォールド';
-                    btn.addEventListener('click', () => sendActionAndHide({ type: 'fold' }));
+                    // Long-press (0.4s) to prevent accidental fold
+                    let foldTimer = null;
+                    let foldFired = false;
+                    btn.addEventListener('pointerdown', (e) => {
+                        foldFired = false;
+                        btn.classList.add('fold-holding');
+                        foldTimer = setTimeout(() => {
+                            foldFired = true;
+                            btn.classList.remove('fold-holding');
+                            sendActionAndHide({ type: 'fold' });
+                        }, 400);
+                    });
+                    btn.addEventListener('pointerup', () => {
+                        clearTimeout(foldTimer);
+                        btn.classList.remove('fold-holding');
+                    });
+                    btn.addEventListener('pointerleave', () => {
+                        clearTimeout(foldTimer);
+                        btn.classList.remove('fold-holding');
+                    });
+                    // Add separator before fold
+                    const sep = document.createElement('div');
+                    sep.className = 'action-separator';
+                    btnDiv.appendChild(sep);
                     break;
+                }
                 case 'check':
                     btn.textContent = 'チェック';
                     btn.addEventListener('click', () => sendActionAndHide({ type: 'check' }));

@@ -685,16 +685,24 @@ body {
     transition: flex-basis 0.2s ease;
     min-width: 0;
 }
-/* Collapsed: tab bar only, content hidden, panel shrinks to tab bar width */
+/* Collapsed: only expand button visible, minimal width */
 #log-panel.collapsed {
-    flex: 0 0 auto;
+    flex: 0 0 32px;
+    min-width: 32px;
 }
 #log-panel.collapsed #log-content {
     display: none;
 }
 #log-panel.collapsed #log-tab-bar {
     border-bottom: none;
+    justify-content: center;
+    padding: 3px 2px;
 }
+/* Hide all tabs except expand button when collapsed */
+#log-panel.collapsed .log-tab { display: none; }
+#log-panel.collapsed .log-tab-expand { display: flex; }
+/* Hide expand button when NOT collapsed */
+.log-tab-expand { display: none; }
 
 /* Tab bar */
 #log-tab-bar {
@@ -716,6 +724,10 @@ body {
 .log-tab-close { margin-left: auto; color: #555; font-size: 12px; }
 .log-tab-close:hover { background: rgba(255,60,60,0.15); color: #f44; border-color: rgba(255,60,60,0.3); }
 .log-tab-close.active { background: rgba(255,60,60,0.15); color: #f44; border-color: rgba(255,60,60,0.3); }
+.log-tab-expand {
+    font-size: 16px; padding: 4px 8px; color: #aaa; align-items: center; justify-content: center;
+}
+.log-tab-expand:hover { background: rgba(0,229,255,0.15); color: var(--gold); }
 
 /* Log content area */
 #log-content {
@@ -732,17 +744,31 @@ body {
     gap: 4px; padding: 6px 10px; flex: 1; justify-content: flex-end;
 }
 #action-buttons {
-    display: flex; flex-direction: column; gap: 4px; width: 100%;
+    display: flex; flex-direction: column; gap: 6px; width: 100%;
+}
+
+/* Separator before fold — visual gap to prevent misclick */
+.action-separator {
+    height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;
 }
 
 /* Action button — full-width vertical stack */
 .btn-action {
-    padding: 9px 14px; font-size: 13px; border: none; border-radius: 7px;
+    padding: 11px 14px; font-size: 14px; border: none; border-radius: 7px;
     cursor: pointer; font-weight: bold; color: #fff; transition: all 0.15s;
     width: 100%; text-align: center; letter-spacing: 0.3px;
+    -webkit-user-select: none; user-select: none; touch-action: manipulation;
 }
 .btn-action:hover { filter: brightness(1.12); }
 .btn-action:active { transform: scale(0.98); }
+/* Fold long-press visual feedback */
+.btn-fold.fold-holding {
+    animation: fold-fill 0.4s linear forwards;
+}
+@keyframes fold-fill {
+    0% { background: #37474f; }
+    100% { background: #b71c1c; }
+}
 .btn-fold  { background: #37474f; }
 .btn-check { background: #2e7d32; }
 .btn-call  { background: #2e7d32; }
@@ -768,11 +794,12 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 5px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 2px; }
+#bet-presets { display: flex; gap: 5px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 4px; }
 .btn-preset {
-    padding: 6px 13px; font-size: 13px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
     background: rgba(255,255,255,0.09); color: #ddd; cursor: pointer; font-weight: 600;
     transition: all 0.12s; white-space: nowrap; flex: 1; min-width: 0;
+    -webkit-user-select: none; user-select: none; touch-action: manipulation;
 }
 .btn-preset:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4); }
 .btn-preset.active { background: rgba(0,229,255,0.2); color: var(--gold); border-color: var(--gold); }
@@ -1113,7 +1140,7 @@ body {
 
     /* Bet Presets */
     #bet-presets { gap: 4px; }
-    .btn-preset { padding: 4px 8px; font-size: 11px; }
+    .btn-preset { padding: 7px 8px; font-size: 12px; }
 
     /* Cards */
     .card { width: 26px; height: 36px; border-radius: 3px; }
@@ -1144,10 +1171,10 @@ body {
     .seat-bottom-right { bottom: 15px; right: -10px; }
 
     /* Action Buttons */
-    .btn-action { padding: 12px 14px; font-size: 14px; min-width: 70px; border-radius: 8px; }
+    .btn-action { padding: 13px 14px; font-size: 15px; min-width: 70px; border-radius: 8px; }
     .btn-action:active { transform: scale(0.95); }
     #action-bar { padding: 6px 4px; gap: 6px; }
-    #action-buttons { gap: 6px; }
+    #action-buttons { gap: 7px; }
     #bet-slider-area { gap: 8px; }
     #bet-slider { width: 140px; height: 28px; }
     .bet-numpad-input { font-size: 14px; width: 64px; padding: 4px; }
@@ -1159,8 +1186,9 @@ body {
     /* Game Log */
     #game-log { height: auto; padding: 4px 8px; font-size: 10px; }
     #log-panel { flex-basis: 45%; }
-    #bottom-area { height: 185px; }
-    .btn-action { padding: 11px 16px; font-size: 14px; }
+    #log-panel.collapsed { flex: 0 0 28px; min-width: 28px; }
+    #bottom-area { height: 195px; }
+    .btn-action { padding: 13px 16px; font-size: 15px; }
     .bet-raise-input { width: 58px; font-size: 13px; }
     .log-tab { padding: 2px 7px; font-size: 10px; }
 
@@ -1222,15 +1250,16 @@ body {
 
     .seat-name { font-size: 9px; }
     .seat-chips { font-size: 8px; }
-    .btn-action { padding: 10px 10px; font-size: 13px; min-width: 60px; }
+    .btn-action { padding: 12px 10px; font-size: 14px; min-width: 60px; }
     #player-cards .card { width: 36px; height: 48px; }
     #player-cards .card-rank { font-size: 14px; }
     #player-cards .card-suit { font-size: 12px; }
     #player-hand { height: 66px; margin-top: 36px; }
     #game-log { height: auto; font-size: 9px; }
     #log-panel { flex-basis: 42%; }
-    #bottom-area { height: 170px; }
-    .btn-action { padding: 9px 12px; font-size: 13px; }
+    #log-panel.collapsed { flex: 0 0 28px; min-width: 28px; }
+    #bottom-area { height: 180px; }
+    .btn-action { padding: 12px 12px; font-size: 14px; }
     .log-tab { padding: 2px 6px; font-size: 9px; }
 }
 
