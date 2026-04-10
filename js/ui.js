@@ -232,21 +232,26 @@ class PokerUI {
         tableFelt.querySelectorAll('.table-bet-chip').forEach(el => el.remove());
         // Positions: [left%, top%] within table-felt
         // Between seat edge and table center, shifted inward for clarity
-        const betPos = [
-            [50, 68], // seat-0 bottom-center  → right above seat
-            [25, 72], // seat-1 bottom-left    → right above-right of seat
-            [25, 28], // seat-2 top-left       → right below-right of seat
-            [50, 18], // seat-3 top-center     → right below seat
-            [75, 28], // seat-4 top-right      → right below-left of seat
-            [75, 72], // seat-5 bottom-right   → right above-left of seat
-        ];
+        // Bet chip positions keyed by visual seat class
+        const betPosByClass = {
+            'seat-bottom':       [50, 80],
+            'seat-bottom-left':  [22, 75],
+            'seat-top-left':     [22, 22],
+            'seat-top':          [50, 12],
+            'seat-top-right':    [78, 22],
+            'seat-bottom-right': [78, 75],
+        };
         s.players.forEach((p, i) => {
-            if (p.seatBet > 0 && i < betPos.length) {
+            if (p.seatBet > 0) {
+                const seatEl = document.getElementById(`seat-${i}`);
+                const seatClass = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat');
+                const pos = betPosByClass[seatClass];
+                if (!pos) return;
                 const chip = document.createElement('div');
                 chip.className = 'table-bet-chip';
                 chip.textContent = p.seatBet.toLocaleString();
-                chip.style.left = betPos[i][0] + '%';
-                chip.style.top = betPos[i][1] + '%';
+                chip.style.left = pos[0] + '%';
+                chip.style.top = pos[1] + '%';
                 tableFelt.appendChild(chip);
             }
         });
