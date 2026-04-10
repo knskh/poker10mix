@@ -213,10 +213,10 @@ class PokerUI {
             return (Number.isInteger(v) ? v : parseFloat(v.toFixed(1))) + 'bb';
         };
 
-        // Pot display: "Pot 1.5bb" style
+        // Pot display
         const potEl = document.getElementById('pot-display');
         if (s.pot > 0) {
-            potEl.innerHTML = `<span class="pot-label">Pot</span><span class="pot-amount">${fmtBB(s.pot)}</span>`;
+            potEl.innerHTML = `<span class="pot-label">Pot</span><span class="pot-amount">${s.pot.toLocaleString()}</span>`;
         } else {
             potEl.innerHTML = '';
         }
@@ -225,7 +225,7 @@ class PokerUI {
         const tableInfo = document.getElementById('table-info');
         if (tableInfo) {
             tableInfo.innerHTML = s.currentBet > 0
-                ? `<span class="bet-label">Bet</span><span class="bet-amount">${fmtBB(s.currentBet)}</span>`
+                ? `<span class="bet-label">Bet</span><span class="bet-amount">${s.currentBet.toLocaleString()}</span>`
                 : '';
         }
 
@@ -244,28 +244,28 @@ class PokerUI {
                 `<span class="blind-item">BI <b>${s.bringIn || 0}</b></span>`;
         } else {
             blindInfoEl.innerHTML =
-                `<span class="blind-item">${fmtBB(s.smallBlind || 0)}</span>` +
+                `<span class="blind-item">${(s.smallBlind || 0).toLocaleString()}</span>` +
                 `<span class="blind-sep">/</span>` +
-                `<span class="blind-item">${fmtBB(s.bigBlind || 0)}</span>`;
+                `<span class="blind-item">${(s.bigBlind || 0).toLocaleString()}</span>`;
         }
 
-        // Floating bet chips on table (between each seat and center)
+        // Floating bet chips on table — placed on the table-side of each seat icon
         const tableFelt = document.getElementById('table-felt');
         tableFelt.querySelectorAll('.table-bet-chip').forEach(el => el.remove());
-        // Positions: [left%, top%] for each seat index (0-5)
+        // Positions: [left%, top%] within table-felt, close to each seat on the table side
         const betPos = [
-            [50, 73], // seat-0 bottom
-            [24, 67], // seat-1 bottom-left
-            [24, 33], // seat-2 top-left
-            [50, 18], // seat-3 top
-            [76, 33], // seat-4 top-right
-            [76, 67], // seat-5 bottom-right
+            [50, 60], // seat-0 bottom-center  → just inside table above seat
+            [20, 70], // seat-1 bottom-left    → to the right of seat (toward center)
+            [20, 30], // seat-2 top-left       → to the right and below seat
+            [50, 13], // seat-3 top-center     → just inside table below seat
+            [80, 30], // seat-4 top-right      → to the left and below seat
+            [80, 70], // seat-5 bottom-right   → to the left of seat (toward center)
         ];
         s.players.forEach((p, i) => {
             if (p.seatBet > 0 && i < betPos.length) {
                 const chip = document.createElement('div');
                 chip.className = 'table-bet-chip';
-                chip.textContent = s.gameType === 'stud' ? p.seatBet.toLocaleString() : fmtBB(p.seatBet);
+                chip.textContent = p.seatBet.toLocaleString();
                 chip.style.left = betPos[i][0] + '%';
                 chip.style.top = betPos[i][1] + '%';
                 tableFelt.appendChild(chip);
@@ -382,10 +382,10 @@ class PokerUI {
         nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '');
         el.appendChild(nameDiv);
 
-        // Chips in BB units (raw for stud)
+        // Chips display (chip amounts)
         const chipsDiv = document.createElement('div');
         chipsDiv.className = 'seat-chips';
-        chipsDiv.textContent = s.gameType === 'stud' ? p.chips.toLocaleString() : fmtBB(p.chips);
+        chipsDiv.textContent = p.chips.toLocaleString();
         el.appendChild(chipsDiv);
 
         // Position badge
