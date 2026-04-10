@@ -916,23 +916,22 @@ body {
 .pre-action-opt input { accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
 .pre-action-opt input:checked + span { color: var(--gold); font-weight: 600; }
 
-/* Emote toggle button */
+/* Emote toggle button (in top bar) */
 #emote-toggle {
-    position: absolute; bottom: 8px; right: 8px;
-    width: 36px; height: 36px; font-size: 20px;
+    width: 26px; height: 26px; font-size: 16px;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 50%; cursor: pointer; z-index: 16;
-    transition: all 0.15s; user-select: none;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50%; cursor: pointer;
+    transition: all 0.15s; user-select: none; position: relative;
 }
-#emote-toggle:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); }
+#emote-toggle:hover { background: rgba(255,255,255,0.15); transform: scale(1.1); }
 
-/* Emote picker (expandable) */
+/* Emote picker (expandable dropdown from top bar) */
 #emote-picker {
-    position: absolute; bottom: 50px; right: 8px;
-    display: flex; flex-direction: column; gap: 4px;
-    background: rgba(15,20,30,0.92); border: 1px solid rgba(0,229,255,0.25);
-    border-radius: 12px; padding: 8px 6px; z-index: 16;
+    position: absolute; top: 38px; right: 30px;
+    display: flex; flex-direction: row; gap: 4px;
+    background: rgba(15,20,30,0.95); border: 1px solid rgba(0,229,255,0.25);
+    border-radius: 10px; padding: 6px 8px; z-index: 200;
     box-shadow: 0 4px 20px rgba(0,0,0,0.6);
     backdrop-filter: blur(10px);
     animation: emote-picker-in 0.15s ease-out;
