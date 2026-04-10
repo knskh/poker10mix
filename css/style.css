@@ -902,19 +902,37 @@ body {
 .pre-action-opt input { accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
 .pre-action-opt input:checked + span { color: var(--gold); font-weight: 600; }
 
-/* Emote bar */
-#emote-bar {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    display: flex; justify-content: center; gap: 4px;
-    padding: 3px 8px; background: rgba(0,0,0,0.4);
-    z-index: 15; pointer-events: auto;
+/* Emote toggle button */
+#emote-toggle {
+    position: absolute; bottom: 8px; right: 8px;
+    width: 36px; height: 36px; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50%; cursor: pointer; z-index: 16;
+    transition: all 0.15s; user-select: none;
+}
+#emote-toggle:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); }
+
+/* Emote picker (expandable) */
+#emote-picker {
+    position: absolute; bottom: 50px; right: 8px;
+    display: flex; flex-direction: column; gap: 4px;
+    background: rgba(15,20,30,0.92); border: 1px solid rgba(0,229,255,0.25);
+    border-radius: 12px; padding: 8px 6px; z-index: 16;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    animation: emote-picker-in 0.15s ease-out;
+}
+@keyframes emote-picker-in {
+    0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .emote-btn {
-    font-size: 18px; padding: 2px 6px; cursor: pointer;
-    background: transparent; border: 1px solid transparent; border-radius: 6px;
-    transition: all 0.15s; line-height: 1;
+    font-size: 24px; padding: 4px 8px; cursor: pointer;
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    transition: all 0.12s; line-height: 1;
 }
-.emote-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); transform: scale(1.2); }
+.emote-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); transform: scale(1.15); }
 .emote-btn:active { transform: scale(0.9); }
 
 /* Floating emote animation on table */

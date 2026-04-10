@@ -2397,12 +2397,28 @@ function onLobbyChat(data) {
 // Emote Reactions
 // ==========================================
 function setupEmotes() {
+    const toggle = document.getElementById('emote-toggle');
+    const picker = document.getElementById('emote-picker');
+
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        picker.classList.toggle('hidden');
+    });
+
     document.querySelectorAll('.emote-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             const emote = btn.dataset.emote;
             client.sendEmote(emote);
+            picker.classList.add('hidden');
         });
     });
+
+    // Close picker when clicking outside
+    document.addEventListener('click', () => {
+        picker.classList.add('hidden');
+    });
+    picker.addEventListener('click', (e) => e.stopPropagation());
 }
 
 function onEmote(data) {
