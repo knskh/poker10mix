@@ -358,6 +358,10 @@ function getStateForPlayer(game, room, playerSeat) {
         isShowdown: game.isShowdown,
         mySeatIndex: playerSeat,
         mySitout: !!(room.sitout && room.sitout[playerSeat]),
+        turnRemaining: (room.turnStartTime && room.turnTimeLimit)
+            ? Math.max(0, room.turnTimeLimit - (Date.now() - room.turnStartTime) / 1000)
+            : null,
+        turnTimeLimit: room.turnTimeLimit || null,
     };
 }
 
@@ -806,6 +810,8 @@ function startGame(room) {
                 resolve(auto);
             }, 45000);
 
+            room.turnStartTime = Date.now();
+            room.turnTimeLimit = 45;
             room.pending = { type: 'action', playerId: seatIdx, resolve, timer };
         });
     };
@@ -843,6 +849,8 @@ function startGame(room) {
                 resolve([]);
             }, 45000);
 
+            room.turnStartTime = Date.now();
+            room.turnTimeLimit = 45;
             room.pending = { type: 'draw', playerId: seatIdx, resolve, timer };
         });
     };

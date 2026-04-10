@@ -425,6 +425,22 @@ class PokerUI {
             actionDiv.textContent = names[p.lastAction] || p.lastAction;
             el.appendChild(actionDiv);
         }
+
+        // Turn timer bar on active player's seat
+        if (s.currentPlayer === idx && s.turnRemaining != null && s.turnTimeLimit) {
+            const barContainer = document.createElement('div');
+            barContainer.className = 'seat-timer-bar';
+            const fill = document.createElement('div');
+            fill.className = 'seat-timer-fill';
+            const remaining = s.turnRemaining;
+            const pct = Math.max(0, Math.min(100, (remaining / s.turnTimeLimit) * 100));
+            // Use CSS animation for smooth countdown
+            fill.style.width = pct + '%';
+            fill.style.animation = `seat-timer-shrink ${remaining}s linear forwards`;
+            if (remaining <= 10) fill.classList.add('seat-timer-urgent');
+            barContainer.appendChild(fill);
+            el.appendChild(barContainer);
+        }
     }
 
     showSeatPopup(p, s, idx) {
