@@ -1309,7 +1309,14 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
         btn.className = 'btn-preset btn-preset-allin';
         btn.textContent = `All-In ${amount.toLocaleString()}`;
         btn.addEventListener('click', () => {
-            sendActionAndHide({ type: 'allin', amount: allInAction.amount });
+            const slider = document.getElementById('bet-slider');
+            if (slider) slider.value = parseInt(slider.max);
+            const total = parseInt(slider.max) + sliderOffset;
+            const input = document.getElementById('bet-amount-input');
+            if (input) input.value = total;
+            updateRaiseBtnText(total);
+            presetsDiv.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
         });
         presetsDiv.appendChild(btn);
     }

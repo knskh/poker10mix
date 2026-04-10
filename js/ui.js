@@ -221,33 +221,11 @@ class PokerUI {
             potEl.innerHTML = '';
         }
 
-        // Current bet
+        // Current bet — hidden (removed from table center)
         const tableInfo = document.getElementById('table-info');
-        if (tableInfo) {
-            tableInfo.innerHTML = s.currentBet > 0
-                ? `<span class="bet-label">Bet</span><span class="bet-amount">${s.currentBet.toLocaleString()}</span>`
-                : '';
-        }
+        if (tableInfo) tableInfo.innerHTML = '';
 
-        // Blind info (small, top-left of table)
-        let blindInfoEl = document.getElementById('blind-info');
-        if (!blindInfoEl) {
-            blindInfoEl = document.createElement('div');
-            blindInfoEl.id = 'blind-info';
-            blindInfoEl.className = 'blind-info';
-            document.getElementById('table-felt').appendChild(blindInfoEl);
-        }
-        if (s.gameType === 'stud') {
-            blindInfoEl.innerHTML =
-                `<span class="blind-item">ANTE <b>${s.ante || 0}</b></span>` +
-                `<span class="blind-sep">/</span>` +
-                `<span class="blind-item">BI <b>${s.bringIn || 0}</b></span>`;
-        } else {
-            blindInfoEl.innerHTML =
-                `<span class="blind-item">${(s.smallBlind || 0).toLocaleString()}</span>` +
-                `<span class="blind-sep">/</span>` +
-                `<span class="blind-item">${(s.bigBlind || 0).toLocaleString()}</span>`;
-        }
+        // Blind info — removed from table display
 
         // Floating bet chips on table — placed on the table-side of each seat icon
         const tableFelt = document.getElementById('table-felt');
@@ -255,12 +233,12 @@ class PokerUI {
         // Positions: [left%, top%] within table-felt
         // Between seat edge and table center, shifted inward for clarity
         const betPos = [
-            [50, 65], // seat-0 bottom-center  → above seat, toward center
-            [24, 70], // seat-1 bottom-left    → right of seat, toward center
-            [24, 30], // seat-2 top-left       → right of seat, toward center
-            [50, 27], // seat-3 top-center     → below seat, toward center
-            [76, 30], // seat-4 top-right      → left of seat, toward center
-            [76, 70], // seat-5 bottom-right   → left of seat, toward center
+            [50, 60], // seat-0 bottom-center  → just above seat, at table edge
+            [30, 67], // seat-1 bottom-left    → toward table center, at edge
+            [30, 33], // seat-2 top-left       → toward table center, at edge
+            [50, 22], // seat-3 top-center     → just below seat, at table edge
+            [70, 33], // seat-4 top-right      → toward table center, at edge
+            [70, 67], // seat-5 bottom-right   → toward table center, at edge
         ];
         s.players.forEach((p, i) => {
             if (p.seatBet > 0 && i < betPos.length) {
