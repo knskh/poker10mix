@@ -544,12 +544,13 @@ body {
     padding: 1px 5px; font-size: 9px; font-weight: 700;
     color: #fff; margin-top: 1px; letter-spacing: 0.3px;
 }
-.pos-btn  { background: #e65100; }
-.pos-sb   { background: #37474f; }
-.pos-bb   { background: #37474f; }
-.pos-utg  { background: #b71c1c; }
-.pos-hj   { background: #1565c0; }
-.pos-co   { background: #4a148c; }
+.pos-btn   { background: #e65100; }
+.pos-sbtn  { background: #e65100; } /* Heads-up: SB/BTN same as BTN color */
+.pos-sb    { background: #37474f; }
+.pos-bb    { background: #37474f; }
+.pos-utg   { background: #b71c1c; }
+.pos-hj    { background: #1565c0; }
+.pos-co    { background: #4a148c; }
 
 #community-cards {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -688,20 +689,28 @@ body {
     display: flex; flex-direction: column;
     border-right: 1px solid #2a2d35;
     overflow: hidden;
-    transition: flex-basis 0.2s ease, opacity 0.2s ease;
+    transition: flex-basis 0.2s ease;
+    min-width: 0;
 }
+/* Collapsed: tab bar only, content hidden, panel shrinks to tab bar width */
 #log-panel.collapsed {
-    flex-basis: 0; border-right: none; opacity: 0; pointer-events: none;
+    flex: 0 0 auto;
+}
+#log-panel.collapsed #log-content {
+    display: none;
+}
+#log-panel.collapsed #log-tab-bar {
+    border-bottom: none;
 }
 
 /* Tab bar */
 #log-tab-bar {
     display: flex; align-items: center; flex-shrink: 0;
     background: #0d1018; border-bottom: 1px solid #1e2430;
-    padding: 4px 6px; gap: 2px;
+    padding: 3px 5px; gap: 2px;
 }
 .log-tab {
-    padding: 3px 10px; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; font-size: 11px; font-weight: 600;
     border: 1px solid transparent; border-radius: 4px;
     background: transparent; color: var(--text-dim);
     cursor: pointer; transition: all 0.15s; white-space: nowrap;
@@ -727,15 +736,15 @@ body {
 
 #action-bar {
     display: flex; flex-direction: column;
-    gap: 5px; padding: 8px 12px; flex: 1; justify-content: flex-end;
+    gap: 4px; padding: 6px 10px; flex: 1; justify-content: flex-end;
 }
 #action-buttons {
-    display: flex; flex-direction: column; gap: 5px; width: 100%;
+    display: flex; flex-direction: column; gap: 4px; width: 100%;
 }
 
 /* Action button — full-width vertical stack */
 .btn-action {
-    padding: 13px 20px; font-size: 15px; border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 13px; border: none; border-radius: 7px;
     cursor: pointer; font-weight: bold; color: #fff; transition: all 0.15s;
     width: 100%; text-align: center; letter-spacing: 0.3px;
 }
@@ -754,10 +763,10 @@ body {
 }
 .action-raise-row .btn-action { flex: 1; }
 .bet-raise-input {
-    width: 70px; flex-shrink: 0;
+    width: 62px; flex-shrink: 0;
     background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 8px; color: #fff; font-size: 14px; font-weight: bold;
-    text-align: center; padding: 0 8px; font-family: inherit; outline: none;
+    border-radius: 7px; color: #fff; font-size: 13px; font-weight: bold;
+    text-align: center; padding: 0 6px; font-family: inherit; outline: none;
     transition: border-color 0.2s;
 }
 .bet-raise-input:focus { border-color: var(--accent); box-shadow: 0 0 6px rgba(56,189,248,0.3); }
@@ -766,9 +775,9 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 5px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 2px; }
+#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 1px; }
 .btn-preset {
-    padding: 4px 10px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
+    padding: 3px 8px; font-size: 11px; border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
     background: rgba(255,255,255,0.07); color: #ccc; cursor: pointer; font-weight: 600;
     transition: all 0.12s; white-space: nowrap;
 }

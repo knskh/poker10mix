@@ -9,7 +9,7 @@ function getPositionLabel(players, dealerSeat, targetIdx) {
     }
     const n = seated.length;
     const posNames = {
-        2: ['SB', 'BB'],
+        2: ['SB/BTN', 'BB'],  // Heads-up: dealer is SB and BTN
         3: ['BTN', 'SB', 'BB'],
         4: ['BTN', 'SB', 'BB', 'UTG'],
         5: ['BTN', 'SB', 'BB', 'HJ', 'CO'],
@@ -393,7 +393,8 @@ class PokerUI {
             const pos = getPositionLabel(s.players, s.dealerSeat, idx);
             if (pos) {
                 const badge = document.createElement('span');
-                badge.className = `pos-badge pos-${pos.toLowerCase()}`;
+                const cssPos = pos.replace('/', '').toLowerCase(); // 'SB/BTN' → 'sbtn'
+                badge.className = `pos-badge pos-${cssPos}`;
                 badge.textContent = pos;
                 el.appendChild(badge);
             }

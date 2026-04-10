@@ -492,8 +492,10 @@ function setupGameScreen() {
             const gameLog = document.getElementById('game-log');
             const chatBar = document.querySelector('.game-chat-bar');
             if (mode === 'none') {
+                // Collapse: hide content, keep tab bar visible
                 logPanel.classList.add('collapsed');
             } else {
+                // Re-open from collapsed or just switch content
                 logPanel.classList.remove('collapsed');
                 gameLog.classList.toggle('hidden', mode === 'chat');
                 chatBar.classList.toggle('hidden', mode === 'log');
