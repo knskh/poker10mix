@@ -426,20 +426,37 @@ class PokerUI {
             el.appendChild(actionDiv);
         }
 
-        // Turn timer bar on active player's seat
+        // Border timer + badge on active player's seat
         if (s.currentPlayer === idx && s.turnRemaining != null && s.turnTimeLimit) {
-            const barContainer = document.createElement('div');
-            barContainer.className = 'seat-timer-bar';
-            const fill = document.createElement('div');
-            fill.className = 'seat-timer-fill';
             const remaining = s.turnRemaining;
-            const pct = Math.max(0, Math.min(100, (remaining / s.turnTimeLimit) * 100));
-            // Use CSS animation for smooth countdown
-            fill.style.width = pct + '%';
-            fill.style.animation = `seat-timer-shrink ${remaining}s linear forwards`;
-            if (remaining <= 10) fill.classList.add('seat-timer-urgent');
-            barContainer.appendChild(fill);
-            el.appendChild(barContainer);
+            el.classList.add('seat-ring-timer');
+            el.style.setProperty('--ring-duration', remaining + 's');
+            if (remaining <= 10) el.classList.add('seat-timer-urgent');
+
+            // Timer badge with countdown
+            const badge = document.createElement('div');
+            badge.className = 'seat-timer-badge' + (remaining <= 10 ? ' urgent' : '');
+            badge.textContent = '⏱' + Math.ceil(remaining) + 's';
+            badge.dataset.remaining = remaining;
+            badge.dataset.startTime = Date.now();
+            el.appendChild(badge);
+
+            // Live countdown update
+            const badgeInterval = setInterval(() => {
+                const elapsed = (Date.now() - parseInt(badge.dataset.startTime)) / 1000;
+                const left = Math.max(0, Math.ceil(parseFloat(badge.dataset.remaining) - elapsed));
+                badge.textContent = '⏱' + left + 's';
+                if (left <= 10) {
+                    if (!badge.classList.contains('urgent')) badge.classList.add('urgent');
+                    if (!el.classList.contains('seat-timer-urgent')) el.classList.add('seat-timer-urgent');
+                }
+                if (left <= 0) clearInterval(badgeInterval);
+            }, 500);
+            el._timerInterval = badgeInterval;
+        } else {
+            if (el._timerInterval) { clearInterval(el._timerInterval); el._timerInterval = null; }
+            el.classList.remove('seat-ring-timer', 'seat-timer-urgent');
+            el.style.removeProperty('--ring-duration');
         }
     }
 

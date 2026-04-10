@@ -625,6 +625,18 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'rebuy_chips': {
+            const room = rooms.get(client.roomId);
+            if (!room || !room.game) break;
+            const seat = room.seatMap[client.id];
+            if (seat === undefined) break;
+            const amount = parseInt(msg.amount) || 10000;
+            room.game.players[seat].chips = amount;
+            broadcastLog(room, `${client.name} のチップが ${amount.toLocaleString()} になりました`, 'important');
+            broadcastGameState(room);
+            break;
+        }
+
         case 'rejoin_game': {
             const room = rooms.get(client.roomId);
             if (!room || !room.sitout) break;

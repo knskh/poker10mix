@@ -383,34 +383,45 @@ body {
 }
 
 #top-bar {
-    display: flex; align-items: center; justify-content: center;
-    gap: 16px; padding: 6px 16px;
+    display: flex; align-items: center; justify-content: flex-start;
+    gap: 10px; padding: 6px 12px;
     background: #111318; border-bottom: 1px solid #2a2d35;
     height: 40px; flex-shrink: 0;
 }
 #game-name { font-size: 16px; font-weight: bold; color: var(--text); }
 #game-rotation { font-size: 13px; color: var(--text-dim); }
-#turn-timer {
-    display: flex; align-items: center; gap: 6px;
-}
-#turn-timer-text { font-size: 14px; font-weight: bold; color: var(--gold); white-space: nowrap; }
-#turn-timer-bar {
-    width: 80px; height: 6px; background: rgba(255,255,255,0.1);
-    border-radius: 3px; overflow: hidden;
-}
-#turn-timer-fill {
-    height: 100%; width: 100%; background: var(--gold);
-    border-radius: 3px; transition: width 0.2s linear, background 0.3s;
-}
-#turn-timer-fill.urgent { background: #f44; }
 
-#game-rules-btn {
-    width: 26px; height: 26px; border-radius: 50%;
-    background: rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 14px; font-weight: bold; color: var(--text-dim);
+/* Hamburger menu */
+#top-bar-menu-wrap { position: relative; margin-left: auto; }
+#btn-hamburger { font-size: 16px; padding: 4px 10px; }
+#top-bar-menu {
+    position: absolute; top: 100%; right: 0; margin-top: 4px;
+    background: rgba(15,20,30,0.97); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px; padding: 6px 0; z-index: 300; min-width: 160px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.7); backdrop-filter: blur(12px);
+    animation: menu-in 0.12s ease-out;
 }
-#game-rules-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+@keyframes menu-in {
+    0% { opacity: 0; transform: translateY(-6px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.menu-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 10px 16px; font-size: 14px;
+    color: var(--text-dim); background: transparent; border: none;
+    cursor: pointer; text-align: left; white-space: nowrap;
+    transition: background 0.1s;
+}
+.menu-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.menu-danger { color: #f44; }
+.menu-danger:hover { background: rgba(244,67,54,0.15); color: #f44; }
+
+/* game-rules-btn is now a menu-item, override old standalone styles */
+#game-rules-btn {
+    width: auto; height: auto; border-radius: 0;
+    background: transparent; font-size: 14px; font-weight: normal;
+}
+#game-rules-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
 #rules-modal {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -679,18 +690,67 @@ body {
     font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;
 }
 
-/* Seat turn timer bar */
-.seat-timer-bar {
-    width: 100%; height: 3px; background: rgba(255,255,255,0.1);
-    border-radius: 2px; margin-top: 3px; overflow: hidden;
+/* Seat turn timer: border color animation + badge */
+.seat.seat-ring-timer {
+    --ring-duration: 45s;
+    border: 3px solid #38bdf8 !important;
+    box-shadow: 0 0 12px rgba(56,189,248,0.5), 0 4px 16px rgba(0,0,0,0.3);
+    animation: border-timer-color var(--ring-duration) linear forwards;
+    position: relative;
+    overflow: visible;
 }
-.seat-timer-fill {
-    height: 100%; background: var(--gold); border-radius: 2px;
+@keyframes border-timer-color {
+    0% { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56,189,248,0.5), 0 4px 16px rgba(0,0,0,0.3); }
+    50% { border-color: #eab308; box-shadow: 0 0 12px rgba(234,179,8,0.5), 0 4px 16px rgba(0,0,0,0.3); }
+    75% { border-color: #f97316; box-shadow: 0 0 12px rgba(249,115,22,0.5), 0 4px 16px rgba(0,0,0,0.3); }
+    100% { border-color: #ef4444; box-shadow: 0 0 16px rgba(239,68,68,0.6), 0 4px 16px rgba(0,0,0,0.3); }
 }
-.seat-timer-fill.seat-timer-urgent { background: #f44; }
-@keyframes seat-timer-shrink {
-    from { width: inherit; }
-    to { width: 0%; }
+/* Urgent pulse when time is low */
+.seat.seat-ring-timer.seat-timer-urgent {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 16px rgba(239,68,68,0.6), 0 4px 16px rgba(0,0,0,0.3) !important;
+    animation: border-urgent-pulse 0.8s ease-in-out infinite !important;
+}
+@keyframes border-urgent-pulse {
+    0%, 100% { border-color: #ef4444; box-shadow: 0 0 16px rgba(239,68,68,0.6), 0 4px 16px rgba(0,0,0,0.3); }
+    50% { border-color: rgba(239,68,68,0.4); box-shadow: 0 0 6px rgba(239,68,68,0.2), 0 4px 16px rgba(0,0,0,0.3); }
+}
+/* Timer badge - always positioned to the side to avoid card/text overlap */
+.seat-timer-badge {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    right: -38px;
+    background: rgba(10,15,25,0.92); border: 1.5px solid #38bdf8;
+    border-radius: 10px; padding: 1px 7px;
+    font-size: 11px; font-weight: 900; color: #38bdf8;
+    box-shadow: 0 0 8px rgba(56,189,248,0.35);
+    z-index: 5; white-space: nowrap; letter-spacing: 0.5px;
+    text-shadow: 0 0 6px rgba(56,189,248,0.5);
+    pointer-events: none;
+}
+/* Left-side seats: badge on right. Right-side seats: badge on left */
+.seat-top-right .seat-timer-badge,
+.seat-bottom-right .seat-timer-badge {
+    right: auto; left: -38px;
+}
+/* Top/bottom center seats: badge below/above */
+.seat-top .seat-timer-badge {
+    right: auto; left: 50%; top: auto; bottom: -24px;
+    transform: translateX(-50%);
+}
+.seat-bottom .seat-timer-badge {
+    right: auto; left: 50%; top: -24px; bottom: auto;
+    transform: translateX(-50%);
+}
+/* Urgent state */
+.seat-timer-badge.urgent {
+    border-color: #f44; color: #f44;
+    box-shadow: 0 0 8px rgba(244,68,68,0.4);
+    text-shadow: 0 0 6px rgba(244,68,68,0.5);
+    animation: timer-badge-blink 0.8s ease-in-out infinite;
+}
+@keyframes timer-badge-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 .seat-dealer-btn {
@@ -918,20 +978,20 @@ body {
 
 /* Emote toggle button (in top bar) */
 #emote-toggle {
-    width: 26px; height: 26px; font-size: 16px;
+    width: 28px; height: 28px; font-size: 16px;
     display: flex; align-items: center; justify-content: center;
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 50%; cursor: pointer;
-    transition: all 0.15s; user-select: none; position: relative;
+    border-radius: 50%; cursor: pointer; margin-left: auto;
+    transition: all 0.15s; user-select: none;
 }
 #emote-toggle:hover { background: rgba(255,255,255,0.15); transform: scale(1.1); }
 
 /* Emote picker (expandable dropdown from top bar) */
 #emote-picker {
-    position: absolute; top: 38px; right: 30px;
+    position: absolute; top: 38px; right: 40px;
     display: flex; flex-direction: row; gap: 4px;
     background: rgba(15,20,30,0.95); border: 1px solid rgba(0,229,255,0.25);
-    border-radius: 10px; padding: 6px 8px; z-index: 200;
+    border-radius: 10px; padding: 6px 8px; z-index: 310;
     box-shadow: 0 4px 20px rgba(0,0,0,0.6);
     backdrop-filter: blur(10px);
     animation: emote-picker-in 0.15s ease-out;
@@ -1228,7 +1288,7 @@ body {
     .btn-tiny { padding: 8px 14px; font-size: 12px; }
     .btn-small { padding: 8px 16px; font-size: 14px; min-height: 36px; }
     #btn-logout { padding: 6px 12px; font-size: 12px; }
-    #game-rules-btn { width: 36px; height: 36px; font-size: 16px; }
+    .menu-item { padding: 12px 16px; font-size: 15px; min-height: 44px; }
     .stats-tab { padding: 8px 14px; font-size: 13px; }
 
     /* --- Login Screen --- */
@@ -1266,8 +1326,7 @@ body {
     #game-name { font-size: 13px; }
     .game-type-badge { font-size: 8px; padding: 1px 4px; margin-left: 4px; }
     #game-rotation { font-size: 11px; }
-    #turn-timer-text { font-size: 12px; }
-    #turn-timer-bar { width: 50px; height: 5px; }
+    #btn-hamburger { padding: 6px 10px; font-size: 14px; }
 
     /* Table - mobile rail */
     #table-felt.rail-draw { box-shadow: 0 0 0 2px #1a1d24, 0 0 0 6px #1565c0, 0 0 0 8px #1a1d24, inset 0 0 20px rgba(0,0,0,0.4), 0 2px 12px rgba(21,101,192,0.3); }

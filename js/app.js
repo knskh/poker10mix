@@ -415,7 +415,6 @@ function onRoomJoined(room) {
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
         document.getElementById('btn-back-room').classList.remove('hidden');
         document.getElementById('btn-zoom-exit').classList.add('hidden');
-        document.getElementById('btn-zoom-sitout').classList.add('hidden');
         document.getElementById('game-log').innerHTML = '';
         currentHandLogs = [];
     } else {
@@ -524,12 +523,30 @@ function setupGameScreen() {
 
     // Sound toggle button
     const soundBtn = document.getElementById('btn-sound-toggle');
-    const updateSoundBtn = () => { soundBtn.textContent = sound.isEnabled() ? '🔔' : '🔕'; };
+    const updateSoundBtn = () => { soundBtn.textContent = sound.isEnabled() ? '🔔 サウンド ON' : '🔕 サウンド OFF'; };
     updateSoundBtn();
     soundBtn.addEventListener('click', () => { sound.toggle(); updateSoundBtn(); });
 
+    // Hamburger menu toggle
+    const hamburgerBtn = document.getElementById('btn-hamburger');
+    const topBarMenu = document.getElementById('top-bar-menu');
+    hamburgerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        topBarMenu.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+        if (!topBarMenu.contains(e.target) && e.target !== hamburgerBtn) {
+            topBarMenu.classList.add('hidden');
+        }
+    });
+    // Close menu when any menu-item is clicked
+    topBarMenu.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', () => topBarMenu.classList.add('hidden'));
+    });
+
     // Rules button
     document.getElementById('game-rules-btn').addEventListener('click', () => {
+        topBarMenu.classList.add('hidden');
         document.getElementById('rules-modal').classList.toggle('hidden');
     });
     document.getElementById('rules-close').addEventListener('click', () => {
@@ -608,6 +625,11 @@ function setupGameScreen() {
         client.zoomSitout();
     });
 
+    // Rebuy chips button
+    document.getElementById('btn-rebuy').addEventListener('click', () => {
+        client.rebuyChips(10000);
+    });
+
     // Zoom sit-out overlay buttons
     document.getElementById('btn-zoom-rejoin').addEventListener('click', () => {
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
@@ -651,11 +673,9 @@ function onGameStarted(data) {
         isInZoom = true;
         document.getElementById('btn-back-room').classList.add('hidden');
         document.getElementById('btn-zoom-exit').classList.remove('hidden');
-        document.getElementById('btn-zoom-sitout').classList.remove('hidden');
     } else {
         document.getElementById('btn-back-room').classList.remove('hidden');
         document.getElementById('btn-zoom-exit').classList.add('hidden');
-        document.getElementById('btn-zoom-sitout').classList.add('hidden');
     }
 }
 
@@ -769,7 +789,6 @@ function onZoomLeft() {
     document.getElementById('zoom-waiting-overlay').classList.add('hidden');
     document.getElementById('zoom-sitout-overlay').classList.add('hidden');
     document.getElementById('btn-zoom-exit').classList.add('hidden');
-    document.getElementById('btn-zoom-sitout').classList.add('hidden');
     document.getElementById('btn-back-room').classList.remove('hidden');
     saveCurrentHand();
     showScreen('lobby');
@@ -1425,25 +1444,15 @@ function startTurnTimer(seconds) {
     stopTurnTimer();
     turnTimeLimit = seconds;
     turnTimerStart = Date.now();
-    const timerEl = document.getElementById('turn-timer');
-    const textEl = document.getElementById('turn-timer-text');
-    const fillEl = document.getElementById('turn-timer-fill');
-    timerEl.classList.remove('hidden');
     turnTimer = setInterval(() => {
         const elapsed = (Date.now() - turnTimerStart) / 1000;
         const remaining = Math.max(0, Math.ceil(turnTimeLimit - elapsed));
-        const pct = Math.max(0, (1 - elapsed / turnTimeLimit) * 100);
-        textEl.textContent = `⏱ ${remaining}s`;
-        textEl.style.color = remaining <= 10 ? '#f44' : 'var(--gold)';
-        fillEl.style.width = pct + '%';
-        fillEl.classList.toggle('urgent', remaining <= 10);
         if (remaining <= 0) stopTurnTimer();
     }, 200);
 }
 
 function stopTurnTimer() {
     if (turnTimer) { clearInterval(turnTimer); turnTimer = null; }
-    document.getElementById('turn-timer').classList.add('hidden');
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('draw-action-bar').classList.add('hidden');
 }

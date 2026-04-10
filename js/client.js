@@ -147,6 +147,7 @@ class PokerClient {
     sendChat(message) { this.send({ type: 'chat', message }); }
     rejoinGame() { this.send({ type: 'rejoin_game' }); }
     sendEmote(emote) { this.send({ type: 'emote', emote }); }
+    rebuyChips(amount) { this.send({ type: 'rebuy_chips', amount }); }
     getStats() { this.send({ type: 'get_stats' }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
 }
