@@ -426,38 +426,86 @@ class PokerUI {
             el.appendChild(actionDiv);
         }
 
-        // Border timer + badge on active player's seat
+        // Bubble timer on active player's seat
         if (s.currentPlayer === idx && s.turnRemaining != null && s.turnTimeLimit) {
             const remaining = s.turnRemaining;
-            el.classList.add('seat-ring-timer');
-            el.style.setProperty('--ring-duration', remaining + 's');
-            if (remaining <= 10) el.classList.add('seat-timer-urgent');
-
-            // Timer badge with countdown
-            const badge = document.createElement('div');
-            badge.className = 'seat-timer-badge' + (remaining <= 10 ? ' urgent' : '');
-            badge.textContent = '⏱' + Math.ceil(remaining) + 's';
-            badge.dataset.remaining = remaining;
-            badge.dataset.startTime = Date.now();
-            el.appendChild(badge);
-
-            // Live countdown update
-            const badgeInterval = setInterval(() => {
-                const elapsed = (Date.now() - parseInt(badge.dataset.startTime)) / 1000;
-                const left = Math.max(0, Math.ceil(parseFloat(badge.dataset.remaining) - elapsed));
-                badge.textContent = '⏱' + left + 's';
-                if (left <= 10) {
-                    if (!badge.classList.contains('urgent')) badge.classList.add('urgent');
-                    if (!el.classList.contains('seat-timer-urgent')) el.classList.add('seat-timer-urgent');
-                }
-                if (left <= 0) clearInterval(badgeInterval);
-            }, 500);
-            el._timerInterval = badgeInterval;
+            const total = s.turnTimeLimit;
+            this._startBubbleTimer(el, remaining, total);
         } else {
-            if (el._timerInterval) { clearInterval(el._timerInterval); el._timerInterval = null; }
-            el.classList.remove('seat-ring-timer', 'seat-timer-urgent');
-            el.style.removeProperty('--ring-duration');
+            this._clearBubbleTimer(el);
         }
+    }
+
+    _startBubbleTimer(el, remaining, total) {
+        this._clearBubbleTimer(el);
+
+        // Create wrapper with 4 bubbles
+        const wrap = document.createElement('div');
+        wrap.className = 'bubble-timer-wrap';
+        for (let i = 0; i < 4; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'bubble-dot';
+            wrap.appendChild(dot);
+        }
+        el.appendChild(wrap);
+
+        const interval = total / 4; // pop one every 1/4 of total
+        const dots = Array.from(wrap.querySelectorAll('.bubble-dot'));
+
+        // Pop already-expired bubbles immediately (no animation)
+        const alreadyElapsed = total - remaining;
+        const alreadyPopped = Math.min(3, Math.floor(alreadyElapsed / interval));
+        for (let i = 0; i < alreadyPopped; i++) {
+            dots[i].style.transition = 'none';
+            dots[i].style.opacity = '0';
+            dots[i].style.transform = 'scale(0)';
+            dots[i].classList.add('bubble-pop');
+        }
+
+        const startTime = Date.now();
+        const criticalThreshold = 5; // seconds
+
+        el._bubbleInterval = setInterval(() => {
+            const elapsedSec = (Date.now() - startTime) / 1000;
+            const left = Math.max(0, remaining - elapsedSec);
+            const totalElapsed = total - left;
+
+            // Pop bubbles at 1/4 intervals (keep last one until time-up)
+            const shouldPop = Math.min(3, Math.floor(totalElapsed / interval));
+            for (let i = 0; i < shouldPop; i++) {
+                if (!dots[i].classList.contains('bubble-pop')) {
+                    dots[i].classList.add('bubble-pop');
+                }
+            }
+
+            // Critical phase: last bubble warning
+            if (left <= criticalThreshold && left > 0) {
+                wrap.classList.add('bubble-critical');
+                dots.forEach(d => {
+                    if (!d.classList.contains('bubble-pop')) d.classList.add('bubble-warn');
+                });
+            }
+
+            // Time up: pop the last bubble
+            if (left <= 0) {
+                dots.forEach(d => {
+                    if (!d.classList.contains('bubble-pop')) d.classList.add('bubble-pop');
+                });
+                el.classList.add('seat-timed-out');
+                clearInterval(el._bubbleInterval);
+                el._bubbleInterval = null;
+            }
+        }, 250);
+    }
+
+    _clearBubbleTimer(el) {
+        if (el._bubbleInterval) {
+            clearInterval(el._bubbleInterval);
+            el._bubbleInterval = null;
+        }
+        const wrap = el.querySelector('.bubble-timer-wrap');
+        if (wrap) wrap.remove();
+        el.classList.remove('seat-timed-out');
     }
 
     showSeatPopup(p, s, idx) {

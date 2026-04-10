@@ -690,67 +690,57 @@ body {
     font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;
 }
 
-/* Seat turn timer: border color animation + badge */
-.seat.seat-ring-timer {
-    --ring-duration: 45s;
-    border: 3px solid #38bdf8 !important;
-    box-shadow: 0 0 12px rgba(56,189,248,0.5), 0 4px 16px rgba(0,0,0,0.3);
-    animation: border-timer-color var(--ring-duration) linear forwards;
-    position: relative;
-    overflow: visible;
+/* ===== Bubble Turn Timer ===== */
+.bubble-timer-wrap {
+    position: absolute; inset: -12px;
+    pointer-events: none; z-index: 6;
+    animation: bubble-orbit 4s linear infinite;
 }
-@keyframes border-timer-color {
-    0% { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56,189,248,0.5), 0 4px 16px rgba(0,0,0,0.3); }
-    50% { border-color: #eab308; box-shadow: 0 0 12px rgba(234,179,8,0.5), 0 4px 16px rgba(0,0,0,0.3); }
-    75% { border-color: #f97316; box-shadow: 0 0 12px rgba(249,115,22,0.5), 0 4px 16px rgba(0,0,0,0.3); }
-    100% { border-color: #ef4444; box-shadow: 0 0 16px rgba(239,68,68,0.6), 0 4px 16px rgba(0,0,0,0.3); }
+.bubble-timer-wrap.bubble-critical {
+    animation: bubble-orbit 1.2s linear infinite;
 }
-/* Urgent pulse when time is low */
-.seat.seat-ring-timer.seat-timer-urgent {
-    border-color: #ef4444 !important;
-    box-shadow: 0 0 16px rgba(239,68,68,0.6), 0 4px 16px rgba(0,0,0,0.3) !important;
-    animation: border-urgent-pulse 0.8s ease-in-out infinite !important;
+@keyframes bubble-orbit {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
-@keyframes border-urgent-pulse {
-    0%, 100% { border-color: #ef4444; box-shadow: 0 0 16px rgba(239,68,68,0.6), 0 4px 16px rgba(0,0,0,0.3); }
-    50% { border-color: rgba(239,68,68,0.4); box-shadow: 0 0 6px rgba(239,68,68,0.2), 0 4px 16px rgba(0,0,0,0.3); }
+
+/* Individual bubble */
+.bubble-dot {
+    position: absolute;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #a5f3fc, #38bdf8 60%, #0284c7);
+    box-shadow: 0 0 6px rgba(56,189,248,0.6), inset 0 -1px 2px rgba(0,0,0,0.15);
+    transition: transform 0.25s ease, opacity 0.25s ease, background 0.5s ease, box-shadow 0.5s ease;
 }
-/* Timer badge - always positioned to the side to avoid card/text overlap */
-.seat-timer-badge {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    right: -38px;
-    background: rgba(10,15,25,0.92); border: 1.5px solid #38bdf8;
-    border-radius: 10px; padding: 1px 7px;
-    font-size: 11px; font-weight: 900; color: #38bdf8;
-    box-shadow: 0 0 8px rgba(56,189,248,0.35);
-    z-index: 5; white-space: nowrap; letter-spacing: 0.5px;
-    text-shadow: 0 0 6px rgba(56,189,248,0.5);
-    pointer-events: none;
+/* 4 bubbles at N/E/S/W — counter-rotate to stay upright */
+.bubble-dot:nth-child(1) { top: -5px;  left: 50%; margin-left: -5px; }
+.bubble-dot:nth-child(2) { top: 50%;  right: -5px; margin-top: -5px; }
+.bubble-dot:nth-child(3) { bottom: -5px; left: 50%; margin-left: -5px; }
+.bubble-dot:nth-child(4) { top: 50%;  left: -5px; margin-top: -5px; }
+
+/* Pop animation — overrides all other states including warn */
+.bubble-dot.bubble-pop {
+    transform: scale(1.4) !important;
+    opacity: 0 !important;
+    animation: none !important;
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0.5, 1), opacity 0.3s ease !important;
 }
-/* Left-side seats: badge on right. Right-side seats: badge on left */
-.seat-top-right .seat-timer-badge,
-.seat-bottom-right .seat-timer-badge {
-    right: auto; left: -38px;
+
+/* Critical state: color shift + blink */
+.bubble-dot.bubble-warn {
+    background: radial-gradient(circle at 35% 35%, #fca5a5, #ef4444 60%, #b91c1c);
+    box-shadow: 0 0 8px rgba(239,68,68,0.7), inset 0 -1px 2px rgba(0,0,0,0.2);
+    animation: bubble-blink 0.4s ease-in-out infinite alternate;
 }
-/* Top/bottom center seats: badge below/above */
-.seat-top .seat-timer-badge {
-    right: auto; left: 50%; top: auto; bottom: -24px;
-    transform: translateX(-50%);
+@keyframes bubble-blink {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0.5; transform: scale(0.85); }
 }
-.seat-bottom .seat-timer-badge {
-    right: auto; left: 50%; top: -24px; bottom: auto;
-    transform: translateX(-50%);
-}
-/* Urgent state */
-.seat-timer-badge.urgent {
-    border-color: #f44; color: #f44;
-    box-shadow: 0 0 8px rgba(244,68,68,0.4);
-    text-shadow: 0 0 6px rgba(244,68,68,0.5);
-    animation: timer-badge-blink 0.8s ease-in-out infinite;
-}
-@keyframes timer-badge-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+/* Seat fade-out on time-up */
+.seat.seat-timed-out {
+    opacity: 0.3 !important;
+    transition: opacity 0.6s ease;
 }
 
 .seat-dealer-btn {
