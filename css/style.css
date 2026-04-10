@@ -869,10 +869,13 @@ body {
 }
 .btn-preset-allin:hover { background: rgba(106,27,154,0.6); color: #fff; border-color: #9c27b0; }
 
-/* Folded state message in action panel */
+/* Folded/sitout state message in action panel */
 .folded-msg {
     font-size: 12px; color: #888; text-align: center;
     padding: 8px 0; font-weight: 600;
+}
+.sitout-msg {
+    color: #f4a236; font-size: 11px;
 }
 
 /* Slider: hidden but functional */

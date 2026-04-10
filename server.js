@@ -332,7 +332,7 @@ function getStateForPlayer(game, room, playerSeat) {
                 id: p.id, name: p.name, chips: p.chips,
                 folded: p.folded, allIn: p.allIn,
                 seatBet: p.seatBet, lastAction: p.lastAction,
-                connected: p.connected,
+                connected: p.connected, sitout: !!(room.sitout && room.sitout[i]),
                 hand: showCards ? p.hand : [],
                 upCards: gc.type === 'stud' ? p.upCards : [],
                 downCards: (isMe && gc.type === 'stud') ? p.downCards : [],
@@ -357,6 +357,7 @@ function getStateForPlayer(game, room, playerSeat) {
         dealerSeat: game.dealerSeat,
         isShowdown: game.isShowdown,
         mySeatIndex: playerSeat,
+        mySitout: !!(room.sitout && room.sitout[playerSeat]),
     };
 }
 
@@ -566,6 +567,8 @@ function handleMessage(ws, client, msg) {
             const seat = room.seatMap[client.id];
             if (room.pending.type !== 'action' || room.pending.playerId !== seat) return;
             clearTimeout(room.pending.timer);
+            // Reset timeout counter on manual action
+            if (room.consecutiveTimeouts) room.consecutiveTimeouts[seat] = 0;
             const p = room.pending;
             room.pending = null;
             p.resolve(msg.action);
@@ -579,6 +582,8 @@ function handleMessage(ws, client, msg) {
             const seat = room.seatMap[client.id];
             if (room.pending.type !== 'draw' || room.pending.playerId !== seat) return;
             clearTimeout(room.pending.timer);
+            // Reset timeout counter on manual action
+            if (room.consecutiveTimeouts) room.consecutiveTimeouts[seat] = 0;
             const p = room.pending;
             room.pending = null;
             p.resolve(msg.discards || []);
@@ -600,6 +605,20 @@ function handleMessage(ws, client, msg) {
         case 'zoom_rejoin':
             handleZoomRejoin(ws, client);
             break;
+
+        case 'rejoin_game': {
+            const room = rooms.get(client.roomId);
+            if (!room || !room.sitout) break;
+            const seat = room.seatMap[client.id];
+            if (seat !== undefined && room.sitout[seat]) {
+                room.sitout[seat] = false;
+                delete room.sitoutTime[seat];
+                room.consecutiveTimeouts[seat] = 0;
+                broadcastLog(room, `${client.name} が復帰しました`, 'important');
+                broadcastGameState(room);
+            }
+            break;
+        }
 
         case 'chat': {
             const text = (msg.message || '').slice(0, 200);
@@ -715,6 +734,11 @@ function startGame(room) {
     // Track consecutive missed hands per seat (for sit-out eviction)
     room.missedHands = {};
 
+    // Track consecutive timeouts per seat (for auto-sitout)
+    room.consecutiveTimeouts = {};
+    room.sitout = {};        // seat -> true if sitting out
+    room.sitoutTime = {};    // seat -> timestamp when sitout started
+
     // Stats
     room.stats = new StatsTracker();
 
@@ -728,6 +752,13 @@ function startGame(room) {
             const member = room.getClientBySeat(seatIdx);
 
             broadcastGameState(room);
+
+            // Auto-fold sitout players
+            if (room.sitout[seatIdx]) {
+                const auto = actions.find(a => a.type === 'check') || actions.find(a => a.type === 'fold') || actions[0];
+                resolve(auto);
+                return;
+            }
 
             if (!member || !member.ws || member.ws.readyState !== WebSocket.OPEN) {
                 const auto = actions.find(a => a.type === 'check') || actions.find(a => a.type === 'fold') || actions[0];
@@ -750,6 +781,13 @@ function startGame(room) {
                 room.pending = null;
                 const auto = actions.find(a => a.type === 'check') || actions.find(a => a.type === 'fold') || actions[0];
                 broadcastLog(room, `${player.name}: タイムアウト`, 'action');
+                // Track consecutive timeouts
+                room.consecutiveTimeouts[seatIdx] = (room.consecutiveTimeouts[seatIdx] || 0) + 1;
+                if (room.consecutiveTimeouts[seatIdx] >= 2 && !room.sitout[seatIdx]) {
+                    room.sitout[seatIdx] = true;
+                    room.sitoutTime[seatIdx] = Date.now();
+                    broadcastLog(room, `${player.name} が2回連続タイムアウトのため離席状態になりました`, 'important');
+                }
                 resolve(auto);
             }, 45000);
 
@@ -764,6 +802,12 @@ function startGame(room) {
 
             broadcastGameState(room);
 
+            // Auto-stand-pat for sitout players
+            if (room.sitout[seatIdx]) {
+                resolve([]);
+                return;
+            }
+
             if (!member || !member.ws || member.ws.readyState !== WebSocket.OPEN) {
                 resolve([]); // Stand pat
                 return;
@@ -774,6 +818,13 @@ function startGame(room) {
             const timer = setTimeout(() => {
                 room.pending = null;
                 broadcastLog(room, `${player.name}: タイムアウト（スタンドパット）`, 'action');
+                // Track consecutive timeouts
+                room.consecutiveTimeouts[seatIdx] = (room.consecutiveTimeouts[seatIdx] || 0) + 1;
+                if (room.consecutiveTimeouts[seatIdx] >= 2 && !room.sitout[seatIdx]) {
+                    room.sitout[seatIdx] = true;
+                    room.sitoutTime[seatIdx] = Date.now();
+                    broadcastLog(room, `${player.name} が2回連続タイムアウトのため離席状態になりました`, 'important');
+                }
                 resolve([]);
             }, 45000);
 
@@ -796,6 +847,26 @@ function startGame(room) {
                 room.missedHands[seat] = 0; // reset on reconnect
             }
         });
+
+        // Auto-kick sitout players after 10 minutes
+        const TEN_MINUTES = 10 * 60 * 1000;
+        game.players.forEach((p, seat) => {
+            if (room.sitout[seat] && room.sitoutTime[seat]) {
+                if (Date.now() - room.sitoutTime[seat] >= TEN_MINUTES) {
+                    p.chips = 0;
+                    p.folded = true;
+                    room.sitout[seat] = false;
+                    delete room.sitoutTime[seat];
+                    broadcastLog(room, `${p.name} が10分間離席のため退室しました`, 'important');
+                    // Disconnect the player's ws
+                    const member = room.getClientBySeat(seat);
+                    if (member && member.ws) {
+                        send(member.ws, { type: 'auto_kicked' });
+                    }
+                }
+            }
+        });
+
         room.stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
         broadcastToRoom(room, { type: 'hand_start' });
     };

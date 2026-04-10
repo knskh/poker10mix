@@ -120,6 +120,9 @@ class PokerClient {
             case 'zoom_sitout':
                 this.emit('zoom_sitout');
                 break;
+            case 'auto_kicked':
+                this.emit('auto_kicked');
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -139,6 +142,7 @@ class PokerClient {
     sendAction(action) { this.send({ type: 'action', action }); }
     sendDraw(discards) { this.send({ type: 'draw', discards }); }
     sendChat(message) { this.send({ type: 'chat', message }); }
+    rejoinGame() { this.send({ type: 'rejoin_game' }); }
     getStats() { this.send({ type: 'get_stats' }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
 }

@@ -130,6 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('zoom_waiting', onZoomWaiting);
     client.on('zoom_left', onZoomLeft);
     client.on('zoom_sitout', onZoomSitout);
+    client.on('auto_kicked', () => {
+        alert('10分間離席のため自動退室されました');
+        showScreen('lobby');
+    });
     client.on('error', (msg) => alert(msg));
 });
 
@@ -1408,36 +1412,61 @@ function showFoldedButtons(state) {
     const btnDiv = document.getElementById('action-buttons');
     const presetsDiv = document.getElementById('bet-presets');
 
-    // Only show when player is folded AND action bar is hidden (not their turn)
     if (!state.mySeatIndex && state.mySeatIndex !== 0) return;
     const me = state.players[state.mySeatIndex];
-    if (!me || !me.folded) return;
-    if (!actionBar.classList.contains('hidden')) return; // still acting
+    if (!me) return;
 
-    // Show folded-state UI
+    const isSitout = state.mySitout;
+    const isFolded = me.folded;
+
+    // Only show when player is folded/sitout AND action bar is hidden (not their turn)
+    if (!isFolded && !isSitout) return;
+    if (!actionBar.classList.contains('hidden')) return;
+
     actionBar.classList.remove('hidden');
     btnDiv.innerHTML = '';
     presetsDiv.innerHTML = '';
     presetsDiv.classList.add('hidden');
 
-    // Folded message
-    const msg = document.createElement('div');
-    msg.className = 'folded-msg';
-    msg.textContent = 'フォールド済み — 次のハンドを待っています';
-    btnDiv.appendChild(msg);
+    if (isSitout) {
+        // Sitout state — show rejoin + leave
+        const msg = document.createElement('div');
+        msg.className = 'folded-msg sitout-msg';
+        msg.textContent = '離席中 — 10分以内に復帰しないと自動退室されます';
+        btnDiv.appendChild(msg);
 
-    // Leave room button
-    const leaveBtn = document.createElement('button');
-    leaveBtn.className = 'btn-action btn-fold';
-    leaveBtn.textContent = '退室';
-    leaveBtn.addEventListener('click', () => {
-        if (isInZoom) {
-            client.leaveZoom();
-        } else {
-            client.leaveRoom();
-        }
-    });
-    btnDiv.appendChild(leaveBtn);
+        const rejoinBtn = document.createElement('button');
+        rejoinBtn.className = 'btn-action btn-call';
+        rejoinBtn.textContent = '復帰する';
+        rejoinBtn.addEventListener('click', () => {
+            client.rejoinGame();
+        });
+        btnDiv.appendChild(rejoinBtn);
+
+        const leaveBtn = document.createElement('button');
+        leaveBtn.className = 'btn-action btn-fold';
+        leaveBtn.textContent = '退室する';
+        leaveBtn.addEventListener('click', () => {
+            if (isInZoom) client.leaveZoom();
+            else client.leaveRoom();
+        });
+        btnDiv.appendChild(leaveBtn);
+    } else {
+        // Just folded — show leave only
+        const msg = document.createElement('div');
+        msg.className = 'folded-msg';
+        msg.textContent = 'フォールド済み — 次のハンドを待っています';
+        btnDiv.appendChild(msg);
+
+        const leaveBtn = document.createElement('button');
+        leaveBtn.className = 'btn-action btn-fold';
+        leaveBtn.textContent = '退室';
+        leaveBtn.addEventListener('click', () => {
+            if (isInZoom) client.leaveZoom();
+            else client.leaveRoom();
+        });
+        btnDiv.appendChild(leaveBtn);
+    }
 }
 
 function onGameOver(data) {
