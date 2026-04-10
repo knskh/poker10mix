@@ -233,12 +233,12 @@ class PokerUI {
         // Positions: [left%, top%] within table-felt
         // Between seat edge and table center, shifted inward for clarity
         const betPos = [
-            [50, 60], // seat-0 bottom-center  → just above seat, at table edge
-            [30, 67], // seat-1 bottom-left    → toward table center, at edge
-            [30, 33], // seat-2 top-left       → toward table center, at edge
-            [50, 22], // seat-3 top-center     → just below seat, at table edge
-            [70, 33], // seat-4 top-right      → toward table center, at edge
-            [70, 67], // seat-5 bottom-right   → toward table center, at edge
+            [50, 68], // seat-0 bottom-center  → right above seat
+            [25, 72], // seat-1 bottom-left    → right above-right of seat
+            [25, 28], // seat-2 top-left       → right below-right of seat
+            [50, 18], // seat-3 top-center     → right below seat
+            [75, 28], // seat-4 top-right      → right below-left of seat
+            [75, 72], // seat-5 bottom-right   → right above-left of seat
         ];
         s.players.forEach((p, i) => {
             if (p.seatBet > 0 && i < betPos.length) {
