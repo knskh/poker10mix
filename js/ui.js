@@ -381,26 +381,26 @@ class PokerUI {
         infoRow.appendChild(chipsSpan);
         el.appendChild(infoRow);
 
-        // Cards in seat (mini)
+        // Cards in seat (mini) — sized by card count
+        let totalCards = 0;
         if (s.gameType === 'stud' && !p.folded) {
             const cardsDiv = document.createElement('div');
             cardsDiv.className = 'seat-cards';
-            // Down cards (face down for others, face down in seat even for self)
+            totalCards = (p.downCount || 0) + (p.upCards ? p.upCards.length : 0);
             for (let d = 0; d < p.downCount; d++) {
                 cardsDiv.appendChild(this.createCardEl(null, true));
             }
-            // Up cards (visible to all)
             if (p.upCards) {
                 for (const card of p.upCards) {
                     cardsDiv.appendChild(this.createCardEl(card, false));
                 }
             }
+            cardsDiv.classList.add(`seat-cards-${Math.min(totalCards, 7)}`);
             el.appendChild(cardsDiv);
         } else if (!isMe && !p.folded && p.cardCount > 0) {
-            // Show face-down cards for other players
             const cardsDiv = document.createElement('div');
             cardsDiv.className = 'seat-cards';
-            // If showdown, show their actual cards
+            totalCards = p.cardCount;
             if (s.isShowdown && p.hand && p.hand.length > 0) {
                 for (const card of p.hand) {
                     cardsDiv.appendChild(this.createCardEl(card, false));
@@ -410,6 +410,7 @@ class PokerUI {
                     cardsDiv.appendChild(this.createCardEl(null, true));
                 }
             }
+            cardsDiv.classList.add(`seat-cards-${Math.min(totalCards, 7)}`);
             el.appendChild(cardsDiv);
         }
 
