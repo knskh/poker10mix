@@ -2607,8 +2607,7 @@ function showFoldedButtons(state) {
         msg.textContent = 'フォールド済み — 次のハンドを待っています';
         btnDiv.appendChild(msg);
 
-        const bb = state.bigBlind || 100;
-        const rebuyAmount = bb * 100;
+        const rebuyAmount = 10000;
         if (me.chips < rebuyAmount) {
             const rebuyBtn = document.createElement('button');
             rebuyBtn.className = 'btn-action btn-call';
