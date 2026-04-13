@@ -548,6 +548,7 @@ body {
     height: 100dvh;
     background: #1a1d24;
     position: relative;
+    overflow: hidden;
 }
 
 #top-bar {
@@ -1205,7 +1206,9 @@ body {
 #bottom-area {
     display: flex; flex-direction: row; flex-shrink: 0;
     background: #111318; border-top: 1px solid #2a2d35;
-    min-height: 120px; max-height: 240px;
+    min-height: 80px; max-height: 200px;
+    flex: 0 1 auto;
+    overflow: hidden;
 }
 
 /* Bottom Panel (replaces log-panel) */
@@ -2566,6 +2569,8 @@ body {
     background: #0d0f14;
     border-top: 1px solid #2a2d35;
     padding: 2px 0 env(safe-area-inset-bottom, 2px);
+    min-height: 32px;
+    z-index: 10;
 }
 .nav-item {
     flex: 1; display: flex; flex-direction: column; align-items: center;

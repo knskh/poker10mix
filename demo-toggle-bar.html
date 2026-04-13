@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>トグルバー デモ</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100dvh; height: 100vh; overflow: hidden; }
+@supports (height: 100dvh) { html, body { height: 100dvh; } }
+body {
+    background: radial-gradient(circle at top, #142130 0%, #070a13 100%);
+    color: #e0f2fe; font-family: 'Segoe UI','Hiragino Sans',sans-serif;
+    display: flex; flex-direction: column;
+}
+
+/* ===== Demo controls ===== */
+#demo-controls {
+    background: rgba(30,40,60,0.9); border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 4px 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    z-index: 100; flex-shrink: 0;
+}
+#demo-controls .label { font-size: 11px; color: rgba(255,255,255,0.5); }
+#demo-controls button {
+    padding: 3px 10px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(50,60,80,0.8); color: #e0e0e0; font-size: 11px; cursor: pointer;
+}
+#demo-controls button:hover { background: rgba(70,80,110,0.9); }
+#demo-controls button.active { background: #1565c0; border-color: #42a5f5; }
+
+/* ===== Top bar ===== */
+#top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 10px; flex-shrink: 0; z-index: 20;
+    background: rgba(10,14,20,0.8);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#top-bar-left { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); }
+
+/* ===== Table area ===== */
+#table-area {
+    flex: 1; min-height: 0; position: relative; overflow: hidden;
+    transition: flex 0.3s ease;
+}
+#table-felt {
+    position: absolute; top: 45%; left: 50%; transform: translate(-50%, -55%);
+    width: min(85vw, 460px); aspect-ratio: 1.8;
+    background: radial-gradient(ellipse at 50% 40%, #0f5e8c 0%, #083a5c 50%, #052d47 80%, #041f33 100%);
+    border-radius: 50%; border: 3px solid #0a4a6f;
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.4), 0 0 60px rgba(0,0,0,0.5);
+}
+/* Pot */
+#pot-display {
+    position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 12px; padding: 4px 16px; text-align: center; z-index: 5;
+}
+.pot-label { font-size: 9px; color: rgba(0,229,255,0.5); }
+.pot-amount { font-size: 16px; font-weight: 800; color: #00e5ff; }
+
+/* Seats (simplified) */
+.seat {
+    position: absolute; text-align: center; z-index: 10;
+}
+.seat-box {
+    background: rgba(7,10,19,0.7); border-radius: 10px; padding: 4px 8px;
+    border: 2px solid rgba(0,229,255,0.15);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.4);
+}
+.seat.active .seat-box { border-color: rgba(0,229,255,0.5); box-shadow: 0 0 12px rgba(0,229,255,0.3); }
+.seat-name { font-size: 10px; font-weight: 700; }
+.seat-chips { font-size: 10px; font-weight: 700; color: #00e5ff; }
+.seat-cards { display: flex; gap: 2px; justify-content: center; margin-top: 2px; }
+.mini-card {
+    width: 20px; height: 28px; border-radius: 3px; font-size: 8px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1;
+}
+.mini-card.face { background: #fff; }
+.mini-card.face.red { color: #dc2626; }
+.mini-card.face.black { color: #1a1a1a; }
+.mini-card.back { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
+
+.s-bottom { bottom: 2%; left: 50%; transform: translateX(-50%); }
+.s-bl { bottom: 18%; left: 3%; }
+.s-tl { top: 18%; left: 3%; }
+.s-top { top: 2%; left: 50%; transform: translateX(-50%); }
+.s-tr { top: 18%; right: 3%; }
+.s-br { bottom: 18%; right: 3%; }
+
+/* Player hand (bottom) */
+#player-hand {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; z-index: 15; padding-bottom: 4px;
+}
+.hand-card {
+    width: 32px; height: 46px; border-radius: 4px; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+}
+.hand-card.red { color: #dc2626; }
+.hand-card.black { color: #1a1a1a; }
+.hand-card .rank { font-size: 12px; line-height: 1; }
+.hand-card .suit { font-size: 10px; line-height: 1; }
+
+/* ===== Action bar area ===== */
+#action-area {
+    flex-shrink: 0; z-index: 30;
+}
+/* Simulated action bar */
+#action-bar-demo {
+    display: flex; gap: 6px; justify-content: center; align-items: center;
+    padding: 6px 10px; background: rgba(10,14,20,0.95);
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+#action-bar-demo.hidden { display: none; }
+.btn-act {
+    padding: 8px 14px; border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 700; cursor: pointer; min-width: 60px;
+}
+.btn-fold-d { background: rgba(255,255,255,0.08); color: #94a3b8; }
+.btn-check-d { background: #0284c7; color: #fff; }
+.btn-raise-d { background: #00bfff; color: #000; }
+
+/* ===================================================
+   TOGGLE BAR + PANELS (the new design)
+   =================================================== */
+#toggle-bar {
+    display: flex; flex-shrink: 0;
+    background: #0d0f14;
+    border-top: 1px solid #2a2d35;
+    height: 30px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.toggle-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    gap: 4px; padding: 0;
+    font-size: 14px; color: #555;
+    cursor: pointer; background: none; border: none;
+    position: relative;
+    transition: color 0.2s, background 0.2s;
+}
+.toggle-btn:active { background: rgba(255,255,255,0.04); }
+.toggle-btn .toggle-label {
+    font-size: 9px; font-weight: 600; color: inherit;
+}
+.toggle-btn.open {
+    color: #00bfff;
+    background: rgba(0,191,255,0.06);
+}
+.toggle-btn.open::after {
+    content: '';
+    position: absolute; top: 0; left: 20%; right: 20%;
+    height: 2px; border-radius: 1px;
+    background: #00bfff;
+}
+/* Unread badge */
+.toggle-badge {
+    position: absolute; top: 3px; right: calc(50% - 20px);
+    background: #ef5350; color: #fff;
+    font-size: 7px; font-weight: 800;
+    min-width: 12px; height: 12px; line-height: 12px;
+    border-radius: 6px; text-align: center;
+    padding: 0 3px;
+}
+.toggle-badge.hidden { display: none; }
+
+/* Separator lines between buttons */
+.toggle-btn + .toggle-btn {
+    border-left: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Panel container */
+#toggle-panel {
+    background: #111318;
+    border-top: 1px solid #2a2d35;
+    overflow: hidden;
+    flex-shrink: 0;
+    height: 0;
+    transition: height 0.25s ease;
+}
+#toggle-panel.open {
+    height: 140px;
+}
+
+/* Panel views */
+.tpanel-view {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+.tpanel-view.active {
+    display: flex;
+}
+
+/* Chat panel */
+.chat-messages {
+    flex: 1; overflow-y: auto; padding: 6px 10px;
+    font-size: 12px; line-height: 1.5;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.chat-msg { margin-bottom: 3px; }
+.chat-msg .ts { color: #555; font-size: 10px; margin-right: 4px; }
+.chat-msg .name { color: #00bfff; font-weight: 600; margin-right: 4px; }
+.chat-msg .text { color: #ccc; }
+
+.chat-input-bar {
+    display: flex; gap: 4px; padding: 4px 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: rgba(0,0,0,0.2);
+}
+.chat-input-bar input {
+    flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; padding: 5px 8px; color: #e0e0e0; font-size: 12px;
+    outline: none;
+}
+.chat-input-bar button {
+    padding: 5px 10px; border-radius: 6px; border: none;
+    background: #00bfff; color: #000; font-size: 11px; font-weight: 700; cursor: pointer;
+}
+
+/* Log panel */
+.log-messages {
+    flex: 1; overflow-y: auto; padding: 6px 10px;
+    font-size: 11px; line-height: 1.6;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.log-entry { color: #8899aa; }
+.log-entry.action { color: #00e5ff; }
+.log-entry.important { color: #ffd54f; font-weight: 600; }
+
+/* History panel */
+.history-list {
+    flex: 1; overflow-y: auto; padding: 6px 10px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 8px; margin-bottom: 3px;
+    background: rgba(255,255,255,0.03); border-radius: 6px;
+    font-size: 11px; cursor: pointer;
+    transition: background 0.15s;
+}
+.history-item:hover { background: rgba(255,255,255,0.06); }
+.history-game { color: #ccc; font-weight: 600; }
+.history-result { font-weight: 700; }
+.history-result.win { color: #2dd4bf; }
+.history-result.loss { color: #f43f5e; }
+
+/* ===== Narration ===== */
+#narration {
+    position: fixed; top: 45%; left: 50%; transform: translate(-50%,-50%);
+    background: rgba(0,0,0,0.85); border: 1px solid rgba(0,229,255,0.3);
+    border-radius: 12px; padding: 12px 24px; z-index: 200;
+    font-size: 14px; font-weight: 600; color: #67e8f9; text-align: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.4s;
+    max-width: 320px;
+}
+#narration.show { opacity: 1; }
+
+/* Comparison indicator */
+#compare-label {
+    position: fixed; top: 8px; right: 8px;
+    background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 4px 10px;
+    font-size: 10px; color: #888; z-index: 100;
+}
+</style>
+</head>
+<body>
+
+<!-- Demo controls -->
+<div id="demo-controls">
+    <span class="label">トグルバー デモ</span>
+    <button id="btn-auto" class="active">自動再生</button>
+    <button id="btn-chat-open">チャット開閉</button>
+    <button id="btn-log-open">ログ開閉</button>
+    <button id="btn-hist-open">履歴開閉</button>
+</div>
+
+<!-- Top bar -->
+<div id="top-bar">
+    <div id="top-bar-left">5 Card Draw NL &nbsp;<span style="font-size:10px;color:#555">Hand #7</span></div>
+</div>
+
+<!-- Table area (grows when panel closed) -->
+<div id="table-area">
+    <div id="table-felt">
+        <div id="pot-display">
+            <div class="pot-label">POT</div>
+            <div class="pot-amount">2,400</div>
+        </div>
+
+        <div class="seat s-bottom active">
+            <div class="seat-box"><div class="seat-name">あなた</div><div class="seat-chips">9,200</div></div>
+        </div>
+        <div class="seat s-tl">
+            <div class="seat-box"><div class="seat-name">Player B</div><div class="seat-chips">10,800</div>
+                <div class="seat-cards"><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div></div>
+            </div>
+        </div>
+        <div class="seat s-top">
+            <div class="seat-box"><div class="seat-name">Player C</div><div class="seat-chips">7,500</div>
+                <div class="seat-cards"><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div></div>
+            </div>
+        </div>
+        <div class="seat s-br">
+            <div class="seat-box"><div class="seat-name">Player D</div><div class="seat-chips">12,100</div>
+                <div class="seat-cards"><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="player-hand">
+        <div class="hand-card red"><span class="rank">A</span><span class="suit">&#9829;</span></div>
+        <div class="hand-card black"><span class="rank">A</span><span class="suit">&#9824;</span></div>
+        <div class="hand-card red"><span class="rank">K</span><span class="suit">&#9830;</span></div>
+        <div class="hand-card black"><span class="rank">9</span><span class="suit">&#9827;</span></div>
+        <div class="hand-card red"><span class="rank">7</span><span class="suit">&#9829;</span></div>
+    </div>
+</div>
+
+<!-- Action area -->
+<div id="action-area">
+    <div id="action-bar-demo">
+        <button class="btn-act btn-fold-d">フォールド</button>
+        <button class="btn-act btn-check-d">チェック</button>
+        <button class="btn-act btn-raise-d">レイズ 400</button>
+    </div>
+</div>
+
+<!-- ===== NEW: Toggle Panel (slides open) ===== -->
+<div id="toggle-panel">
+    <!-- Chat -->
+    <div class="tpanel-view active" id="tp-chat">
+        <div class="chat-messages" id="chat-msgs">
+            <div class="chat-msg"><span class="ts">21:30</span><span class="name">Player B:</span><span class="text">よろしく！</span></div>
+            <div class="chat-msg"><span class="ts">21:31</span><span class="name">Player C:</span><span class="text">gg</span></div>
+            <div class="chat-msg"><span class="ts">21:32</span><span class="name">あなた:</span><span class="text">よろしく！</span></div>
+            <div class="chat-msg"><span class="ts">21:34</span><span class="name">Player D:</span><span class="text">ナイスハンド！</span></div>
+            <div class="chat-msg"><span class="ts">21:35</span><span class="name">Player B:</span><span class="text">えぐい...</span></div>
+        </div>
+        <div class="chat-input-bar">
+            <input type="text" placeholder="チャット..." maxlength="200">
+            <button>送信</button>
+        </div>
+    </div>
+    <!-- Log -->
+    <div class="tpanel-view" id="tp-log">
+        <div class="log-messages">
+            <div class="log-entry important">--- Hand #7: 5 Card Draw NL ---</div>
+            <div class="log-entry">Player D がディーラーです</div>
+            <div class="log-entry">あなた: SB 50</div>
+            <div class="log-entry">Player B: BB 100</div>
+            <div class="log-entry action">Player C: レイズ 300</div>
+            <div class="log-entry">Player D: コール 300</div>
+            <div class="log-entry">あなた: コール 250</div>
+            <div class="log-entry">Player B: フォールド</div>
+            <div class="log-entry important">--- ドロー ---</div>
+            <div class="log-entry">Player C: 2枚交換</div>
+            <div class="log-entry">Player D: 1枚交換</div>
+            <div class="log-entry action">あなた: 2枚交換</div>
+        </div>
+    </div>
+    <!-- History -->
+    <div class="tpanel-view" id="tp-history">
+        <div class="history-list">
+            <div class="history-item"><span class="history-game">Hand #6 - Omaha Hi-Lo</span><span class="history-result win">+1,200</span></div>
+            <div class="history-item"><span class="history-game">Hand #5 - Texas Hold'em</span><span class="history-result loss">-800</span></div>
+            <div class="history-item"><span class="history-game">Hand #4 - 7 Card Stud</span><span class="history-result win">+3,500</span></div>
+            <div class="history-item"><span class="history-game">Hand #3 - 5 Card Draw</span><span class="history-result loss">-500</span></div>
+            <div class="history-item"><span class="history-game">Hand #2 - Razz</span><span class="history-result win">+900</span></div>
+            <div class="history-item"><span class="history-game">Hand #1 - Texas Hold'em</span><span class="history-result loss">-1,400</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== NEW: Toggle Bar ===== -->
+<div id="toggle-bar">
+    <button class="toggle-btn" data-panel="chat" id="tb-chat">
+        <span>💬</span>
+        <span class="toggle-badge hidden" id="badge-chat">2</span>
+    </button>
+    <button class="toggle-btn" data-panel="log" id="tb-log">
+        <span>📋</span>
+    </button>
+    <button class="toggle-btn" data-panel="history" id="tb-history">
+        <span>🕐</span>
+    </button>
+</div>
+
+<!-- Narration -->
+<div id="narration"></div>
+<div id="compare-label"></div>
+
+<script>
+// ==============================
+// Toggle bar logic
+// ==============================
+let openPanel = null; // 'chat' | 'log' | 'history' | null
+
+const togglePanel = document.getElementById('toggle-panel');
+const toggleBtns = document.querySelectorAll('.toggle-btn');
+
+function setPanel(panel) {
+    if (openPanel === panel) {
+        // Close
+        openPanel = null;
+        togglePanel.classList.remove('open');
+        toggleBtns.forEach(b => b.classList.remove('open'));
+    } else {
+        // Open or switch
+        openPanel = panel;
+        togglePanel.classList.add('open');
+        toggleBtns.forEach(b => b.classList.toggle('open', b.dataset.panel === panel));
+        // Show correct view
+        document.querySelectorAll('.tpanel-view').forEach(v => v.classList.remove('active'));
+        const target = document.getElementById('tp-' + panel);
+        if (target) target.classList.add('active');
+        // Scroll to bottom for chat/log
+        if (panel === 'chat') {
+            const el = document.getElementById('chat-msgs');
+            if (el) el.scrollTop = el.scrollHeight;
+        }
+        if (panel === 'log') {
+            const el = target.querySelector('.log-messages');
+            if (el) el.scrollTop = el.scrollHeight;
+        }
+    }
+    // Hide badge when opened
+    if (panel === 'chat') {
+        document.getElementById('badge-chat').classList.add('hidden');
+    }
+}
+
+toggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => setPanel(btn.dataset.panel));
+});
+
+// ==============================
+// Demo controls
+// ==============================
+document.getElementById('btn-chat-open').addEventListener('click', () => setPanel('chat'));
+document.getElementById('btn-log-open').addEventListener('click', () => setPanel('log'));
+document.getElementById('btn-hist-open').addEventListener('click', () => setPanel('history'));
+
+// ==============================
+// Narration
+// ==============================
+const narration = document.getElementById('narration');
+function showNarration(text, duration) {
+    narration.textContent = text;
+    narration.classList.add('show');
+    return new Promise(resolve => {
+        setTimeout(() => {
+            narration.classList.remove('show');
+            setTimeout(resolve, 400);
+        }, duration);
+    });
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ==============================
+// Auto demo
+// ==============================
+let demoRunning = false;
+
+async function runDemo() {
+    if (demoRunning) return;
+    demoRunning = true;
+    document.getElementById('btn-auto').classList.add('active');
+
+    // Reset
+    openPanel = null;
+    togglePanel.classList.remove('open');
+    toggleBtns.forEach(b => b.classList.remove('open'));
+    document.getElementById('badge-chat').classList.add('hidden');
+
+    await wait(600);
+    await showNarration('パネルが閉じた状態 \u2014 テーブルを広く表示', 2500);
+    await wait(500);
+
+    // Open chat
+    await showNarration('\ud83d\udcac タップでチャットを開く', 1500);
+    await wait(300);
+    setPanel('chat');
+    await wait(2000);
+
+    // Switch to log
+    await showNarration('\ud83d\udccb そのままログに切替', 1500);
+    await wait(300);
+    setPanel('log');
+    await wait(2000);
+
+    // Switch to history
+    await showNarration('\ud83d\udd50 履歴に切替', 1500);
+    await wait(300);
+    setPanel('history');
+    await wait(2000);
+
+    // Close
+    await showNarration('\ud83d\udd50 もう一度タップで閉じる', 1500);
+    await wait(300);
+    setPanel('history');
+    await wait(1500);
+
+    await showNarration('閉じるとテーブルが広がる', 2000);
+    await wait(1000);
+
+    // Simulate incoming chat while closed
+    await showNarration('閉じた状態でチャットが届くとバッジ表示', 2500);
+    await wait(500);
+    const badge = document.getElementById('badge-chat');
+    badge.textContent = '1';
+    badge.classList.remove('hidden');
+    await wait(1500);
+    badge.textContent = '3';
+    await wait(1500);
+
+    // Open chat to clear badge
+    await showNarration('\ud83d\udcac 開くとバッジが消える', 1500);
+    await wait(300);
+    setPanel('chat');
+    await wait(2500);
+
+    // Close again
+    setPanel('chat');
+    await wait(500);
+
+    await showNarration('デモ終了', 1500);
+    demoRunning = false;
+    document.getElementById('btn-auto').classList.remove('active');
+}
+
+document.getElementById('btn-auto').addEventListener('click', () => {
+    if (!demoRunning) runDemo();
+});
+
+// Auto-run on load
+setTimeout(runDemo, 500);
+</script>
+</body>
+</html>
