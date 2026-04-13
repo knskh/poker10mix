@@ -344,31 +344,59 @@ function renderRoomList(data) {
     const container = document.getElementById('room-list-body');
     container.innerHTML = '';
     if (!rooms || rooms.length === 0) {
-        container.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">ルームがありません</td></tr>';
+        container.innerHTML = '<div class="room-empty">ルームがありません</div>';
         return;
     }
     for (const r of rooms) {
-        const tr = document.createElement('tr');
         const canJoin = r.playerCount < 6;
-        const currentGameMark = r.playing && r.gameName
-            ? ` <span style="font-size:10px;color:var(--gold);">[${r.gameName}]</span>` : '';
-        const mergedNames = (r.mergedGames || []).map(i => GAME_LIST[i]?.shortName || '').filter(Boolean);
-        const gamesStr = mergedNames.length > 0
-            ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${mergedNames.join(' ')}</div>` : '';
-        let statusHtml;
+        const card = document.createElement('div');
+        card.className = 'room-card' + (canJoin ? '' : ' room-full');
+
+        // Status
+        let statusCls, statusText;
         if (!r.playing) {
-            statusHtml = '<span style="color:#4f4">待機中</span>';
+            statusCls = 'waiting'; statusText = '待機中';
         } else if (canJoin) {
-            statusHtml = '<span style="color:#f44">進行中</span> <span style="font-size:10px;color:#4af">途中参加可</span>';
+            statusCls = 'joinable'; statusText = '参加可';
         } else {
-            statusHtml = '<span style="color:#f44">進行中</span>';
+            statusCls = 'playing'; statusText = '進行中';
         }
-        tr.innerHTML = `<td>${r.id}${currentGameMark}${gamesStr}</td><td>${r.hostName}</td><td>${r.playerCount}/6</td><td>${statusHtml}</td>`;
+
+        // Current game
+        const currentGame = r.playing && r.gameName ? r.gameName : '';
+
+        // Game tags
+        const mergedNames = (r.mergedGames || []).map(i => GAME_LIST[i]?.shortName || '').filter(Boolean);
+        const gameTags = mergedNames.map(n => `<span class="room-card-game-tag">${n}</span>`).join('');
+
+        // Avatar initial
+        const initial = (r.hostName || '?').charAt(0).toUpperCase();
+
+        // Player bar fill
+        const fillPct = Math.round((r.playerCount / 6) * 100);
+
+        card.innerHTML = `
+            <div class="room-card-header">
+                <span class="room-card-id">${r.id}</span>
+                <span class="room-card-status ${statusCls}">${statusText}</span>
+            </div>
+            <div class="room-card-host">
+                <div class="room-card-avatar">${initial}</div>
+                <span class="room-card-hostname">${r.hostName}</span>
+                ${currentGame ? `<span class="room-card-game">▶ ${currentGame}</span>` : ''}
+            </div>
+            <div class="room-card-bottom">
+                <div class="room-card-players">
+                    <div class="room-card-players-bar"><div class="room-card-players-fill" style="width:${fillPct}%"></div></div>
+                    <span>${r.playerCount}/6</span>
+                </div>
+                <div class="room-card-games">${gameTags}</div>
+            </div>
+        `;
         if (canJoin) {
-            tr.style.cursor = 'pointer';
-            tr.addEventListener('click', () => client.joinRoom(r.id));
+            card.addEventListener('click', () => client.joinRoom(r.id));
         }
-        container.appendChild(tr);
+        container.appendChild(card);
     }
 }
 
