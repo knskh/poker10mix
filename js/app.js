@@ -1906,30 +1906,6 @@ function showActionButtons(actions, turnData) {
     }
 }
 
-// Non-linear slider helpers for segment bar
-let presetSliderPresetMax = 0;
-let presetSliderBetMin = 0;
-let presetSliderBetMax = 0;
-
-function presetSliderToValue(s) {
-    const half = 500;
-    if (s <= half) {
-        return presetSliderBetMin + (presetSliderPresetMax - presetSliderBetMin) * (s / half);
-    } else {
-        return presetSliderPresetMax + (presetSliderBetMax - presetSliderPresetMax) * ((s - half) / half);
-    }
-}
-
-function presetValueToSlider(val) {
-    const half = 500;
-    if (val <= presetSliderPresetMax) {
-        const range = presetSliderPresetMax - presetSliderBetMin;
-        return range > 0 ? half * (val - presetSliderBetMin) / range : 0;
-    } else {
-        const range = presetSliderBetMax - presetSliderPresetMax;
-        return range > 0 ? half + half * (val - presetSliderPresetMax) / range : 1000;
-    }
-}
 
 function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction) {
     const presetsDiv = document.getElementById('bet-presets');
@@ -1973,44 +1949,23 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
         bar.appendChild(track);
 
         const allItems = [...filtered];
-        let allinItem = null;
         if (allInAction) {
             const amount = allInAction.total || allInAction.amount;
-            allinItem = { label: 'All-In', targetTotal: amount, isAllin: true };
-            allItems.push(allinItem);
+            allItems.push({ label: 'All-In', targetTotal: amount, isAllin: true });
         }
 
-        // Setup non-linear slider mapping
-        presetSliderBetMin = sliderMin + sliderOffset;
-        presetSliderBetMax = sliderMax + sliderOffset;
-        presetSliderPresetMax = filtered.length > 0 ? filtered[filtered.length - 1].targetTotal : presetSliderBetMin;
-
-        // Convert real slider to 0-1000 internal range
         const slider = document.getElementById('bet-slider');
-        const realMin = parseInt(slider.min);
-        const realMax = parseInt(slider.max);
-        let ignoreSliderSync = false;
 
         allItems.forEach((p, i) => {
             const seg = document.createElement('div');
             seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '');
             seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
             seg.addEventListener('click', () => {
-                ignoreSliderSync = true;
-                // Set slider to correct position
+                // Set slider directly (linear)
                 const outOfPocket = p.targetTotal - sliderOffset;
-                if (p.isAllin) {
-                    slider.value = realMax;
-                } else {
-                    // Map target to non-linear position, then back to real slider
-                    const nlPos = presetValueToSlider(p.targetTotal);
-                    slider.value = Math.round(realMin + (realMax - realMin) * nlPos / 1000);
-                }
-                const input = document.getElementById('bet-amount-input');
-                if (input) input.value = p.targetTotal;
-                updateRaiseBtnText(p.targetTotal);
+                slider.value = Math.min(parseInt(slider.max), Math.max(parseInt(slider.min), outOfPocket));
+                slider.dispatchEvent(new Event('input'));
                 setSegActive(i);
-                requestAnimationFrame(() => ignoreSliderSync = false);
             });
             bar.appendChild(seg);
         });
@@ -2018,7 +1973,6 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
         function setSegActive(index) {
             const segments = bar.querySelectorAll('.preset-segment');
             segments.forEach((s, i) => s.classList.toggle('active', i === index));
-            // Move track
             if (index < 0 || index >= segments.length) {
                 track.style.opacity = '0';
                 return;
@@ -2039,25 +1993,13 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             else track.classList.remove('track-allin');
         }
 
-        // Sync slider → segment highlight
+        // Sync slider → segment highlight (linear)
         function onSliderInput() {
-            if (ignoreSliderSync) return;
-            const rawVal = parseInt(slider.value);
-            // Convert real slider position to non-linear 0-1000
-            const nlPos = (rawVal - realMin) / (realMax - realMin) * 1000;
-            const betVal = presetSliderToValue(nlPos);
-            const rounded = Math.round(betVal / 50) * 50;
-            const input = document.getElementById('bet-amount-input');
-            if (input) input.value = Math.max(sliderOffset + parseInt(slider.min), Math.round(betVal));
-            updateRaiseBtnText(Math.round(betVal));
-
-            // Find closest preset
+            const total = parseInt(slider.value) + sliderOffset;
             let closest = -1, minDist = Infinity;
-            const presetRange = presetSliderPresetMax - presetSliderBetMin;
-            const allinRange = presetSliderBetMax - presetSliderPresetMax;
             allItems.forEach((p, i) => {
-                const dist = Math.abs(p.targetTotal - betVal);
-                const threshold = p.isAllin ? allinRange * 0.05 : Math.max(presetRange * 0.08, 15);
+                const dist = Math.abs(p.targetTotal - total);
+                const threshold = p.isAllin ? (sliderMax * 0.05) : Math.max(bb * 0.3, 15);
                 if (dist <= threshold && dist < minDist) {
                     minDist = dist;
                     closest = i;
@@ -2066,13 +2008,11 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             setSegActive(closest);
         }
 
-        // Remove previous listener and add new one
         slider._presetListener && slider.removeEventListener('input', slider._presetListener);
         slider._presetListener = onSliderInput;
         slider.addEventListener('input', onSliderInput);
 
         presetsDiv.appendChild(bar);
-        // Initial track state
         requestAnimationFrame(() => setSegActive(-1));
 
     } else if (allInAction) {
