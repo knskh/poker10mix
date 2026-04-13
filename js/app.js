@@ -94,6 +94,8 @@ let sitoutLocalRemaining = null;    // client-side countdown value
 const tables = new Map(); // roomId -> table context
 let activeTableId = null;
 const MAX_TABLES = 3;
+const pendingSwitchQueue = []; // roomIds waiting to auto-switch after current action
+let myTurnOnActiveTable = false; // true while action bar is showing on active table
 
 function createTableContext(roomId) {
     return {
@@ -605,10 +607,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const ctx = tables.get(rid);
             if (ctx) ctx.isMyTurn = true;
             renderTableTabs();
-            // Auto-switch to the table that needs attention
-            switchToTable(rid);
+            if (myTurnOnActiveTable) {
+                // Queue switch — don't interrupt current action
+                if (!pendingSwitchQueue.includes(rid)) pendingSwitchQueue.push(rid);
+            } else {
+                switchToTable(rid);
+            }
+        } else {
+            myTurnOnActiveTable = true;
         }
-        onYourTurn(msg);
+        if (rid === activeTableId || !rid) onYourTurn(msg);
     });
     client.on('your_draw', (msg) => {
         const rid = msg.roomId;
@@ -616,9 +624,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const ctx = tables.get(rid);
             if (ctx) ctx.isMyTurn = true;
             renderTableTabs();
-            switchToTable(rid);
+            if (myTurnOnActiveTable) {
+                if (!pendingSwitchQueue.includes(rid)) pendingSwitchQueue.push(rid);
+            } else {
+                switchToTable(rid);
+            }
+        } else {
+            myTurnOnActiveTable = true;
         }
-        onYourDraw({ hand: msg.hand, timeLimit: msg.timeLimit });
+        if (rid === activeTableId || !rid) onYourDraw({ hand: msg.hand, timeLimit: msg.timeLimit });
     });
     client.on('log', (d) => {
         const rid = d.roomId;
@@ -1145,12 +1159,14 @@ function setupGameScreen() {
         ui.selectedCards.clear();
         document.getElementById('draw-action-bar').classList.add('hidden');
         ui.pendingDraw = false;
+        processPendingSwitch();
     });
     document.getElementById('btn-stand-pat').addEventListener('click', () => {
         client.sendDraw([], activeTableId);
         ui.selectedCards.clear();
         document.getElementById('draw-action-bar').classList.add('hidden');
         ui.pendingDraw = false;
+        processPendingSwitch();
     });
 
     // Keyboard shortcut: Enter to confirm raise
@@ -2364,6 +2380,20 @@ function setupNumpad() {
     });
 }
 
+function processPendingSwitch() {
+    myTurnOnActiveTable = false;
+    if (pendingSwitchQueue.length > 0) {
+        const nextRid = pendingSwitchQueue.shift();
+        // Verify the table still exists and needs attention
+        const ctx = tables.get(nextRid);
+        if (ctx && ctx.isMyTurn) {
+            setTimeout(() => switchToTable(nextRid), 300);
+        } else if (pendingSwitchQueue.length > 0) {
+            processPendingSwitch();
+        }
+    }
+}
+
 function sendActionAndHide(action) {
     // Fold card animation (skip in focus mode)
     if (action.type === 'fold' && !focusMode) {
@@ -2377,6 +2407,7 @@ function sendActionAndHide(action) {
     document.getElementById('bet-numpad').classList.add('hidden');
     document.getElementById('bet-numpad').classList.remove('visible');
     stopTurnTimer();
+    processPendingSwitch();
 }
 
 function startTurnTimer(seconds) {
