@@ -141,7 +141,7 @@ function evaluate5LowA5(cards) {
     // Return sorted high to low (for comparison, lower values = better)
     const sorted = [...ranks].sort((a, b) => b - a);
     const rankNames = { 1: 'A', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K' };
-    const name = sorted[0] + '-' + sorted[sorted.length - 1] + ' ロー';
+    const name = (rankNames[sorted[0]] || sorted[0]) + '-' + (rankNames[sorted[sorted.length - 1]] || sorted[sorted.length - 1]) + ' ロー';
     return { value: sorted, cards, name };
 }
 
@@ -214,7 +214,8 @@ function evaluate5Low27(cards) {
     }
 
     // Valid low hand: return ranks sorted high to low (lower = better)
-    return { value: [0, ...ranks], name: `${ranks[0]}ロー`, cards };
+    const rankNames27 = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A' };
+    return { value: [0, ...ranks], name: `${rankNames27[ranks[0]] || ranks[0]}ロー`, cards };
 }
 
 function bestLow27(cards) {
