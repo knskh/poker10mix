@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 - アクションタイムライン デモ</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+
+/* TABLE AREA */
+#table-area {
+    position: relative; flex: 1; display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+}
+#table {
+    position: relative;
+    width: 650px; height: 300px;
+    background: radial-gradient(ellipse at 50% 40%, #0f4b7a, #082c47 60%, #051e33);
+    border-radius: 160px; border: 8px solid #111a2c;
+    box-shadow: 0 0 0 4px #0f172a, 0 0 0 12px #1e293b, 0 0 0 14px #0f172a,
+        inset 0 0 40px rgba(0,0,0,0.5), 0 8px 32px rgba(14,165,233,0.2);
+}
+
+/* POT */
+#pot-display {
+    position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 10px; padding: 4px 16px; text-align: center; z-index: 10;
+}
+#pot-label { font-size: 9px; color: rgba(0,229,255,0.5); letter-spacing: 1px; }
+#pot-amount { font-size: 20px; font-weight: 800; color: #ffd54f; }
+
+/* COMMUNITY CARDS */
+#community {
+    position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
+    display: flex; gap: 6px; z-index: 10;
+}
+.card {
+    width: 40px; height: 56px; border-radius: 4px; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.card .rank { font-size: 14px; line-height: 1; }
+.card .suit { font-size: 12px; line-height: 1; }
+.card.red { color: #dc2626; }
+.card.black { color: #1a1a1a; }
+
+/* SEATS */
+.seat {
+    position: absolute; text-align: center; z-index: 15;
+}
+.seat-box {
+    background: rgba(7,10,19,0.8); border-radius: 10px; padding: 6px 10px;
+    border: 2px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    min-width: 80px;
+}
+.seat.active .seat-box {
+    border-color: rgba(0,229,255,0.5);
+    box-shadow: 0 0 12px rgba(0,229,255,0.3);
+}
+.seat.folded .seat-box { opacity: 0.35; }
+.seat-name { font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+.seat-chips { font-size: 10px; color: #7dd3fc; }
+.seat-action {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 3px; margin-top: 3px; display: inline-block;
+}
+
+/* Seat positions */
+.seat-0 { bottom: 2%; left: 50%; transform: translateX(-50%); }
+.seat-1 { bottom: 15%; left: 8%; }
+.seat-2 { top: 10%; left: 8%; }
+.seat-3 { top: -5%; left: 50%; transform: translateX(-50%); }
+.seat-4 { top: 10%; right: 8%; }
+.seat-5 { bottom: 15%; right: 8%; }
+
+/* ==========================================
+   ACTION TIMELINE — the main feature demo
+   ========================================== */
+#timeline-area {
+    background: rgba(7,10,19,0.95);
+    border-top: 1px solid rgba(0,229,255,0.15);
+    padding: 10px 16px 14px;
+    flex-shrink: 0;
+}
+#timeline-title {
+    font-size: 11px; color: rgba(0,229,255,0.5); letter-spacing: 1px;
+    margin-bottom: 8px; font-weight: 600;
+}
+
+#action-timeline {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: thin; scrollbar-color: rgba(0,229,255,0.2) transparent;
+    padding-bottom: 4px;
+}
+#action-timeline::-webkit-scrollbar { height: 3px; }
+#action-timeline::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 3px; }
+
+/* Round divider */
+.tl-round {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 10px; flex-shrink: 0;
+}
+.tl-round-label {
+    font-size: 9px; font-weight: 700; color: #ffd54f;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    background: rgba(255,213,79,0.1); border: 1px solid rgba(255,213,79,0.2);
+    border-radius: 4px; padding: 2px 8px;
+    white-space: nowrap;
+}
+.tl-round-line {
+    width: 1px; height: 14px; background: rgba(255,213,79,0.2); margin-top: 2px;
+}
+
+/* Action bubble */
+.tl-action {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 0 5px; flex-shrink: 0;
+    animation: tl-pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes tl-pop-in {
+    0% { opacity: 0; transform: scale(0.5) translateY(8px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.tl-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: #fff;
+    border: 2px solid transparent;
+    position: relative;
+}
+.tl-avatar-icon {
+    position: absolute; bottom: -3px; right: -3px;
+    font-size: 11px; line-height: 1;
+    background: rgba(0,0,0,0.7); border-radius: 50%; padding: 1px;
+}
+.tl-player-name {
+    font-size: 8px; color: #94a3b8; max-width: 50px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
+}
+.tl-amount {
+    font-size: 8px; font-weight: 700; color: #7dd3fc;
+}
+
+/* Action-specific colors */
+.tl-check .tl-avatar  { background: #1b5e20; border-color: #43a047; }
+.tl-call .tl-avatar   { background: #0d47a1; border-color: #1976d2; }
+.tl-raise .tl-avatar  { background: #b71c1c; border-color: #e53935; }
+.tl-bet .tl-avatar    { background: #e65100; border-color: #ff6d00; }
+.tl-fold .tl-avatar   { background: #37474f; border-color: #546e7a; opacity: 0.5; }
+.tl-allin .tl-avatar  { background: #880e4f; border-color: #e91e63; }
+.tl-blind .tl-avatar  { background: #4a148c; border-color: #7b1fa2; }
+
+/* Connector line between actions */
+.tl-connector {
+    width: 12px; height: 2px; background: rgba(255,255,255,0.08);
+    flex-shrink: 0; align-self: center; margin-top: -8px;
+}
+
+/* CONTROLS */
+#controls {
+    background: rgba(7,10,19,0.9); border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 12px 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+}
+.demo-btn {
+    background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.3);
+    color: #00e5ff; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: background 0.15s;
+}
+.demo-btn:hover { background: rgba(0,229,255,0.2); }
+.demo-btn.active { background: rgba(0,229,255,0.3); }
+.demo-btn.reset { border-color: rgba(239,68,68,0.3); color: #f87171; background: rgba(239,68,68,0.1); }
+.demo-btn.reset:hover { background: rgba(239,68,68,0.2); }
+
+#demo-info {
+    text-align: center; color: #94a3b8; font-size: 12px; padding: 8px;
+    background: rgba(0,0,0,0.3);
+}
+</style>
+</head>
+<body>
+
+<div id="demo-info">案29: アクションヒストリータイムライン — ハンドの流れを一目で把握</div>
+
+<div id="table-area">
+    <div id="table">
+        <div id="pot-display">
+            <div id="pot-label">POT</div>
+            <div id="pot-amount">0</div>
+        </div>
+        <div id="community"></div>
+
+        <div class="seat seat-0"><div class="seat-box"><div class="seat-name">You (自分)</div><div class="seat-chips">9,700</div></div></div>
+        <div class="seat seat-1"><div class="seat-box"><div class="seat-name">Tanaka</div><div class="seat-chips">10,200</div></div></div>
+        <div class="seat seat-2"><div class="seat-box"><div class="seat-name">Mike</div><div class="seat-chips">8,500</div></div></div>
+        <div class="seat seat-3"><div class="seat-box"><div class="seat-name">Sato</div><div class="seat-chips">12,100</div></div></div>
+        <div class="seat seat-4"><div class="seat-box"><div class="seat-name">Ken</div><div class="seat-chips">7,800</div></div></div>
+        <div class="seat seat-5"><div class="seat-box"><div class="seat-name">Yuki</div><div class="seat-chips">11,400</div></div></div>
+    </div>
+</div>
+
+<div id="timeline-area">
+    <div id="timeline-title">ACTION TIMELINE</div>
+    <div id="action-timeline"></div>
+</div>
+
+<div id="controls">
+    <button class="demo-btn" onclick="playPreflop()">Preflop</button>
+    <button class="demo-btn" onclick="playFlop()">Flop</button>
+    <button class="demo-btn" onclick="playTurn()">Turn</button>
+    <button class="demo-btn" onclick="playRiver()">River</button>
+    <button class="demo-btn" onclick="playShowdown()">Showdown</button>
+    <button class="demo-btn" onclick="playFullHand()">▶ フルハンド再生</button>
+    <button class="demo-btn reset" onclick="resetDemo()">リセット</button>
+</div>
+
+<script>
+const PLAYERS = [
+    { name: 'You', initial: 'Y', color: '#00e5ff' },
+    { name: 'Tanaka', initial: 'T', color: '#ff9800' },
+    { name: 'Mike', initial: 'M', color: '#4caf50' },
+    { name: 'Sato', initial: 'S', color: '#e91e63' },
+    { name: 'Ken', initial: 'K', color: '#9c27b0' },
+    { name: 'Yuki', initial: 'Y', color: '#2196f3' },
+];
+
+const CARDS = {
+    flop: [
+        { rank: 'A', suit: '♠', color: 'black' },
+        { rank: '9', suit: '♥', color: 'red' },
+        { rank: '7', suit: '♦', color: 'red' },
+    ],
+    turn: { rank: 'K', suit: '♣', color: 'black' },
+    river: { rank: '2', suit: '♠', color: 'black' },
+};
+
+const timeline = document.getElementById('action-timeline');
+const community = document.getElementById('community');
+let pot = 0;
+let actionDelay = 0;
+
+function createCardEl(card) {
+    const el = document.createElement('div');
+    el.className = `card ${card.color}`;
+    el.innerHTML = `<span class="rank">${card.rank}</span><span class="suit">${card.suit}</span>`;
+    return el;
+}
+
+function updatePot(amount) {
+    pot += amount;
+    document.getElementById('pot-amount').textContent = pot.toLocaleString();
+}
+
+function addRoundDivider(label) {
+    const div = document.createElement('div');
+    div.className = 'tl-round';
+    div.innerHTML = `<div class="tl-round-label">${label}</div><div class="tl-round-line"></div>`;
+    div.style.animationDelay = actionDelay + 'ms';
+    timeline.appendChild(div);
+}
+
+function addConnector() {
+    const c = document.createElement('div');
+    c.className = 'tl-connector';
+    timeline.appendChild(c);
+}
+
+function addAction(playerIdx, actionType, amount, delay) {
+    const p = PLAYERS[playerIdx];
+    const icons = {
+        check: '✓', call: '→', raise: '↑', bet: '●', fold: '✗', allin: '★', blind: '◎',
+    };
+
+    setTimeout(() => {
+        addConnector();
+
+        const el = document.createElement('div');
+        el.className = `tl-action tl-${actionType}`;
+
+        const amountText = amount ? `<div class="tl-amount">${amount.toLocaleString()}</div>` : '';
+        el.innerHTML = `
+            <div class="tl-avatar" style="background:${actionType === 'fold' ? '#37474f' : p.color}20; border-color:${p.color}">
+                ${p.initial}
+                <span class="tl-avatar-icon">${icons[actionType] || '?'}</span>
+            </div>
+            <div class="tl-player-name">${p.name}</div>
+            ${amountText}
+        `;
+
+        timeline.appendChild(el);
+        timeline.scrollLeft = timeline.scrollWidth;
+
+        if (amount && actionType !== 'fold') updatePot(amount);
+
+        // Update seat visual
+        const seatEl = document.querySelector(`.seat-${playerIdx}`);
+        if (seatEl) {
+            if (actionType === 'fold') {
+                seatEl.classList.add('folded');
+            }
+            // Flash active
+            document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
+            if (actionType !== 'fold') seatEl.classList.add('active');
+
+            // Show action label
+            const existing = seatEl.querySelector('.seat-action');
+            if (existing) existing.remove();
+            const label = document.createElement('div');
+            label.className = 'seat-action';
+            const labels = { check: 'CHECK', call: 'CALL', raise: 'RAISE', bet: 'BET', fold: 'FOLD', allin: 'ALL-IN', blind: 'BLIND' };
+            const colors = { check: '#2e7d32', call: '#1565c0', raise: '#c62828', bet: '#e65100', fold: '#546e7a', allin: '#ad1457', blind: '#6a1b9a' };
+            label.textContent = labels[actionType] || actionType;
+            label.style.background = colors[actionType] || '#444';
+            label.style.color = '#fff';
+            seatEl.querySelector('.seat-box').appendChild(label);
+        }
+    }, delay);
+}
+
+function playPreflop() {
+    resetDemo();
+    addRoundDivider('PREFLOP');
+
+    const actions = [
+        [1, 'blind', 50],
+        [2, 'blind', 100],
+        [3, 'raise', 300],
+        [4, 'fold', 0],
+        [5, 'call', 300],
+        [0, 'call', 300],
+        [1, 'fold', 0],
+        [2, 'call', 200],
+    ];
+
+    actions.forEach((a, i) => {
+        addAction(a[0], a[1], a[2], (i + 1) * 400);
+    });
+}
+
+function playFlop() {
+    addRoundDivider('FLOP');
+
+    // Deal flop cards
+    setTimeout(() => {
+        CARDS.flop.forEach((c, i) => {
+            setTimeout(() => community.appendChild(createCardEl(c)), i * 200);
+        });
+    }, 200);
+
+    const actions = [
+        [2, 'check', 0],
+        [3, 'bet', 600],
+        [5, 'call', 600],
+        [0, 'raise', 1500],
+        [2, 'fold', 0],
+        [3, 'call', 900],
+        [5, 'call', 900],
+    ];
+
+    actions.forEach((a, i) => {
+        addAction(a[0], a[1], a[2], 800 + (i + 1) * 400);
+    });
+}
+
+function playTurn() {
+    addRoundDivider('TURN');
+
+    setTimeout(() => {
+        community.appendChild(createCardEl(CARDS.turn));
+    }, 200);
+
+    const actions = [
+        [3, 'check', 0],
+        [5, 'bet', 2000],
+        [0, 'call', 2000],
+        [3, 'fold', 0],
+    ];
+
+    actions.forEach((a, i) => {
+        addAction(a[0], a[1], a[2], 600 + (i + 1) * 400);
+    });
+}
+
+function playRiver() {
+    addRoundDivider('RIVER');
+
+    setTimeout(() => {
+        community.appendChild(createCardEl(CARDS.river));
+    }, 200);
+
+    const actions = [
+        [5, 'bet', 3000],
+        [0, 'allin', 5600],
+        [5, 'call', 2600],
+    ];
+
+    actions.forEach((a, i) => {
+        addAction(a[0], a[1], a[2], 600 + (i + 1) * 500);
+    });
+}
+
+function playShowdown() {
+    addRoundDivider('SHOWDOWN');
+    setTimeout(() => {
+        document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
+        document.querySelector('.seat-0').classList.add('active');
+        const box0 = document.querySelector('.seat-0 .seat-box');
+        const old = box0.querySelector('.seat-action');
+        if (old) old.remove();
+        const win = document.createElement('div');
+        win.className = 'seat-action';
+        win.textContent = 'WINNER!';
+        win.style.background = '#ffd54f';
+        win.style.color = '#000';
+        box0.appendChild(win);
+        updatePot(0);
+    }, 400);
+}
+
+function playFullHand() {
+    resetDemo();
+    playPreflop();
+    setTimeout(playFlop, 4000);
+    setTimeout(playTurn, 8500);
+    setTimeout(playRiver, 11000);
+    setTimeout(playShowdown, 14000);
+}
+
+function resetDemo() {
+    timeline.innerHTML = '';
+    community.innerHTML = '';
+    pot = 0;
+    document.getElementById('pot-amount').textContent = '0';
+    document.querySelectorAll('.seat').forEach(s => {
+        s.classList.remove('folded', 'active');
+        const action = s.querySelector('.seat-action');
+        if (action) action.remove();
+    });
+    // Reset chips display
+    const chips = ['9,700', '10,200', '8,500', '12,100', '7,800', '11,400'];
+    document.querySelectorAll('.seat-chips').forEach((el, i) => el.textContent = chips[i]);
+}
+</script>
+</body>
+</html>

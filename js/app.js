@@ -83,6 +83,8 @@ let startingHandCards = []; // starting hand card objects captured at hand start
 let cardSnapshots = []; // track card changes per round for stud/draw
 let showdownPlayers = null; // opponent cards captured at showdown
 let lastHandResult = null; // full hand result from server
+let titleFlashInterval = null; // tab title flash timer
+let focusMode = localStorage.getItem('poker10mix_focus') === 'on'; // focus mode state
 
 function loadHandHistory() {
     try {
@@ -132,6 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setupChat();
     setupPreActions();
     setupEmotes();
+    setupFocusMode();
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
 
     client.connect();
 
@@ -628,6 +636,24 @@ function setupGameScreen() {
     updateSoundBtn();
     soundBtn.addEventListener('click', () => { sound.toggle(); updateSoundBtn(); });
 
+    // Theme toggle button
+    const THEMES = ['dark', 'classic', 'midnight'];
+    const THEME_LABELS = { dark: '🎨 ダーク', classic: '🎨 クラシック', midnight: '🎨 ミッドナイト' };
+    let currentThemeIdx = THEMES.indexOf(localStorage.getItem('poker10mix_theme') || 'dark');
+    if (currentThemeIdx < 0) currentThemeIdx = 0;
+    function applyTheme(idx) {
+        document.body.classList.remove('theme-dark', 'theme-classic', 'theme-midnight');
+        document.body.classList.add('theme-' + THEMES[idx]);
+        localStorage.setItem('poker10mix_theme', THEMES[idx]);
+        const btn = document.getElementById('btn-theme-toggle');
+        if (btn) btn.textContent = THEME_LABELS[THEMES[idx]];
+    }
+    applyTheme(currentThemeIdx);
+    document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+        currentThemeIdx = (currentThemeIdx + 1) % THEMES.length;
+        applyTheme(currentThemeIdx);
+    });
+
     // Hamburger menu toggle
     const hamburgerBtn = document.getElementById('btn-hamburger');
     const topBarMenu = document.getElementById('top-bar-menu');
@@ -670,7 +696,12 @@ function setupGameScreen() {
         if (betInput) betInput.value = total;
         updateRaiseBtnText(total);
         const tip = document.getElementById('slider-value-tip');
-        if (tip) tip.textContent = Number(total).toLocaleString();
+        if (tip) {
+            const bb = currentTurnBB || 100;
+            const bbVal = total / bb;
+            const bbText = Number.isInteger(bbVal) ? bbVal : bbVal.toFixed(1);
+            tip.textContent = `${Number(total).toLocaleString()} (${bbText}bb)`;
+        }
     });
 
     document.addEventListener('input', (e) => {
@@ -693,6 +724,57 @@ function setupGameScreen() {
         betSlider.value = sliderVal;
         updateRaiseBtnText(e.target.value);
     }, true);
+
+    // Slider area swipe gesture for preset switching
+    const sliderArea = document.getElementById('bet-slider-area');
+    let swipeStartY = null;
+    sliderArea.addEventListener('touchstart', (e) => {
+        if (e.target.id === 'bet-slider') return; // don't interfere with slider drag
+        swipeStartY = e.touches[0].clientY;
+    }, { passive: true });
+    sliderArea.addEventListener('touchend', (e) => {
+        if (swipeStartY === null) return;
+        const dy = swipeStartY - (e.changedTouches[0] ? e.changedTouches[0].clientY : swipeStartY);
+        swipeStartY = null;
+        if (Math.abs(dy) < 30) return;
+        const presetBtns = [...document.querySelectorAll('#bet-presets .btn-preset')];
+        if (presetBtns.length === 0) return;
+        const activeIdx = presetBtns.findIndex(b => b.classList.contains('active'));
+        let nextIdx;
+        if (dy > 0) { // swipe up = higher preset
+            nextIdx = activeIdx < 0 ? presetBtns.length - 1 : Math.min(presetBtns.length - 1, activeIdx + 1);
+        } else { // swipe down = lower preset
+            nextIdx = activeIdx < 0 ? 0 : Math.max(0, activeIdx - 1);
+        }
+        presetBtns[nextIdx].click();
+    }, { passive: true });
+
+    // Slider ± buttons
+    const sliderMinusBtn = document.getElementById('btn-slider-minus');
+    const sliderPlusBtn = document.getElementById('btn-slider-plus');
+    function adjustSlider(delta) {
+        const slider = document.getElementById('bet-slider');
+        const bb = currentTurnBB || 100;
+        let val = parseInt(slider.value) + delta * bb;
+        val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val));
+        slider.value = val;
+        slider.dispatchEvent(new Event('input'));
+    }
+    // Single click
+    sliderMinusBtn.addEventListener('click', () => adjustSlider(-1));
+    sliderPlusBtn.addEventListener('click', () => adjustSlider(1));
+    // Long-press repeat
+    let adjInterval = null;
+    const startRepeat = (delta) => {
+        adjInterval = setInterval(() => adjustSlider(delta), 150);
+    };
+    const stopRepeat = () => { if (adjInterval) { clearInterval(adjInterval); adjInterval = null; } };
+    sliderMinusBtn.addEventListener('pointerdown', () => { setTimeout(() => { if (!adjInterval) startRepeat(-1); }, 300); });
+    sliderMinusBtn.addEventListener('pointerup', stopRepeat);
+    sliderMinusBtn.addEventListener('pointerleave', stopRepeat);
+    sliderPlusBtn.addEventListener('pointerdown', () => { setTimeout(() => { if (!adjInterval) startRepeat(1); }, 300); });
+    sliderPlusBtn.addEventListener('pointerup', stopRepeat);
+    sliderPlusBtn.addEventListener('pointerleave', stopRepeat);
 
     // Draw buttons
     document.getElementById('btn-draw').addEventListener('click', () => {
@@ -1496,7 +1578,39 @@ document.addEventListener('click', (e) => {
     }
 });
 
+function notifyYourTurn() {
+    // Title flash when tab is hidden
+    if (document.hidden) {
+        if (!titleFlashInterval) {
+            const orig = document.title;
+            let flip = false;
+            titleFlashInterval = setInterval(() => {
+                document.title = flip ? orig : '★ あなたの番です！';
+                flip = !flip;
+            }, 800);
+            // Stop flashing when tab becomes visible
+            const stopFlash = () => {
+                if (!document.hidden) {
+                    clearInterval(titleFlashInterval);
+                    titleFlashInterval = null;
+                    document.title = orig;
+                    document.removeEventListener('visibilitychange', stopFlash);
+                }
+            };
+            document.addEventListener('visibilitychange', stopFlash);
+        }
+        // Desktop notification
+        if (Notification.permission === 'granted') {
+            try {
+                const n = new Notification('mix-1', { body: 'あなたの番です！', icon: 'logos/logo.png', tag: 'your-turn' });
+                setTimeout(() => n.close(), 5000);
+            } catch (e) {}
+        }
+    }
+}
+
 function onYourTurn(data) {
+    notifyYourTurn();
     // Check pre-action before showing buttons
     if (preAction) {
         const actions = data.actions;
@@ -1532,6 +1646,7 @@ function onYourTurn(data) {
 }
 
 function onYourDraw(data) {
+    notifyYourTurn();
     sound.yourDraw();
     startTurnTimer(data.timeLimit || 45);
     ui.pendingDraw = true;
@@ -1624,26 +1739,46 @@ function showActionButtons(actions, turnData) {
             switch (action.type) {
                 case 'fold': {
                     btn.textContent = 'フォールド（長押し）';
+                    btn.style.position = 'relative';
+                    btn.style.overflow = 'hidden';
+                    // Progress bar element
+                    const progressBar = document.createElement('div');
+                    progressBar.className = 'fold-progress-bar';
+                    btn.appendChild(progressBar);
                     // Long-press (0.4s) to prevent accidental fold
                     let foldTimer = null;
                     let foldFired = false;
+                    let foldRAF = null;
+                    let foldStart = 0;
+                    const FOLD_DURATION = 400;
+                    const animateProgress = () => {
+                        const elapsed = Date.now() - foldStart;
+                        const pct = Math.min(100, (elapsed / FOLD_DURATION) * 100);
+                        progressBar.style.width = pct + '%';
+                        if (elapsed < FOLD_DURATION) foldRAF = requestAnimationFrame(animateProgress);
+                    };
                     btn.addEventListener('pointerdown', (e) => {
                         foldFired = false;
+                        foldStart = Date.now();
                         btn.classList.add('fold-holding');
+                        progressBar.style.width = '0%';
+                        foldRAF = requestAnimationFrame(animateProgress);
                         foldTimer = setTimeout(() => {
                             foldFired = true;
                             btn.classList.remove('fold-holding');
+                            progressBar.style.width = '100%';
+                            cancelAnimationFrame(foldRAF);
                             sendActionAndHide({ type: 'fold' });
-                        }, 400);
+                        }, FOLD_DURATION);
                     });
-                    btn.addEventListener('pointerup', () => {
+                    const cancelFold = () => {
                         clearTimeout(foldTimer);
+                        cancelAnimationFrame(foldRAF);
                         btn.classList.remove('fold-holding');
-                    });
-                    btn.addEventListener('pointerleave', () => {
-                        clearTimeout(foldTimer);
-                        btn.classList.remove('fold-holding');
-                    });
+                        progressBar.style.width = '0%';
+                    };
+                    btn.addEventListener('pointerup', cancelFold);
+                    btn.addEventListener('pointerleave', cancelFold);
                     // Add separator before fold
                     const sep = document.createElement('div');
                     sep.className = 'action-separator';
@@ -1765,7 +1900,13 @@ function setupSlider(min, max, currentBet) {
     if (input) input.value = min + sliderOffset;
     // Update slider tooltip and show slider
     const tip = document.getElementById('slider-value-tip');
-    if (tip) tip.textContent = Number(min + sliderOffset).toLocaleString();
+    if (tip) {
+        const total = min + sliderOffset;
+        const bb = currentTurnBB || 100;
+        const bbVal = total / bb;
+        const bbText = Number.isInteger(bbVal) ? bbVal : bbVal.toFixed(1);
+        tip.textContent = `${Number(total).toLocaleString()} (${bbText}bb)`;
+    }
     document.getElementById('bet-slider-area').classList.add('visible');
 }
 
@@ -2929,6 +3070,31 @@ function setupEmotes() {
         picker.classList.add('hidden');
     });
     picker.addEventListener('click', (e) => e.stopPropagation());
+}
+
+function setupFocusMode() {
+    const btn = document.getElementById('btn-focus-mode');
+    if (!btn) return;
+
+    function applyFocusMode() {
+        const gameScreen = document.getElementById('game-screen');
+        if (!gameScreen) return;
+        if (focusMode) {
+            gameScreen.classList.add('focus-mode');
+            btn.textContent = '🎯 フォーカス ON';
+        } else {
+            gameScreen.classList.remove('focus-mode');
+            btn.textContent = '🎯 フォーカス OFF';
+        }
+    }
+
+    applyFocusMode();
+
+    btn.addEventListener('click', () => {
+        focusMode = !focusMode;
+        localStorage.setItem('poker10mix_focus', focusMode ? 'on' : 'off');
+        applyFocusMode();
+    });
 }
 
 function showQuickChatFloat(msg) {

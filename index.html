@@ -169,14 +169,18 @@
                         <button id="btn-zoom-exit" class="menu-item menu-danger hidden">⛔ Zoom退出</button>
                         <button id="btn-sound-toggle" class="menu-item" title="サウンドON/OFF">🔔 サウンド</button>
                         <button id="btn-menu-history" class="menu-item">📋 ハンド履歴</button>
+                        <button id="btn-focus-mode" class="menu-item">🎯 フォーカス OFF</button>
+                        <button id="btn-theme-toggle" class="menu-item">🎨 テーマ</button>
                         <div id="game-rules-btn" class="menu-item" title="ルール表示">❓ ルール</div>
                     </div>
                 </div>
             </div>
 
             <div id="rules-modal" class="hidden">
-                <div id="rules-content"></div>
-                <button id="rules-close" class="btn-small">閉じる</button>
+                <div id="rules-modal-inner">
+                    <div id="rules-content"></div>
+                    <button id="rules-close" class="btn-small">閉じる</button>
+                </div>
             </div>
 
             <div id="table-area">
@@ -257,7 +261,9 @@
                     <div id="action-bar" class="hidden">
                         <div id="bet-presets" class="hidden"></div>
                         <div id="bet-slider-area" class="hidden">
+                            <button id="btn-slider-minus" class="btn-slider-adj">−</button>
                             <input type="range" id="bet-slider" min="0" max="10000" step="50">
+                            <button id="btn-slider-plus" class="btn-slider-adj">＋</button>
                             <span id="slider-value-tip" class="slider-value-tip"></span>
                         </div>
                         <div id="action-buttons"></div>
