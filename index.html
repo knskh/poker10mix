@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=22">
+    <link rel="stylesheet" href="css/style.css?v=23">
 </head>
 <body>
     <div id="app">
@@ -276,11 +276,25 @@
                     <div id="pre-action-bar" class="hidden"></div>
                     <div id="action-bar" class="hidden">
                         <div id="bet-presets" class="hidden"></div>
-                        <div id="bet-slider-area" class="hidden">
-                            <button id="btn-slider-minus" class="btn-slider-adj">−</button>
-                            <input type="range" id="bet-slider" min="0" max="10000" step="50">
-                            <button id="btn-slider-plus" class="btn-slider-adj">＋</button>
-                            <span id="slider-value-tip" class="slider-value-tip"></span>
+                        <div id="bet-numpad" class="hidden">
+                            <div class="numpad-display">
+                                <span id="numpad-value">0</span>
+                                <button id="numpad-clear" class="numpad-key numpad-fn">C</button>
+                            </div>
+                            <div class="numpad-grid">
+                                <button class="numpad-key" data-val="1">1</button>
+                                <button class="numpad-key" data-val="2">2</button>
+                                <button class="numpad-key" data-val="3">3</button>
+                                <button class="numpad-key" data-val="4">4</button>
+                                <button class="numpad-key" data-val="5">5</button>
+                                <button class="numpad-key" data-val="6">6</button>
+                                <button class="numpad-key" data-val="7">7</button>
+                                <button class="numpad-key" data-val="8">8</button>
+                                <button class="numpad-key" data-val="9">9</button>
+                                <button class="numpad-key numpad-fn" id="numpad-back">←</button>
+                                <button class="numpad-key" data-val="0">0</button>
+                                <button class="numpad-key numpad-fn" id="numpad-confirm">OK</button>
+                            </div>
                         </div>
                         <div id="action-buttons"></div>
                     </div>
@@ -373,7 +387,7 @@
     <script src="js/evaluator.js"></script>
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
-    <script src="js/ui.js?v=22"></script>
-    <script src="js/app.js?v=22"></script>
+    <script src="js/ui.js?v=23"></script>
+    <script src="js/app.js?v=23"></script>
 </body>
 </html>
