@@ -129,15 +129,6 @@ class PokerClient {
             case 'big_hand':
                 this.emit('big_hand', { roomId: msg.roomId, winner: msg.winner, pot: msg.pot, handRank: msg.handRank, gameName: msg.gameName });
                 break;
-            case 'quiz_start':
-                this.emit('quiz_start', { category: msg.category, display: msg.display, wordLength: msg.wordLength });
-                break;
-            case 'quiz_correct':
-                this.emit('quiz_correct', { winner: msg.winner, answer: msg.answer, bonus: msg.bonus });
-                break;
-            case 'quiz_end':
-                this.emit('quiz_end', { answer: msg.answer });
-                break;
             case 'auto_kicked':
                 this.emit('auto_kicked');
                 break;

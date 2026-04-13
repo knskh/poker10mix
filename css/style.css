@@ -1112,7 +1112,7 @@ body {
 #bottom-area {
     display: flex; flex-direction: row; flex-shrink: 0;
     background: #111318; border-top: 1px solid #2a2d35;
-    height: clamp(140px, 25vh, 220px);
+    min-height: 120px; max-height: 240px;
 }
 #log-panel {
     flex: 0 0 50%;
@@ -1240,7 +1240,7 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: nowrap; margin-bottom: 4px; overflow: hidden; }
+#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 4px; }
 .btn-preset {
     padding: 7px 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
     background: rgba(255,255,255,0.09); color: #ddd; cursor: pointer; font-weight: 600;
@@ -1263,6 +1263,26 @@ body {
 }
 .sitout-msg {
     color: #f4a236; font-size: 11px;
+}
+.sitout-countdown {
+    font-weight: 900; font-size: 14px; color: #fbbf24;
+}
+.sitout-countdown-urgent {
+    color: #ef4444; animation: sitout-blink 1s ease-in-out infinite;
+}
+@keyframes sitout-blink {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+}
+/* Sitout timer badge on seat */
+.sitout-timer-badge {
+    font-size: 9px; font-weight: 700; color: #fbbf24;
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(251,191,36,0.4);
+    border-radius: 8px; padding: 1px 6px;
+    text-align: center; margin-top: 1px;
+}
+.sitout-timer-urgent {
+    color: #ef4444; border-color: rgba(239,68,68,0.5);
+    animation: sitout-blink 1s ease-in-out infinite;
 }
 
 /* Pre-action checkboxes */
@@ -1470,10 +1490,6 @@ body {
 }
 #chat-log .chat-entry { padding: 2px 0; }
 #chat-log .chat-msg { color: #81c784; }
-#chat-log .chat-quiz { color: #67e8f9; font-weight: 600; }
-#chat-log .chat-quiz-hint { color: #94a3b8; font-size: 0.85em; }
-#chat-log .chat-quiz-correct { color: #4ade80; font-weight: 600; }
-#chat-log .chat-quiz-end { color: #94a3b8; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
@@ -1836,7 +1852,6 @@ body {
     #game-log { height: auto; padding: 4px 8px; font-size: 10px; }
     #log-panel { flex-basis: 45%; }
     #log-panel.collapsed { flex: 0 0 28px; min-width: 28px; }
-    #bottom-area { height: clamp(140px, 24vh, 200px); }
     .btn-action { padding: 13px 16px; font-size: 15px; }
     .bet-raise-input { width: 58px; font-size: 13px; }
     .log-tab { padding: 2px 7px; font-size: 10px; }
@@ -1912,7 +1927,6 @@ body {
     #game-log { height: auto; font-size: 9px; }
     #log-panel { flex-basis: 42%; }
     #log-panel.collapsed { flex: 0 0 28px; min-width: 28px; }
-    #bottom-area { height: clamp(130px, 22vh, 180px); }
     .btn-action { padding: 12px 12px; font-size: 14px; }
     .log-tab { padding: 2px 6px; font-size: 9px; }
 }
@@ -1926,13 +1940,11 @@ body {
     #game-rotation { font-size: 10px; }
     #player-hand { height: 60px; padding: 1px 0; margin-top: 28px; }
     #player-cards .card { width: 34px; height: 46px; }
-    #bottom-area { height: clamp(110px, 20vh, 160px); }
     .btn-action { padding: 8px 10px; font-size: 12px; }
     #player-cards .card-rank { font-size: 14px; }
     #player-cards .card-suit { font-size: 12px; }
     #game-log { height: auto; font-size: 9px; }
     #log-panel { width: 110px; }
-    #bottom-area { height: clamp(100px, 18vh, 130px); }
     #table-felt { margin: 10px 0 2px; }
 
     .btn-action { padding: 8px 12px; font-size: 13px; }
@@ -1946,12 +1958,6 @@ body {
 /* ==========================================
    Hiragana Quiz Log Styles
    ========================================== */
-.log-quiz { color: #67e8f9; font-weight: 600; }
-.log-quiz-word { color: #fbbf24; font-size: 1.3em; letter-spacing: 0.15em; font-weight: 700; }
-.log-quiz-hint { color: #94a3b8; font-size: 0.85em; }
-.log-quiz-correct { color: #4ade80; font-weight: 600; }
-.log-quiz-end { color: #94a3b8; }
-
 /* ==========================================
    UX Enhancement: Chip Animation
    ========================================== */

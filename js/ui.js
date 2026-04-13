@@ -404,6 +404,16 @@ class PokerUI {
         });
         el.appendChild(nameDiv);
 
+        // Sitout countdown badge (visible to all players)
+        if (p.sitout && p.sitoutRemaining != null) {
+            const badge = document.createElement('div');
+            badge.className = 'sitout-timer-badge' + (p.sitoutRemaining <= 120 ? ' sitout-timer-urgent' : '');
+            const m = Math.floor(p.sitoutRemaining / 60);
+            const sec = p.sitoutRemaining % 60;
+            badge.textContent = `⏱ ${m}:${String(sec).padStart(2, '0')}`;
+            el.appendChild(badge);
+        }
+
         // Position badge + chips on one row
         const infoRow = document.createElement('div');
         infoRow.className = 'seat-info-row';
@@ -433,8 +443,12 @@ class PokerUI {
             const dc = p.downCount || 0;
             const uc = p.upCards ? p.upCards.length : 0;
             totalCards = dc + uc;
+            // Stud card order: down[0], down[1], up[0..n], down[2](7th)
+            const initialDown = Math.min(dc, 2);
+            const seventhDown = dc > 2 ? 1 : 0;
             let ci = 0;
-            for (let d = 0; d < dc; d++) {
+            // First 2 down cards (face down)
+            for (let d = 0; d < initialDown; d++) {
                 const cel = this.createCardEl(null, true);
                 if (totalCards >= 3) {
                     const info = this.studStreetInfo(dc, uc, ci);
@@ -445,6 +459,7 @@ class PokerUI {
                 cardsDiv.appendChild(cel);
                 ci++;
             }
+            // Up cards (face up)
             if (p.upCards) {
                 for (const card of p.upCards) {
                     const cel = this.createCardEl(card, false);
@@ -457,6 +472,18 @@ class PokerUI {
                     cardsDiv.appendChild(cel);
                     ci++;
                 }
+            }
+            // 7th street down card (face down, last)
+            if (seventhDown > 0) {
+                const cel = this.createCardEl(null, true);
+                if (totalCards >= 3) {
+                    const info = this.studStreetInfo(dc, uc, ci);
+                    cel.style.borderColor = info.color;
+                    cel.style.borderWidth = '2px';
+                    cel.style.borderStyle = 'solid';
+                }
+                cardsDiv.appendChild(cel);
+                ci++;
             }
             cardsDiv.classList.add(`seat-cards-${Math.min(totalCards, 7)}`);
             el.appendChild(cardsDiv);
@@ -651,9 +678,11 @@ class PokerUI {
             const dc = p.downCount || 0;
             const uc = p.upCards ? p.upCards.length : 0;
             const total = dc + uc;
+            const initialDown = Math.min(dc, 2);
+            const seventhDown = dc > 2 ? 1 : 0;
             let ci = 0;
-            // Down cards
-            for (let d = 0; d < dc; d++) {
+            // First 2 down cards
+            for (let d = 0; d < initialDown; d++) {
                 const cel = this.createCardEl(null, true);
                 if (total >= 3) {
                     const info = this.studStreetInfo(dc, uc, ci);
@@ -676,6 +705,17 @@ class PokerUI {
                     ci++;
                 }
             }
+            // 7th street down card (last)
+            if (seventhDown > 0) {
+                const cel = this.createCardEl(null, true);
+                if (total >= 3) {
+                    const info = this.studStreetInfo(dc, uc, ci);
+                    this.applyStudStreetStyle(cel, info, true);
+                }
+                cardsDiv.appendChild(cel);
+                hasCards = true;
+                ci++;
+            }
         } else if (!p.folded && p.cardCount > 0) {
             if (s.isShowdown && p.hand && p.hand.length > 0) {
                 for (const card of p.hand) {
@@ -685,7 +725,7 @@ class PokerUI {
             } else if (idx === s.mySeatIndex) {
                 const me = s.players[s.mySeatIndex];
                 const myCards = s.gameType === 'stud'
-                    ? [...(me.downCards || []), ...(me.upCards || [])]
+                    ? [...(me.downCards || []).slice(0, 2), ...(me.upCards || []), ...(me.downCards || []).slice(2)]
                     : (me.hand || []);
                 for (const card of myCards) {
                     cardsDiv.appendChild(this.createCardEl(card, false));
@@ -813,7 +853,10 @@ class PokerUI {
 
         let cards;
         if (s.gameType === 'stud') {
-            cards = [...(me.downCards || []), ...(me.upCards || [])];
+            // Stud order: down[0], down[1], up[0..n], down[2](7th)
+            const dc = me.downCards || [];
+            const uc = me.upCards || [];
+            cards = [...dc.slice(0, 2), ...uc, ...dc.slice(2)];
         } else {
             cards = me.hand || [];
         }

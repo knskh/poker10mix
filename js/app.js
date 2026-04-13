@@ -179,9 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('emote', onEmote);
     client.on('reaction', onReaction);
     client.on('big_hand', onBigHand);
-    client.on('quiz_start', onQuizStart);
-    client.on('quiz_correct', onQuizCorrect);
-    client.on('quiz_end', onQuizEnd);
     client.on('auto_kicked', () => {
         alert('10分間離席のため自動退室されました');
         showScreen('lobby');
@@ -855,11 +852,6 @@ function setupGameScreen() {
         client.zoomSitout();
     });
 
-    // Rebuy chips button
-    document.getElementById('btn-rebuy').addEventListener('click', () => {
-        client.rebuyChips(10000);
-    });
-
     // Zoom sit-out overlay buttons
     document.getElementById('btn-zoom-rejoin').addEventListener('click', () => {
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
@@ -918,7 +910,6 @@ function onHandStart() {
     cardSnapshots = [];
     showdownPlayers = null;
     lastHandResult = null;
-    activeQuiz = null;
     currentHandGameName = currentState ? currentState.gameName : '';
     currentHandGameType = currentState ? currentState.gameType : '';
     clearPreAction();
@@ -1625,13 +1616,6 @@ function onYourTurn(data) {
                 const fold = actions.find(a => a.type === 'fold');
                 if (fold) { client.sendAction({ type: 'fold' }); executed = true; }
             }
-        } else if (preAction === 'call') {
-            const call = actions.find(a => a.type === 'call');
-            if (call) { client.sendAction({ type: 'call', amount: call.amount }); executed = true; }
-            else {
-                const check = actions.find(a => a.type === 'check');
-                if (check) { client.sendAction({ type: 'check' }); executed = true; }
-            }
         }
         clearPreAction();
         if (executed) {
@@ -1939,38 +1923,69 @@ function stopTurnTimer() {
 // ==========================================
 function clearPreAction() {
     preAction = null;
-    document.querySelectorAll('#pre-action-bar input').forEach(cb => cb.checked = false);
+    const overlay = document.getElementById('pre-action-overlay');
+    if (overlay) {
+        overlay.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
+    }
 }
 
 function hidePreActionBar() {
-    document.getElementById('pre-action-bar').classList.add('hidden');
+    const overlay = document.getElementById('pre-action-overlay');
+    if (overlay) overlay.classList.add('hidden');
 }
 
 function showPreActionBar() {
-    document.getElementById('pre-action-bar').classList.remove('hidden');
+    const overlay = document.getElementById('pre-action-overlay');
+    if (overlay) overlay.classList.remove('hidden');
 }
 
 function setupPreActions() {
-    document.querySelectorAll('#pre-action-bar input').forEach(cb => {
-        cb.addEventListener('change', () => {
-            // Only one can be active — uncheck others
-            if (cb.checked) {
-                document.querySelectorAll('#pre-action-bar input').forEach(other => {
-                    if (other !== cb) other.checked = false;
-                });
-                preAction = cb.value;
-            } else {
+    // Pre-action overlay is created dynamically on the seat
+}
+
+function ensurePreActionOverlay(seatIdx) {
+    let overlay = document.getElementById('pre-action-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pre-action-overlay';
+        overlay.className = 'hidden';
+        overlay.innerHTML =
+            '<button class="pre-action-btn" data-action="check-fold">チェック/フォールド</button>' +
+            '<button class="pre-action-btn" data-action="fold">フォールド</button>';
+        overlay.addEventListener('click', (e) => {
+            const btn = e.target.closest('.pre-action-btn');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active');
                 preAction = null;
+            } else {
+                overlay.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                preAction = action;
             }
         });
-    });
+        document.getElementById('table-felt').appendChild(overlay);
+    }
+    // Position near the player's seat
+    const seatEl = document.getElementById('seat-' + seatIdx);
+    if (seatEl) {
+        const seatStyle = getComputedStyle(seatEl);
+        overlay.style.left = seatStyle.left;
+        overlay.style.bottom = 'auto';
+        // Place above the seat
+        const seatTop = parseFloat(seatStyle.top) || parseFloat(seatStyle.bottom);
+        overlay.style.top = (parseFloat(seatStyle.top) - 30) + '%';
+        overlay.style.transform = 'translateX(-50%)';
+    }
+    return overlay;
 }
 
 function updatePreActionVisibility(state) {
     if (!state || !state.mySeatIndex && state.mySeatIndex !== 0) { hidePreActionBar(); return; }
     const me = state.players[state.mySeatIndex];
-    // Show pre-actions when: not my turn, not folded, not sitout, game is active
     if (me && !me.folded && !state.mySitout && state.currentPlayer !== state.mySeatIndex) {
+        ensurePreActionOverlay(state.mySeatIndex);
         showPreActionBar();
     } else {
         hidePreActionBar();
@@ -2002,7 +2017,15 @@ function showFoldedButtons(state) {
         // Sitout state — show rejoin + leave
         const msg = document.createElement('div');
         msg.className = 'folded-msg sitout-msg';
-        msg.textContent = '離席中 — 10分以内に復帰しないと自動退室されます';
+        const remaining = me.sitoutRemaining;
+        if (remaining != null) {
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            const timeStr = `${m}:${String(s).padStart(2, '0')}`;
+            msg.innerHTML = `離席中 — 自動退室まで <span class="sitout-countdown${remaining <= 120 ? ' sitout-countdown-urgent' : ''}">${timeStr}</span>`;
+        } else {
+            msg.textContent = '離席中 — 10分以内に復帰しないと自動退室されます';
+        }
         btnDiv.appendChild(msg);
 
         const rejoinBtn = document.createElement('button');
@@ -2022,11 +2045,25 @@ function showFoldedButtons(state) {
         });
         btnDiv.appendChild(leaveBtn);
     } else {
-        // Just folded — show leave only
+        // Just folded — show leave + rebuy if low chips
         const msg = document.createElement('div');
         msg.className = 'folded-msg';
         msg.textContent = 'フォールド済み — 次のハンドを待っています';
         btnDiv.appendChild(msg);
+
+        const bb = state.bigBlind || 100;
+        const rebuyAmount = bb * 100;
+        if (me.chips < rebuyAmount) {
+            const rebuyBtn = document.createElement('button');
+            rebuyBtn.className = 'btn-action btn-call';
+            rebuyBtn.textContent = `チップ補充 (${rebuyAmount.toLocaleString()})`;
+            rebuyBtn.addEventListener('click', () => {
+                client.rebuyChips(rebuyAmount);
+                rebuyBtn.disabled = true;
+                rebuyBtn.textContent = '補充済み';
+            });
+            btnDiv.appendChild(rebuyBtn);
+        }
 
         const leaveBtn = document.createElement('button');
         leaveBtn.className = 'btn-action btn-fold';
@@ -3267,37 +3304,6 @@ function renderBigHandFeed() {
             }
         });
     });
-}
-
-// ==========================================
-// Hiragana Quiz
-// ==========================================
-let activeQuiz = null;
-
-function onQuizStart(data) {
-    activeQuiz = data;
-    // Build display string: show chars or ＿ for blanks
-    const displayStr = data.display.map(ch => ch === null ? '＿' : ch).join('');
-    ui.addLog(`🧩 【${data.category}】`, 'quiz');
-    ui.addLog(`　　${displayStr}`, 'quiz-word');
-    ui.addLog('　　チャットで回答！', 'quiz-hint');
-    // Also show in chat tab
-    addChatEntry(`🧩 【${data.category}】 ${displayStr}`, 'quiz');
-    addChatEntry('　　チャットで回答！', 'quiz-hint');
-}
-
-function onQuizCorrect(data) {
-    activeQuiz = null;
-    ui.addLog(`🎉 ${data.winner} さん正解！「${data.answer}」 +${data.bonus}チップ`, 'quiz-correct');
-    addChatEntry(`🎉 ${data.winner} さん正解！「${data.answer}」 +${data.bonus}チップ`, 'quiz-correct');
-}
-
-function onQuizEnd(data) {
-    activeQuiz = null;
-    if (data.answer) {
-        ui.addLog(`🧩 答え: ${data.answer}`, 'quiz-end');
-        addChatEntry(`🧩 答え: ${data.answer}`, 'quiz-end');
-    }
 }
 
 // ==========================================
