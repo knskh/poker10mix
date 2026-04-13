@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=23">
+    <link rel="stylesheet" href="css/style.css?v=25">
 </head>
 <body>
     <div id="app">
@@ -120,6 +120,18 @@
         </div>
 
         <!-- Stats Modal -->
+        <!-- Add Table Modal (lobby view from game screen) -->
+        <div id="add-table-modal" class="hidden">
+            <div class="add-table-modal-inner">
+                <div class="add-table-header">
+                    <h2>テーブル追加</h2>
+                    <button id="btn-add-table-close" class="btn-small">閉じる</button>
+                </div>
+                <div id="add-table-rooms"></div>
+                <button id="btn-add-table-create" class="btn-action btn-raise" style="width:100%;margin-top:8px;">+ 新規ルーム作成</button>
+            </div>
+        </div>
+
         <div id="stats-modal" class="hidden">
             <div class="stats-modal-inner">
                 <div class="stats-header">
@@ -148,6 +160,9 @@
 
         <!-- Game Screen -->
         <div id="game-screen" class="hidden">
+            <div id="table-tabs" class="hidden">
+                <!-- Populated dynamically by JS -->
+            </div>
             <div id="game-change-overlay" class="hidden">
                 <div class="gc-inner">
                     <div class="gc-label">ゲームチェンジ</div>
@@ -377,7 +392,7 @@
     <script src="js/evaluator.js"></script>
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
-    <script src="js/ui.js?v=23"></script>
-    <script src="js/app.js?v=23"></script>
+    <script src="js/ui.js?v=25"></script>
+    <script src="js/app.js?v=25"></script>
 </body>
 </html>

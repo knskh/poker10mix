@@ -238,7 +238,8 @@ function send(ws, data) {
 }
 
 function broadcastToRoom(room, data) {
-    for (const m of room.members) send(m.ws, data);
+    const tagged = { ...data, roomId: room.id };
+    for (const m of room.members) send(m.ws, tagged);
 }
 
 function broadcastRoomList() {
@@ -374,7 +375,7 @@ function broadcastGameState(room) {
     for (const m of room.members) {
         const seat = room.seatMap[m.clientId];
         if (seat !== undefined) {
-            send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, seat) });
+            send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, seat), roomId: room.id });
         }
     }
 }
@@ -384,7 +385,7 @@ function broadcastGameState(room) {
 // ============================================
 wss.on('connection', (ws) => {
     const clientId = nextClientId++;
-    const client = { id: clientId, name: 'Player' + clientId, roomId: null, inZoom: false, ws };
+    const client = { id: clientId, name: 'Player' + clientId, roomId: null, roomIds: [], inZoom: false, ws };
     clients.set(ws, client);
 
     send(ws, { type: 'welcome', clientId });
@@ -419,25 +420,22 @@ function handleMessage(ws, client, msg) {
                     broadcastRoomUpdate(room);
                 }
             }
-            // Auto-rejoin: check if this player was disconnected from an active game
-            if (!client.roomId) {
-                for (const [roomId, room] of rooms) {
-                    if (room.playing && room.disconnectedPlayers && room.disconnectedPlayers[client.name]) {
-                        const dp = room.disconnectedPlayers[client.name];
-                        const seat = dp.seat;
-                        delete room.disconnectedPlayers[client.name];
-                        // Restore player connection
-                        room.members.push({ clientId: client.id, name: client.name, ws });
-                        client.roomId = roomId;
-                        room.seatMap[client.id] = seat;
-                        room.game.players[seat].connected = true;
-                        // Keep sitout so they see the rejoin button
-                        broadcastLog(room, `${client.name} が再接続しました`, 'important');
-                        send(ws, { type: 'room_joined', room: room.toJSON() });
-                        send(ws, { type: 'game_started' });
-                        broadcastGameState(room);
-                        break;
-                    }
+            // Auto-rejoin: check if this player was disconnected from active games
+            for (const [roomId, room] of rooms) {
+                if (client.roomIds.length >= 3) break;
+                if (room.playing && room.disconnectedPlayers && room.disconnectedPlayers[client.name]) {
+                    const dp = room.disconnectedPlayers[client.name];
+                    const seat = dp.seat;
+                    delete room.disconnectedPlayers[client.name];
+                    room.members.push({ clientId: client.id, name: client.name, ws });
+                    client.roomId = roomId;
+                    if (!client.roomIds.includes(roomId)) client.roomIds.push(roomId);
+                    room.seatMap[client.id] = seat;
+                    room.game.players[seat].connected = true;
+                    broadcastLog(room, `${client.name} が再接続しました`, 'important');
+                    send(ws, { type: 'room_joined', room: room.toJSON(), roomId: room.id });
+                    send(ws, { type: 'game_started', roomId: room.id });
+                    broadcastGameState(room);
                 }
             }
             break;
@@ -453,25 +451,28 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'create_room': {
-            if (client.roomId) leaveRoom(client);
+            if (client.roomIds.length >= 3) { send(ws, { type: 'error', message: '最大3テーブルまでです' }); return; }
             if (client.inZoom) leaveZoom(client);
             const roomId = generateRoomId();
             const room = new Room(roomId, client.id, client.name);
             room.members.push({ clientId: client.id, name: client.name, ws });
             rooms.set(roomId, room);
             client.roomId = roomId;
-            send(ws, { type: 'room_joined', room: room.toJSON() });
+            if (!client.roomIds.includes(roomId)) client.roomIds.push(roomId);
+            send(ws, { type: 'room_joined', room: room.toJSON(), roomId });
             broadcastRoomList();
             break;
         }
 
         case 'join_room': {
-            if (client.roomId) leaveRoom(client);
+            if (client.roomIds.includes(msg.roomId)) { send(ws, { type: 'error', message: 'すでに参加しています' }); return; }
+            if (client.roomIds.length >= 3) { send(ws, { type: 'error', message: '最大3テーブルまでです' }); return; }
             const room = rooms.get(msg.roomId);
             if (!room) { send(ws, { type: 'error', message: 'ルームが見つかりません' }); return; }
             if (room.members.length >= 6) { send(ws, { type: 'error', message: 'ルームが満員です' }); return; }
             room.members.push({ clientId: client.id, name: client.name, ws });
             client.roomId = room.id;
+            if (!client.roomIds.includes(room.id)) client.roomIds.push(room.id);
 
             let midJoinSeat = undefined;
             if (room.playing && room.game) {
@@ -525,18 +526,18 @@ function handleMessage(ws, client, msg) {
             }
 
             // Send room_joined first so client can switch to game screen
-            send(ws, { type: 'room_joined', room: room.toJSON() });
+            send(ws, { type: 'room_joined', room: room.toJSON(), roomId: room.id });
 
             if (midJoinSeat !== undefined) {
                 // Send current game state to new joiner after room_joined
-                send(ws, { type: 'game_state', state: getStateForPlayer(room.game, room, midJoinSeat) });
+                send(ws, { type: 'game_state', state: getStateForPlayer(room.game, room, midJoinSeat), roomId: room.id });
                 // Broadcast to others (excluding new joiner)
                 for (const m of room.members) {
                     if (m.clientId !== client.id && room.seatMap[m.clientId] !== undefined) {
-                        send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, room.seatMap[m.clientId]) });
+                        send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, room.seatMap[m.clientId]), roomId: room.id });
                     }
                 }
-                send(ws, { type: 'log', message: `${client.name} が途中参加しました（${MID_JOIN_CHIPS}チップ）`, cls: 'important' });
+                send(ws, { type: 'log', message: `${client.name} が途中参加しました（${MID_JOIN_CHIPS}チップ）`, cls: 'important', roomId: room.id });
                 broadcastToRoom(room, { type: 'log', message: `${client.name} が途中参加しました`, cls: 'important' });
             }
 
@@ -545,14 +546,16 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
-        case 'leave_room':
-            leaveRoom(client);
-            send(ws, { type: 'room_left' });
+        case 'leave_room': {
+            const targetRoomId = msg.roomId || client.roomId;
+            leaveRoom(client, targetRoomId);
+            send(ws, { type: 'room_left', roomId: targetRoomId });
             broadcastRoomList();
             break;
+        }
 
         case 'update_settings': {
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (!room || room.playing) return;
             if (msg.settings) {
                 // Only host can change startingChips
@@ -565,7 +568,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'update_game_selection': {
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (!room) return;
             room.playerGames[client.id] = msg.selectedGames || [];
             // Update merged game list only when not playing (game list is locked during play)
@@ -577,7 +580,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'start_game': {
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (!room || room.hostId !== client.id) return;
             if (room.members.length < 2) { send(ws, { type: 'error', message: '2人以上必要です' }); return; }
             if (room.settings.selectedGames.length < 1) { send(ws, { type: 'error', message: '1つ以上のゲームを選択してください' }); return; }
@@ -588,7 +591,8 @@ function handleMessage(ws, client, msg) {
 
         case 'action': {
             if (client.inZoom) { handleZoomAction(client, msg); break; }
-            const room = rooms.get(client.roomId);
+            const actionRoomId = msg.roomId || client.roomId;
+            const room = rooms.get(actionRoomId);
             if (!room || !room.pending) return;
             const seat = room.seatMap[client.id];
             if (room.pending.type !== 'action' || room.pending.playerId !== seat) return;
@@ -603,7 +607,8 @@ function handleMessage(ws, client, msg) {
 
         case 'draw': {
             if (client.inZoom) { handleZoomDraw(client, msg); break; }
-            const room = rooms.get(client.roomId);
+            const drawRoomId = msg.roomId || client.roomId;
+            const room = rooms.get(drawRoomId);
             if (!room || !room.pending) return;
             const seat = room.seatMap[client.id];
             if (room.pending.type !== 'draw' || room.pending.playerId !== seat) return;
@@ -634,7 +639,7 @@ function handleMessage(ws, client, msg) {
 
         case 'emote': {
             const emote = (msg.emote || '').slice(0, 4);
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (room) {
                 const seat = room.seatMap[client.id];
                 broadcastToRoom(room, { type: 'emote', seat, emote, from: client.name });
@@ -649,7 +654,7 @@ function handleMessage(ws, client, msg) {
 
         case 'reaction': {
             const emote = (msg.emote || '').slice(0, 4);
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (room) {
                 broadcastToRoom(room, { type: 'reaction', emote, from: client.name });
             } else if (client.inZoom) {
@@ -661,7 +666,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'rebuy_chips': {
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (!room || !room.game) break;
             const seat = room.seatMap[client.id];
             if (seat === undefined) break;
@@ -678,7 +683,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'rejoin_game': {
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (!room || !room.sitout) break;
             const seat = room.seatMap[client.id];
             if (seat !== undefined && room.sitout[seat]) {
@@ -695,9 +700,9 @@ function handleMessage(ws, client, msg) {
 
         case 'chat': {
             const text = (msg.message || '').slice(0, 200);
-            if (client.roomId) {
-                // Room/game chat: broadcast to room members only
-                const room = rooms.get(client.roomId);
+            const chatRoomId = msg.roomId || client.roomId;
+            if (chatRoomId) {
+                const room = rooms.get(chatRoomId);
                 if (room) {
                     broadcastToRoom(room, { type: 'chat', from: client.name, message: text });
                 }
@@ -713,7 +718,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'get_stats': {
-            const room = rooms.get(client.roomId);
+            const room = rooms.get(msg.roomId || client.roomId);
             if (!room || !room.stats) return;
             const seat = room.seatMap[client.id];
             const allStats = {};
@@ -722,7 +727,7 @@ function handleMessage(ws, client, msg) {
                 allStats[i] = room.stats.calc(raw);
                 allStats[i].raw = raw;
             }
-            send(ws, { type: 'stats_data', stats: allStats, mySeat: seat });
+            send(ws, { type: 'stats_data', stats: allStats, mySeat: seat, roomId: room.id });
             break;
         }
 
@@ -735,13 +740,17 @@ function handleMessage(ws, client, msg) {
 // ============================================
 // Leave Room
 // ============================================
-function leaveRoom(client) {
-    const room = rooms.get(client.roomId);
-    if (!room) { client.roomId = null; return; }
+function leaveRoom(client, targetRoomId) {
+    const rid = targetRoomId || client.roomId;
+    const room = rooms.get(rid);
+    if (!room) { return; }
 
     room.members = room.members.filter(m => m.clientId !== client.id);
     delete room.playerGames[client.id];
-    client.roomId = null;
+    // Remove from roomIds array
+    client.roomIds = client.roomIds.filter(id => id !== rid);
+    // Update roomId to most recent remaining room, or null
+    client.roomId = client.roomIds.length > 0 ? client.roomIds[client.roomIds.length - 1] : null;
 
     // Recompute merged games after player leaves
     // During an active game, keep filteredGames unchanged so the rotation continues as-is
@@ -785,39 +794,40 @@ function leaveRoom(client) {
 
 function handleDisconnect(client) {
     if (client.inZoom) leaveZoom(client);
-    if (!client.roomId) return;
-    const room = rooms.get(client.roomId);
-    // During active game: mark as disconnected + sitout, but keep seat recoverable
-    if (room && room.playing && room.game) {
-        const seat = room.seatMap[client.id];
-        if (seat !== undefined) {
-            room.game.players[seat].connected = false;
-            room.game.players[seat].folded = true;
-            // Set sitout so they auto-fold future hands
-            if (!room.sitout) room.sitout = {};
-            room.sitout[seat] = true;
-            if (!room.sitoutTime) room.sitoutTime = {};
-            room.sitoutTime[seat] = Date.now();
-            // Store name->roomId mapping for reconnection
-            if (!room.disconnectedPlayers) room.disconnectedPlayers = {};
-            room.disconnectedPlayers[client.name] = { seat, clientId: client.id };
-            // Auto-fold if it was this player's turn
-            if (room.pending && room.pending.playerId === seat) {
-                clearTimeout(room.pending.timer);
-                const p = room.pending;
-                room.pending = null;
-                p.resolve({ type: 'fold' });
+    // Handle all rooms the client is in
+    const roomIdsCopy = [...client.roomIds];
+    for (const rid of roomIdsCopy) {
+        const room = rooms.get(rid);
+        if (!room) continue;
+        // During active game: mark as disconnected + sitout, but keep seat recoverable
+        if (room.playing && room.game) {
+            const seat = room.seatMap[client.id];
+            if (seat !== undefined) {
+                room.game.players[seat].connected = false;
+                room.game.players[seat].folded = true;
+                if (!room.sitout) room.sitout = {};
+                room.sitout[seat] = true;
+                if (!room.sitoutTime) room.sitoutTime = {};
+                room.sitoutTime[seat] = Date.now();
+                if (!room.disconnectedPlayers) room.disconnectedPlayers = {};
+                room.disconnectedPlayers[client.name] = { seat, clientId: client.id };
+                if (room.pending && room.pending.playerId === seat) {
+                    clearTimeout(room.pending.timer);
+                    const p = room.pending;
+                    room.pending = null;
+                    p.resolve({ type: 'fold' });
+                }
+                room.members = room.members.filter(m => m.clientId !== client.id);
+                delete room.seatMap[client.id];
+                broadcastLog(room, `${client.name} が切断されました`, 'dim');
+                broadcastGameState(room);
+                continue;
             }
-            // Remove old member entry but keep seatMap for reference
-            room.members = room.members.filter(m => m.clientId !== client.id);
-            delete room.seatMap[client.id];
-            client.roomId = null;
-            broadcastLog(room, `${client.name} が切断されました`, 'dim');
-            broadcastGameState(room);
-            return;
         }
+        leaveRoom(client, rid);
     }
-    leaveRoom(client);
+    client.roomId = null;
+    client.roomIds = [];
 }
 
 // ============================================
@@ -887,6 +897,7 @@ function startGame(room) {
                 currentBet: game.currentBet,
                 isFirstRound: game.isFirstRound,
                 bigBlind: _gc.bigBlind || _gc.bigBet || 100,
+                roomId: room.id,
             });
 
             // Timer: 45 seconds
@@ -930,7 +941,7 @@ function startGame(room) {
                 return;
             }
 
-            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 45 });
+            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 45, roomId: room.id });
 
             const timer = setTimeout(() => {
                 room.pending = null;

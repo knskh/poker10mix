@@ -1475,6 +1475,85 @@ body {
 .numpad-fn { color: var(--accent); background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.2); }
 #numpad-confirm { color: #4caf50; background: rgba(76,175,80,0.12); border-color: rgba(76,175,80,0.3); }
 
+/* Multi-table tabs */
+#table-tabs {
+    display: flex; gap: 4px; padding: 4px 8px;
+    background: rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.08);
+    overflow-x: auto; flex-shrink: 0;
+}
+#table-tabs.hidden { display: none; }
+.table-tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: #888; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap; position: relative;
+}
+.table-tab.active {
+    background: rgba(0,229,255,0.12); border-color: rgba(0,229,255,0.35);
+    color: var(--accent);
+}
+.table-tab .tab-badge {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ef5350; display: none;
+    animation: pulse-badge 1s infinite;
+}
+.table-tab .tab-badge.visible { display: inline-block; }
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.table-tab .tab-close {
+    font-size: 14px; color: #666; cursor: pointer;
+    margin-left: 2px; line-height: 1;
+}
+.table-tab .tab-close:hover { color: #ef5350; }
+
+/* Add Table Modal */
+#add-table-modal {
+    position: fixed; inset: 0; z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+}
+#add-table-modal.hidden { display: none; }
+.add-table-modal-inner {
+    background: var(--bg); border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 14px; padding: 16px; width: 90%; max-width: 400px;
+    max-height: 70vh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.add-table-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+}
+.add-table-header h2 { font-size: 16px; color: var(--accent); }
+#add-table-rooms { display: flex; flex-direction: column; gap: 6px; }
+.add-table-room-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-radius: 8px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer; transition: all 0.15s;
+}
+.add-table-room-item:hover { background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.2); }
+.add-table-room-item.room-full { opacity: 0.5; pointer-events: none; }
+.add-table-room-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.add-table-room-info { font-size: 11px; color: #888; }
+.add-table-room-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+.add-table-room-status.waiting { background: rgba(76,175,80,0.15); color: #4caf50; }
+.add-table-room-status.playing { background: rgba(255,152,0,0.15); color: #ff9800; }
+.add-table-empty { text-align: center; color: #666; font-size: 13px; padding: 20px; }
+
+/* Table tab + button */
+.table-tab-add {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; font-size: 18px; font-weight: 700;
+    background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 8px; color: #888; cursor: pointer;
+    transition: all 0.15s; flex-shrink: 0;
+}
+.table-tab-add:hover { background: rgba(0,229,255,0.1); border-color: rgba(0,229,255,0.3); color: var(--accent); }
+.table-tab-add.disabled { opacity: 0.3; pointer-events: none; }
+
 /* Focus Mode — hide social/distraction elements */
 .focus-mode #btn-quick-chat,
 .focus-mode #quick-chat-palette,
