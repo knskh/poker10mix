@@ -124,9 +124,9 @@ function hasPlayerNote(name) {
 // ==========================================
 const PRESET_STORAGE_KEY = 'poker10mix_bet_presets';
 const DEFAULT_PRESETS = {
-    'preflop-open': [2, 2.5, 3, 3.5, 4],
-    'preflop-raise': [2, 2.5, 3, 4],
-    'postflop': [0.33, 0.5, 0.66, 1.0]
+    'preflop-open': [2.5, 3, 4],
+    'preflop-raise': [2.5, 3, 4],
+    'postflop': [0.33, 0.66, 1.0]
 };
 
 function loadBetPresets() {
