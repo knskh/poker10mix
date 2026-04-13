@@ -583,6 +583,13 @@ function setupGameScreen() {
         document.getElementById('rules-modal').classList.add('hidden');
     });
 
+    // Hand history button in hamburger menu
+    document.getElementById('btn-menu-history').addEventListener('click', () => {
+        topBarMenu.classList.add('hidden');
+        renderHandHistory('lobby-hand-history');
+        document.getElementById('history-modal').classList.remove('hidden');
+    });
+
     // Bet slider and raise-input sync (event delegation since inputs are created dynamically)
     const betSlider = document.getElementById('bet-slider');
 
@@ -1039,46 +1046,112 @@ function renderHandDetail(h, idx) {
         if (riverRound && cc.length >= 5) riverRound.cards = [cc[4]];
     }
 
-    // Assign draw snapshots to draw rounds (all players, pre-draw + post-draw)
+    // Assign draw exchange diffs to draw rounds
     const drawSnaps = (hr && hr.drawSnapshots) || [];
     const mySnaps = h.cardSnapshots || [];
     if (drawSnaps.length > 0) {
-        // Use server-side snapshots (all players)
-        const preflopRound = rounds.find(r => r.name === 'Preflop');
-        if (preflopRound && drawSnaps[0]) preflopRound.drawAllPlayers = drawSnaps[0];
-
         let drawIdx = 0;
         for (const round of rounds) {
             if (round.name.startsWith('Draw')) {
-                if (drawSnaps[drawIdx]) round.preDrawAll = drawSnaps[drawIdx];
+                const preSnap = drawSnaps[drawIdx];
                 drawIdx++;
-                if (drawSnaps[drawIdx]) round.postDrawAll = drawSnaps[drawIdx];
+                const postSnap = drawSnaps[drawIdx];
+                if (preSnap && postSnap) {
+                    round.drawDiffs = [];
+                    for (const pre of preSnap) {
+                        if (pre.folded || !pre.hand || pre.hand.length === 0) continue;
+                        const post = postSnap.find(s => s.name === pre.name);
+                        if (!post || !post.hand) continue;
+                        const discarded = pre.hand.filter(c => !post.hand.some(pc => pc.r === c.r && pc.s === c.s));
+                        const drawn = post.hand.filter(c => !pre.hand.some(pc => pc.r === c.r && pc.s === c.s));
+                        round.drawDiffs.push({ name: pre.name, discarded, drawn, count: discarded.length });
+                    }
+                }
             }
         }
     } else if (mySnaps.length > 0 && mySnaps[0].type === 'draw') {
-        // Fallback: client-side snapshots (my cards only)
-        const preflopRound = rounds.find(r => r.name === 'Preflop');
-        if (preflopRound && mySnaps[0]) preflopRound.drawHand = mySnaps[0].hand;
-
         let drawIdx = 0;
         for (const round of rounds) {
             if (round.name.startsWith('Draw')) {
-                if (mySnaps[drawIdx]) round.preDraw = mySnaps[drawIdx].hand;
+                const preSnap = mySnaps[drawIdx];
                 drawIdx++;
-                if (mySnaps[drawIdx]) round.postDraw = mySnaps[drawIdx].hand;
+                const postSnap = mySnaps[drawIdx];
+                if (preSnap && postSnap) {
+                    const preHand = preSnap.hand || [];
+                    const postHand = postSnap.hand || [];
+                    const discarded = preHand.filter(c => !postHand.some(pc => pc.r === c.r && pc.s === c.s));
+                    const drawn = postHand.filter(c => !preHand.some(pc => pc.r === c.r && pc.s === c.s));
+                    round.drawDiffs = [{ name: myName, discarded, drawn, count: discarded.length }];
+                }
             }
         }
     }
 
-    // Helper: render all players' draw hands
-    function renderDrawPlayersHands(snapPlayers, label) {
-        if (!snapPlayers || snapPlayers.length === 0) return '';
-        let out = `<div class="hh-draw-section"><span class="hh-draw-label">${label}</span>`;
-        for (const sp of snapPlayers) {
-            if (sp.folded || !sp.hand || sp.hand.length === 0) continue;
-            const isMe = sp.name === myName;
+    // Assign stud card diffs to stud rounds
+    if (mySnaps.length > 0 && mySnaps[0].type === 'stud') {
+        const studRounds = rounds.filter(r => r.name.match(/\d+(st|nd|rd|th) St/));
+        for (let i = 1; i < studRounds.length && i < mySnaps.length; i++) {
+            const prev = mySnaps[i - 1];
+            const curr = mySnaps[i];
+            const prevAll = [...(prev.down || []), ...(prev.up || [])];
+            const currAll = [...(curr.down || []), ...(curr.up || [])];
+            const newCard = currAll.filter(c => !prevAll.some(pc => pc.r === c.r && pc.s === c.s));
+            if (newCard.length > 0) {
+                const isUp = (curr.up || []).some(u => u.r === newCard[0].r && u.s === newCard[0].s);
+                studRounds[i].studNewCard = { card: newCard[0], up: isUp, name: myName };
+            }
+        }
+    }
+    // Server-side stud data (all players)
+    if (hr && hr.gameType === 'stud' && hr.players) {
+        const studRounds = rounds.filter(r => r.name.match(/\d+(st|nd|rd|th) St/));
+        // 4th-7th streets: upCards index 1..4 correspond to studRounds[1..4]
+        for (let si = 1; si < studRounds.length; si++) {
+            studRounds[si].studDeals = [];
+            for (const p of hr.players) {
+                if (p.folded) continue;
+                // For stud: cards = downCards[0..1] + upCards[0] (3rd) + upCards[1] (4th) ... + downCards[2] (7th)
+                // upCards[si-1+1] = upCards[si] for 4th onward (index 1,2,3)
+                // 7th street = last downCard
+                if (si <= 3 && p.upCards && p.upCards.length > si) {
+                    studRounds[si].studDeals.push({ name: p.name, card: p.upCards[si], up: true });
+                } else if (si === 4 && p.downCards && p.downCards.length > 2) {
+                    studRounds[si].studDeals.push({ name: p.name, card: p.downCards[2], up: false });
+                }
+            }
+        }
+    }
+
+    // Helper: render card exchange diff for draw games
+    function renderDrawDiffs(diffs) {
+        if (!diffs || diffs.length === 0) return '';
+        let out = `<div class="hh-draw-section">`;
+        for (const d of diffs) {
+            const isMe = d.name === myName;
             const cls = isMe ? 'hh-draw-player hh-draw-me' : 'hh-draw-player';
-            out += `<div class="${cls}"><span class="hh-draw-pname">${sp.name}:</span>${renderMiniCards(sp.hand)}</div>`;
+            let label;
+            if (d.count === 0) {
+                label = 'スタンドパット';
+            } else {
+                const discStr = renderMiniCards(d.discarded);
+                const drawnStr = renderMiniCards(d.drawn);
+                label = `${d.count}枚交換: ${discStr} → ${drawnStr}`;
+            }
+            out += `<div class="${cls}"><span class="hh-draw-pname">${d.name}</span> <span class="hh-draw-diff">${label}</span></div>`;
+        }
+        out += `</div>`;
+        return out;
+    }
+
+    // Helper: render stud dealt cards
+    function renderStudDeals(deals) {
+        if (!deals || deals.length === 0) return '';
+        let out = `<div class="hh-draw-section">`;
+        for (const d of deals) {
+            const isMe = d.name === myName;
+            const cls = isMe ? 'hh-draw-player hh-draw-me' : 'hh-draw-player';
+            const upDown = d.up ? 'アップ' : 'ダウン';
+            out += `<div class="${cls}"><span class="hh-draw-pname">${d.name}</span> <span class="hh-stud-deal">${renderMiniCards([d.card])} (${upDown})</span></div>`;
         }
         out += `</div>`;
         return out;
@@ -1088,8 +1161,7 @@ function renderHandDetail(h, idx) {
     html += `<div class="hh-rounds">`;
     for (const round of rounds) {
         const hasContent = round.logs.length > 0 || round.cards.length > 0
-            || round.drawAllPlayers || round.preDrawAll || round.postDrawAll
-            || round.drawHand || round.preDraw || round.postDraw;
+            || round.drawDiffs || round.studDeals || round.studNewCard;
         if (!hasContent) continue;
         html += `<div class="hh-round">`;
         // Round header: name + community cards
@@ -1099,16 +1171,15 @@ function renderHandDetail(h, idx) {
             html += `<span class="hh-round-cards">${renderMiniCards(round.cards)}</span>`;
         }
         html += `</div>`;
-        // Draw game: all players' hands
-        if (round.drawAllPlayers) {
-            html += renderDrawPlayersHands(round.drawAllPlayers, 'ハンド:');
-        } else if (round.drawHand) {
-            html += `<div class="hh-draw-cards"><span class="hh-draw-label">ハンド:</span>${renderMiniCards(round.drawHand)}</div>`;
+        // Stud: show dealt cards per street
+        if (round.studDeals && round.studDeals.length > 0) {
+            html += renderStudDeals(round.studDeals);
+        } else if (round.studNewCard) {
+            html += renderStudDeals([round.studNewCard]);
         }
-        if (round.preDrawAll) {
-            html += renderDrawPlayersHands(round.preDrawAll, 'ドロー前:');
-        } else if (round.preDraw) {
-            html += `<div class="hh-draw-cards"><span class="hh-draw-label">ドロー前:</span>${renderMiniCards(round.preDraw)}</div>`;
+        // Draw: show card exchange diffs
+        if (round.drawDiffs) {
+            html += renderDrawDiffs(round.drawDiffs);
         }
         // Actions with position tags
         html += `<div class="hh-round-actions">`;
@@ -1126,12 +1197,6 @@ function renderHandDetail(h, idx) {
             html += `<div class="hh-action ${actionClass}">${posTag}${log}</div>`;
         }
         html += `</div>`;
-        // Post-draw: all players' hands
-        if (round.postDrawAll) {
-            html += renderDrawPlayersHands(round.postDrawAll, 'ドロー後:');
-        } else if (round.postDraw) {
-            html += `<div class="hh-draw-cards"><span class="hh-draw-label">ドロー後:</span>${renderMiniCards(round.postDraw)}</div>`;
-        }
         html += `</div>`;
     }
     html += `</div>`;
@@ -1147,6 +1212,11 @@ function renderHandDetail(h, idx) {
             }
             html += `</div>`;
         }
+    }
+
+    // === Replay button ===
+    if (hr) {
+        html += `<div class="hh-replay-wrap"><button class="btn-hh-replay" data-hh-idx="${idx}">▶ リプレイ</button><button class="btn-hh-share" data-hh-idx="${idx}">🔗 共有</button></div>`;
     }
 
     // === Fallback for old data without handResult ===
@@ -1205,6 +1275,86 @@ function getActionClass(log) {
     if (log.includes('勝利') || log.includes('獲得')) return 'act-win';
     return '';
 }
+
+// ==================== REPLAY ====================
+async function compressForReplay(str) {
+    const blob = new Blob([new TextEncoder().encode(str)]);
+    const stream = blob.stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buf = await new Response(stream).arrayBuffer();
+    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function buildReplayURL(idx) {
+    const h = handHistory[idx];
+    if (!h || !h.handResult) return null;
+    const hr = h.handResult;
+    const data = {
+        g: hr.gameName, t: hr.gameType,
+        c: hr.communityCards, d: hr.dealerSeat,
+        p: hr.players.map(p => ({
+            n: p.name, o: p.position, f: p.folded ? 1 : 0,
+            c: p.chips, s: p.startChips,
+            h: p.cards, u: p.upCards, w: p.downCards,
+        })),
+        l: h.logs, ds: hr.drawSnapshots,
+    };
+    const compressed = await compressForReplay(JSON.stringify(data));
+    const base = window.location.href.replace(/\/[^/]*$/, '/');
+    return base + 'replay.html#' + compressed;
+}
+
+async function openReplay(idx) {
+    const url = await buildReplayURL(idx);
+    if (url) window.open(url, '_blank');
+}
+
+async function shareReplay(idx) {
+    const url = await buildReplayURL(idx);
+    if (!url) return;
+    const h = handHistory[idx];
+    const title = `Hand #${idx + 1} ${h.gameName || ''}`;
+    if (navigator.share) {
+        try {
+            await navigator.share({ title, text: title + ' リプレイ', url });
+            return;
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+        }
+    }
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('リプレイURLをコピーしました');
+    } catch (e) {
+        showToast('コピーに失敗しました');
+    }
+}
+
+function showToast(msg) {
+    let t = document.getElementById('hh-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'hh-toast';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Event delegation for replay/share buttons
+document.addEventListener('click', (e) => {
+    const replayBtn = e.target.closest('.btn-hh-replay');
+    if (replayBtn) {
+        openReplay(parseInt(replayBtn.dataset.hhIdx));
+        return;
+    }
+    const shareBtn = e.target.closest('.btn-hh-share');
+    if (shareBtn) {
+        shareReplay(parseInt(shareBtn.dataset.hhIdx));
+        return;
+    }
+});
 
 function onYourTurn(data) {
     // Check pre-action before showing buttons

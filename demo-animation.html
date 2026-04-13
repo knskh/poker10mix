@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 - デモアニメーション</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+
+/* TABLE */
+#table {
+    position: absolute; top: 48%; left: 50%; transform: translate(-50%,-50%);
+    width: 700px; height: 400px;
+    background: radial-gradient(ellipse at 50% 50%, #1a5c3a, #0e3522 70%, #081f14);
+    border-radius: 50%; border: 4px solid #2a6b4a;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,0,0,0.6);
+}
+#table-logo {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 120px; height: 120px; z-index: 1; opacity: 0.12; pointer-events: none;
+    animation: logoWM 4s ease-in-out infinite;
+}
+@keyframes logoWM { 0%,100%{opacity:0.10} 50%{opacity:0.18} }
+
+/* Info panel (banner+pot) */
+#info-panel {
+    position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 14px; padding: 6px 20px 8px; z-index: 10;
+    text-align: center; white-space: nowrap; opacity: 0; transition: opacity 0.5s; min-width: 160px;
+}
+#table-banner { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.9); margin-bottom: 3px; }
+#table-banner .badge { background: #1565c0; color: #fff; font-size: 9px; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+#pot { display: flex; align-items: baseline; justify-content: center; gap: 5px; }
+#pot-label { font-size: 10px; color: rgba(255,215,0,0.6); }
+#pot-amount { font-size: 18px; font-weight: 700; color: #ffd700; }
+
+/* Board */
+#board {
+    position: absolute; top: 55%; left: 50%; transform: translate(-50%,-50%);
+    display: flex; gap: 6px; z-index: 10;
+}
+.board-card {
+    width: 42px; height: 58px; border-radius: 5px; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+    opacity: 0; transform: scale(0.3) rotateY(180deg);
+    transition: opacity 0.4s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.board-card.show { opacity: 1; transform: scale(1) rotateY(0); }
+.board-card .rank { font-size: 15px; line-height: 1; }
+.board-card .suit { font-size: 13px; line-height: 1; }
+.board-card.red { color: #dc2626; }
+.board-card.black { color: #1a1a1a; }
+
+/* Draw info (center text for draw games) */
+#draw-info {
+    position: absolute; top: 52%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 10; text-align: center; opacity: 0; transition: opacity 0.4s;
+    font-size: 14px; font-weight: 700; color: #67e8f9;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(103,232,249,0.2);
+    border-radius: 10px; padding: 6px 20px;
+}
+#draw-info.show { opacity: 1; }
+
+/* Seats */
+.seat {
+    position: absolute; width: 105px; text-align: center;
+    opacity: 0; transform: scale(0.8); transition: opacity 0.5s, transform 0.5s; z-index: 15;
+}
+.seat.show { opacity: 1; transform: scale(1); }
+.seat.folded { opacity: 0.3; transition: opacity 0.4s; }
+.seat-box {
+    background: rgba(15,20,35,0.9); border-radius: 12px; padding: 5px 8px;
+    border: 2px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: border-color 0.4s, box-shadow 0.4s;
+}
+.seat.active .seat-box { border-color: #38bdf8; box-shadow: 0 0 16px rgba(56,189,248,0.4); }
+.seat.winner .seat-box { border-color: #4ade80; box-shadow: 0 0 20px rgba(74,222,128,0.4); }
+.seat-name { font-size: 11px; font-weight: 700; color: #e0e0e0; }
+.seat-info { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 1px; }
+.seat-pos { font-size: 8px; font-weight: 700; color: #fff; padding: 1px 5px; border-radius: 3px; display: inline-block; }
+.seat-chips { font-size: 11px; font-weight: 700; color: #ffd700; }
+.seat-bet { font-size: 10px; font-weight: 700; color: #7dd3fc; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    opacity: 0; height: 0; overflow: hidden; transition: opacity 0.3s, height 0.2s; }
+.seat-bet.show { opacity: 1; height: 14px; }
+.seat-bet .chip-sm { width: 8px; height: 8px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #7dd3fc, #0284c7);
+    border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
+.seat-cards { display: flex; gap: 3px; justify-content: center; margin-top: 3px; flex-wrap: wrap; }
+.seat-card {
+    width: 24px; height: 34px; border-radius: 3px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 9px; line-height: 1; transition: transform 0.4s, opacity 0.3s;
+}
+.seat-card.facedown { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
+.seat-card.faceup { background: #fff; }
+.seat-card.faceup.red { color: #dc2626; }
+.seat-card.faceup.black { color: #1a1a1a; }
+/* Down card (value visible but visually distinct) */
+.seat-card.downcard { background: linear-gradient(135deg, #1a2a50, #0d1830); border: 1px dashed #5588cc; }
+.seat-card.downcard.red { color: #f87171; }
+.seat-card.downcard.black { color: #94a3b8; }
+.seat-card.downcard span { opacity: 0.85; }
+.seat-card.hidden-card { opacity: 0; transform: scale(0.3); }
+/* Draw discard animation */
+.seat-card.discarding { opacity: 0; transform: translateY(-15px) scale(0.5); transition: all 0.3s; }
+.seat-card.drawing { opacity: 0; transform: translateY(15px) scale(0.5); }
+.seat-card.drawn { opacity: 1; transform: translateY(0) scale(1); transition: all 0.3s; }
+
+/* Action label */
+.seat-action {
+    font-size: 10px; font-weight: 700; margin-top: 3px; padding: 2px 8px; border-radius: 4px;
+    opacity: 0; transform: translateY(5px); transition: opacity 0.3s, transform 0.3s; display: inline-block;
+}
+.seat-action.show { opacity: 1; transform: translateY(0); }
+.act-fold { color: #ef4444; background: rgba(239,68,68,0.15); }
+.act-check { color: #a3e635; background: rgba(163,230,53,0.12); }
+.act-call { color: #4ade80; background: rgba(74,222,128,0.15); }
+.act-raise { color: #fbbf24; background: rgba(251,191,36,0.15); }
+.act-bet { color: #38bdf8; background: rgba(56,189,248,0.15); }
+.act-allin { color: #f472b6; background: rgba(244,114,182,0.15); border: 1px solid rgba(244,114,182,0.3); }
+.act-draw { color: #c084fc; background: rgba(192,132,252,0.15); }
+.act-stand { color: #67e8f9; background: rgba(103,232,249,0.12); }
+
+/* Seat positions */
+.s0 { bottom: -24px; left: 50%; transform: translateX(-50%); }
+.s0.show { transform: translateX(-50%) scale(1); }
+.s1 { bottom: 30px; left: 2px; }
+.s2 { top: 30px; left: 2px; }
+.s3 { top: -24px; left: 50%; transform: translateX(-50%); }
+.s3.show { transform: translateX(-50%) scale(1); }
+.s4 { top: 30px; right: 2px; }
+.s5 { bottom: 30px; right: 2px; }
+
+/* Winner animation */
+@keyframes winPulse { 0%,100%{box-shadow:0 0 20px rgba(74,222,128,0.4)} 50%{box-shadow:0 0 40px rgba(74,222,128,0.7)} }
+.seat.winner .seat-box { animation: winPulse 1s ease-in-out 3; }
+
+/* Result overlay */
+#result-overlay {
+    position: absolute; top: 60%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 20; text-align: center; opacity: 0; transition: opacity 0.5s;
+}
+#result-overlay.show { opacity: 1; }
+.result-hand { font-size: 13px; color: #67e8f9; font-weight: 600;
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(103,232,249,0.3);
+    border-radius: 10px; padding: 5px 18px; margin-bottom: 5px; }
+.result-winner { font-size: 16px; font-weight: 800; color: #4ade80; text-shadow: 0 0 20px rgba(74,222,128,0.5); }
+
+/* Game change overlay */
+#game-change {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.5s;
+}
+#game-change.show { opacity: 1; pointer-events: auto; }
+.gc-inner { text-align: center; }
+.gc-label { font-size: 14px; color: #67e8f9; letter-spacing: 3px; margin-bottom: 8px; }
+.gc-name { font-size: 32px; font-weight: 900; color: #fff; text-shadow: 0 0 30px rgba(56,189,248,0.5);
+    transform: scale(0.5); opacity: 0; transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s; }
+#game-change.show .gc-name { transform: scale(1); opacity: 1; }
+.gc-badges { margin-top: 10px; opacity: 0; transition: opacity 0.5s 0.3s; }
+#game-change.show .gc-badges { opacity: 1; }
+.gc-badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 0 3px; }
+.gc-badge.blue { background: rgba(21,101,192,0.3); color: #67e8f9; border: 1px solid rgba(56,189,248,0.3); }
+.gc-badge.green { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+.gc-badge.purple { background: rgba(147,51,234,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); }
+
+/* Action log */
+#action-log {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 90%; max-width: 900px; max-height: 130px; overflow: hidden;
+    background: rgba(10,14,20,0.92); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 6px 10px; z-index: 30; font-size: 10px;
+}
+#log-entries { display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; }
+#log-entries::-webkit-scrollbar { height: 3px; }
+#log-entries::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+.log-street {
+    flex: 0 0 auto; min-width: 110px; max-width: 180px; background: rgba(255,255,255,0.03);
+    border-radius: 6px; padding: 3px 6px; max-height: 110px; overflow-y: auto;
+    opacity: 0; transform: translateY(8px); transition: opacity 0.3s, transform 0.3s;
+}
+.log-street.show { opacity: 1; transform: translateY(0); }
+.log-street-name { font-size: 9px; font-weight: 800; letter-spacing: 0.5px; padding: 1px 6px; border-radius: 3px; margin-bottom: 3px; display: inline-block; }
+.street-preflop .log-street-name, .street-predraw .log-street-name, .street-3rd .log-street-name { color: #fff; background: rgba(100,100,100,0.4); }
+.street-flop .log-street-name, .street-draw1 .log-street-name, .street-4th .log-street-name { color: #67e8f9; background: rgba(56,189,248,0.15); }
+.street-turn .log-street-name, .street-draw2 .log-street-name, .street-5th .log-street-name { color: #fbbf24; background: rgba(251,191,36,0.12); }
+.street-river .log-street-name, .street-draw3 .log-street-name, .street-6th .log-street-name { color: #f472b6; background: rgba(244,114,182,0.12); }
+.street-showdown .log-street-name, .street-7th .log-street-name { color: #4ade80; background: rgba(74,222,128,0.12); }
+.log-action { padding: 1px 0; white-space: normal; word-break: break-all; opacity: 0; transition: opacity 0.25s; }
+.log-action.show { opacity: 1; }
+.log-action .la-name { font-weight: 700; color: #ccc; }
+.log-action .la-act { font-weight: 600; }
+.la-fold { color: #ef4444; } .la-check { color: #a3e635; } .la-call { color: #4ade80; }
+.la-raise, .la-bet { color: #fbbf24; } .la-allin { color: #f472b6; }
+.la-blind { color: #78909c; } .la-win { color: #4ade80; font-weight: 800; }
+.la-draw { color: #c084fc; } .la-stand { color: #67e8f9; } .la-deal { color: #fbbf24; }
+
+/* Title */
+#title { position: absolute; top: 10px; left: 16px; z-index: 30; display: flex; align-items: center; gap: 8px; }
+#title img { height: 32px; filter: drop-shadow(0 0 8px rgba(255,215,0,0.4)); }
+#title .sub { font-size: 10px; color: rgba(255,215,0,0.5); letter-spacing: 1px; }
+
+/* Controls */
+#controls { position: absolute; top: 10px; right: 16px; z-index: 30; display: flex; gap: 6px; align-items: center; }
+.ctrl-btn { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; }
+.ctrl-btn:hover { background: rgba(255,255,255,0.15); }
+.ctrl-btn.play { background: rgba(56,189,248,0.2); border-color: rgba(56,189,248,0.4); width: 38px; height: 38px; font-size: 16px; }
+
+/* Hand counter */
+#hand-counter { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 30;
+    font-size: 11px; color: #888; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="title"><img src="logos/logo.png" alt="mix-1"><div class="sub">デモアニメーション</div></div>
+<div id="hand-counter"></div>
+<div id="table">
+    <img id="table-logo" src="logos/logo.png" alt="">
+    <div id="info-panel">
+        <div id="table-banner"></div>
+        <div id="pot"><span id="pot-label">Pot</span><span id="pot-amount">0</span></div>
+    </div>
+    <div id="board"></div>
+    <div id="draw-info"></div>
+    <div class="seat s0" id="seat-0"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s1" id="seat-1"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s2" id="seat-2"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s3" id="seat-3"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s4" id="seat-4"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div id="result-overlay"><div class="result-hand" id="result-hand"></div><div class="result-winner" id="result-winner"></div></div>
+</div>
+<div id="game-change"><div class="gc-inner"><div class="gc-label">GAME CHANGE</div><div class="gc-name" id="gc-game-name"></div><div class="gc-badges" id="gc-badges"></div></div></div>
+<div id="action-log"><div id="log-entries"></div></div>
+<div id="controls">
+    <div class="ctrl-btn" id="btn-restart" title="最初から">&#9198;</div>
+    <div class="ctrl-btn play" id="btn-play" title="再生/一時停止">&#9654;</div>
+    <div class="ctrl-btn" id="btn-speed" title="速度変更">1x</div>
+</div>
+
+<script>
+// ==================== HANDS DATA ====================
+const HANDS = [
+// --- HAND 1: Texas Hold'em ---
+{
+    game: "Texas Hold'em", badges: [{t:'No Limit',c:'blue'},{t:'6-Max',c:'green'}],
+    bannerHTML: 'Texas Hold\'em <span class="badge">NL</span>',
+    players: [
+        { name:'Tanaka', pos:'BTN', posColor:'#e65100', chips:10000,
+          cards:[{r:'A',s:'♦',c:'red'},{r:'K',s:'♣',c:'black'}] },
+        { name:'Mike', pos:'SB', posColor:'#37474f', chips:10000,
+          cards:[{r:'Q',s:'♠',c:'black'},{r:'Q',s:'♣',c:'black'}] },
+        { name:'Suzuki', pos:'BB', posColor:'#37474f', chips:10000,
+          cards:[{r:'7',s:'♥',c:'red'},{r:'2',s:'♦',c:'red'}] },
+        { name:'Yamada', pos:'CO', posColor:'#6a1b9a', chips:10000,
+          cards:[{r:'J',s:'♣',c:'black'},{r:'9',s:'♠',c:'black'}] },
+        { name:'Sato', pos:'HJ', posColor:'#1565c0', chips:10000,
+          cards:[{r:'J',s:'♥',c:'red'},{r:'10',s:'♦',c:'red'}] },
+    ],
+    board: [{r:'A',s:'♥',c:'red'},{r:'K',s:'♠',c:'black'},{r:'9',s:'♦',c:'red'},{r:'7',s:'♣',c:'black'},{r:'3',s:'♥',c:'red'}],
+    timeline: [
+        {type:'deal'}, {type:'round',name:'Preflop',cls:'street-preflop'},
+        {type:'blind',seat:1,amount:50,label:'SB 50'},
+        {type:'blind',seat:2,amount:100,label:'BB 100'},
+        {type:'action',seat:4,act:'call',cls:'act-call',amount:100,label:'コール 100'},
+        {type:'action',seat:3,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'action',seat:0,act:'raise',cls:'act-raise',amount:300,label:'レイズ 300'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:250,label:'コール'},
+        {type:'action',seat:2,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'action',seat:4,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'Flop',cls:'street-flop'}, {type:'board',count:3},
+        {type:'action',seat:1,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:4,act:'bet',cls:'act-bet',amount:500,label:'ベット 500'},
+        {type:'action',seat:0,act:'raise',cls:'act-raise',amount:1200,label:'レイズ 1,200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:1200,label:'コール'},
+        {type:'action',seat:4,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'collect'},
+        {type:'round',name:'Turn',cls:'street-turn'}, {type:'board',count:4},
+        {type:'action',seat:1,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:1700,label:'ベット 1,700'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:1700,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'River',cls:'street-river'}, {type:'board',count:5},
+        {type:'action',seat:1,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:2500,label:'ベット 2,500'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:2500,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'Showdown',cls:'street-showdown'},
+        {type:'showdown',seats:[0,1]},
+        {type:'result',winner:0,hand:'ツーペア A-A-K-K',pot:0},
+    ]
+},
+// --- HAND 2: 2-7 Triple Draw ---
+{
+    game: "2-7 Triple Draw", badges: [{t:'Fixed Limit',c:'purple'},{t:'Lowball',c:'green'}],
+    bannerHTML: '2-7 Triple Draw <span class="badge">FL</span>',
+    players: [
+        { name:'Tanaka', pos:'BTN', posColor:'#e65100', chips:10000,
+          cards:[{r:'2',s:'♣',c:'black'},{r:'3',s:'♦',c:'red'},{r:'5',s:'♠',c:'black'},{r:'7',s:'♥',c:'red'},{r:'8',s:'♦',c:'red'}] },
+        { name:'Mike', pos:'SB', posColor:'#37474f', chips:10000,
+          cards:[{r:'3',s:'♥',c:'red'},{r:'4',s:'♠',c:'black'},{r:'6',s:'♣',c:'black'},{r:'9',s:'♦',c:'red'},{r:'K',s:'♠',c:'black'}] },
+        { name:'Suzuki', pos:'BB', posColor:'#37474f', chips:10000,
+          cards:[{r:'A',s:'♠',c:'black'},{r:'4',s:'♦',c:'red'},{r:'5',s:'♥',c:'red'},{r:'8',s:'♣',c:'black'},{r:'J',s:'♦',c:'red'}] },
+        { name:'Yamada', pos:'CO', posColor:'#6a1b9a', chips:10000,
+          cards:[{r:'2',s:'♥',c:'red'},{r:'6',s:'♦',c:'red'},{r:'7',s:'♣',c:'black'},{r:'10',s:'♠',c:'black'},{r:'Q',s:'♥',c:'red'}] },
+    ],
+    board: [],
+    timeline: [
+        {type:'deal'}, {type:'round',name:'Pre-Draw',cls:'street-predraw'},
+        {type:'blind',seat:1,amount:50,label:'SB 50'},
+        {type:'blind',seat:2,amount:100,label:'BB 100'},
+        {type:'action',seat:3,act:'call',cls:'act-call',amount:100,label:'コール'},
+        {type:'action',seat:0,act:'raise',cls:'act-raise',amount:200,label:'レイズ 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:150,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:100,label:'コール'},
+        {type:'action',seat:3,act:'call',cls:'act-call',amount:100,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'1st Draw',cls:'street-draw1'},
+        {type:'drawInfo',text:'1st ドロー'},
+        {type:'draw',seat:1,discard:1,label:'1枚交換: K♠ → 5♣',newCards:[{r:'5',s:'♣',c:'black'}]},
+        {type:'draw',seat:2,discard:2,label:'2枚交換: A♠ J♦ → 7♦ 9♣',newCards:[{r:'7',s:'♦',c:'red'},{r:'9',s:'♣',c:'black'}]},
+        {type:'draw',seat:3,discard:2,label:'2枚交換: 10♠ Q♥ → 4♣ 8♠',newCards:[{r:'4',s:'♣',c:'black'},{r:'8',s:'♠',c:'black'}]},
+        {type:'draw',seat:0,discard:1,label:'1枚交換: 8♦ → 4♥',newCards:[{r:'4',s:'♥',c:'red'}]},
+        {type:'hideDrawInfo'},
+        {type:'action',seat:1,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:2,act:'bet',cls:'act-bet',amount:100,label:'ベット 100'},
+        {type:'action',seat:3,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'action',seat:0,act:'call',cls:'act-call',amount:100,label:'コール'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:100,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'2nd Draw',cls:'street-draw2'},
+        {type:'drawInfo',text:'2nd ドロー'},
+        {type:'draw',seat:1,discard:0,label:'スタンドパット',newCards:[]},
+        {type:'draw',seat:2,discard:1,label:'1枚交換: 9♣ → 6♥',newCards:[{r:'6',s:'♥',c:'red'}]},
+        {type:'draw',seat:0,discard:0,label:'スタンドパット',newCards:[]},
+        {type:'hideDrawInfo'},
+        {type:'action',seat:1,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:200,label:'ベット 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'action',seat:2,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'collect'},
+        {type:'round',name:'3rd Draw',cls:'street-draw3'},
+        {type:'drawInfo',text:'3rd ドロー'},
+        {type:'draw',seat:1,discard:0,label:'スタンドパット',newCards:[]},
+        {type:'draw',seat:0,discard:0,label:'スタンドパット',newCards:[]},
+        {type:'hideDrawInfo'},
+        {type:'action',seat:1,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:200,label:'ベット 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'Showdown',cls:'street-showdown'},
+        {type:'showdown',seats:[0,1]},
+        {type:'result',winner:0,hand:'8-5-4-3-2 (ナンバーワン)',pot:0},
+    ]
+},
+// --- HAND 3: 7-Card Stud ---
+{
+    game: "7-Card Stud", badges: [{t:'Fixed Limit',c:'blue'},{t:'Stud',c:'purple'}],
+    bannerHTML: '7-Card Stud <span class="badge">FL</span>',
+    players: [
+        { name:'Tanaka', pos:'S1', posColor:'#e65100', chips:10000,
+          cards:[{r:'A',s:'♠',c:'black'},{r:'K',s:'♠',c:'black'}] },
+        { name:'Mike', pos:'S2', posColor:'#1565c0', chips:10000,
+          cards:[{r:'J',s:'♥',c:'red'},{r:'J',s:'♦',c:'red'}] },
+        { name:'Suzuki', pos:'S3', posColor:'#2e7d32', chips:10000,
+          cards:[{r:'9',s:'♣',c:'black'},{r:'8',s:'♣',c:'black'}] },
+        { name:'Yamada', pos:'S4', posColor:'#6a1b9a', chips:10000,
+          cards:[{r:'Q',s:'♥',c:'red'},{r:'4',s:'♦',c:'red'}] },
+    ],
+    board: [],
+    timeline: [
+        {type:'round',name:'3rd Street',cls:'street-3rd'},
+        {type:'studDeal', cards:[
+            // seat: [down, down, up]
+            [{r:'A',s:'♠',c:'black'},{r:'10',s:'♠',c:'black'},{r:'K',s:'♠',c:'black',up:true}],
+            [{r:'J',s:'♥',c:'red'},{r:'3',s:'♣',c:'black'},{r:'J',s:'♦',c:'red',up:true}],
+            [{r:'9',s:'♣',c:'black'},{r:'7',s:'♣',c:'black'},{r:'8',s:'♣',c:'black',up:true}],
+            [{r:'Q',s:'♥',c:'red'},{r:'6',s:'♦',c:'red'},{r:'4',s:'♦',c:'red',up:true}],
+        ]},
+        {type:'blind',seat:0,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:1,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:2,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:3,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:3,amount:50,label:'ブリングイン 50'},
+        {type:'action',seat:0,act:'raise',cls:'act-raise',amount:175,label:'コンプリート 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:175,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:175,label:'コール'},
+        {type:'action',seat:3,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'collect'},
+        {type:'round',name:'4th Street',cls:'street-4th'},
+        {type:'studCard', cards:[
+            {r:'Q',s:'♦',c:'red',up:true},
+            {r:'5',s:'♠',c:'black',up:true},
+            {r:'6',s:'♣',c:'black',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:200,label:'ベット 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'5th Street',cls:'street-5th'},
+        {type:'studCard', cards:[
+            {r:'J',s:'♠',c:'black',up:true},
+            {r:'9',s:'♠',c:'black',up:true},
+            {r:'2',s:'♥',c:'red',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'action',seat:2,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'collect'},
+        {type:'round',name:'6th Street',cls:'street-6th'},
+        {type:'studCard', cards:[
+            {r:'9',s:'♥',c:'red',up:true},
+            {r:'K',s:'♥',c:'red',up:true},
+            null, null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'7th Street',cls:'street-7th'},
+        {type:'studCard', cards:[
+            {r:'A',s:'♥',c:'red'}, // face down
+            {r:'2',s:'♦',c:'red'}, // face down
+            null, null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'Showdown',cls:'street-showdown'},
+        {type:'showdown',seats:[0,1]},
+        {type:'result',winner:0,hand:'A-K-Q-J-10♠ ロイヤルフラッシュ',pot:0},
+    ]
+},
+// --- HAND 4: Razz ---
+{
+    game: "Razz", badges: [{t:'Fixed Limit',c:'blue'},{t:'Lowball',c:'green'}],
+    bannerHTML: 'Razz <span class="badge">FL</span>',
+    players: [
+        { name:'Tanaka', pos:'S1', posColor:'#e65100', chips:10000,
+          cards:[{r:'A',s:'♣',c:'black'},{r:'3',s:'♦',c:'red'}] },
+        { name:'Mike', pos:'S2', posColor:'#1565c0', chips:10000,
+          cards:[{r:'2',s:'♠',c:'black'},{r:'5',s:'♥',c:'red'}] },
+        { name:'Suzuki', pos:'S3', posColor:'#2e7d32', chips:10000,
+          cards:[{r:'4',s:'♣',c:'black'},{r:'7',s:'♦',c:'red'}] },
+        { name:'Yamada', pos:'S4', posColor:'#6a1b9a', chips:10000,
+          cards:[{r:'6',s:'♥',c:'red'},{r:'J',s:'♠',c:'black'}] },
+    ],
+    board: [],
+    timeline: [
+        {type:'round',name:'3rd Street',cls:'street-3rd'},
+        {type:'studDeal', cards:[
+            [{r:'A',s:'♣',c:'black'},{r:'3',s:'♦',c:'red'},{r:'4',s:'♠',c:'black',up:true}],
+            [{r:'2',s:'♠',c:'black'},{r:'5',s:'♥',c:'red'},{r:'7',s:'♣',c:'black',up:true}],
+            [{r:'4',s:'♣',c:'black'},{r:'7',s:'♦',c:'red'},{r:'Q',s:'♥',c:'red',up:true}],
+            [{r:'6',s:'♥',c:'red'},{r:'J',s:'♠',c:'black'},{r:'K',s:'♦',c:'red',up:true}],
+        ]},
+        {type:'blind',seat:0,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:1,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:2,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:3,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:3,amount:50,label:'ブリングイン 50'},
+        {type:'action',seat:0,act:'raise',cls:'act-raise',amount:175,label:'コンプリート 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:175,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:175,label:'コール'},
+        {type:'action',seat:3,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'collect'},
+        {type:'round',name:'4th Street',cls:'street-4th'},
+        {type:'studCard', cards:[
+            {r:'2',s:'♦',c:'red',up:true},
+            {r:'6',s:'♣',c:'black',up:true},
+            {r:'8',s:'♠',c:'black',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:200,label:'ベット 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'5th Street',cls:'street-5th'},
+        {type:'studCard', cards:[
+            {r:'5',s:'♣',c:'black',up:true},
+            {r:'8',s:'♥',c:'red',up:true},
+            {r:'J',s:'♣',c:'black',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'action',seat:2,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'collect'},
+        {type:'round',name:'6th Street',cls:'street-6th'},
+        {type:'studCard', cards:[
+            {r:'9',s:'♥',c:'red',up:true},
+            {r:'4',s:'♦',c:'red',up:true},
+            null, null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'7th Street',cls:'street-7th'},
+        {type:'studCard', cards:[
+            {r:'8',s:'♣',c:'black'},
+            {r:'3',s:'♣',c:'black'},
+            null, null
+        ]},
+        {type:'action',seat:0,act:'check',cls:'act-check',amount:0,label:'チェック'},
+        {type:'action',seat:1,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:0,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'Showdown',cls:'street-showdown'},
+        {type:'showdown',seats:[0,1]},
+        {type:'result',winner:1,hand:'2-3-5-6-7 (ナンバーツー)',pot:0},
+    ]
+},
+// --- HAND 5: 7-Card Stud Hi-Lo ---
+{
+    game: "7-Card Stud Hi-Lo", badges: [{t:'Fixed Limit',c:'blue'},{t:'Hi-Lo',c:'orange'}],
+    bannerHTML: '7-Card Stud Hi-Lo <span class="badge">FL</span>',
+    players: [
+        { name:'Tanaka', pos:'S1', posColor:'#e65100', chips:10000,
+          cards:[{r:'A',s:'♥',c:'red'},{r:'2',s:'♣',c:'black'}] },
+        { name:'Mike', pos:'S2', posColor:'#1565c0', chips:10000,
+          cards:[{r:'K',s:'♠',c:'black'},{r:'K',s:'♦',c:'red'}] },
+        { name:'Suzuki', pos:'S3', posColor:'#2e7d32', chips:10000,
+          cards:[{r:'3',s:'♠',c:'black'},{r:'5',s:'♦',c:'red'}] },
+        { name:'Yamada', pos:'S4', posColor:'#6a1b9a', chips:10000,
+          cards:[{r:'10',s:'♣',c:'black'},{r:'Q',s:'♠',c:'black'}] },
+    ],
+    board: [],
+    timeline: [
+        {type:'round',name:'3rd Street',cls:'street-3rd'},
+        {type:'studDeal', cards:[
+            [{r:'A',s:'♥',c:'red'},{r:'2',s:'♣',c:'black'},{r:'4',s:'♦',c:'red',up:true}],
+            [{r:'K',s:'♠',c:'black'},{r:'K',s:'♦',c:'red'},{r:'10',s:'♥',c:'red',up:true}],
+            [{r:'3',s:'♠',c:'black'},{r:'5',s:'♦',c:'red'},{r:'6',s:'♣',c:'black',up:true}],
+            [{r:'10',s:'♣',c:'black'},{r:'Q',s:'♠',c:'black'},{r:'J',s:'♦',c:'red',up:true}],
+        ]},
+        {type:'blind',seat:0,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:1,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:2,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:3,amount:25,label:'アンティ 25'},
+        {type:'blind',seat:0,amount:50,label:'ブリングイン 50'},
+        {type:'action',seat:1,act:'raise',cls:'act-raise',amount:150,label:'コンプリート 200'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:175,label:'コール'},
+        {type:'action',seat:3,act:'fold',cls:'act-fold',amount:0,label:'フォールド'},
+        {type:'action',seat:0,act:'call',cls:'act-call',amount:125,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'4th Street',cls:'street-4th'},
+        {type:'studCard', cards:[
+            {r:'3',s:'♥',c:'red',up:true},
+            {r:'J',s:'♣',c:'black',up:true},
+            {r:'7',s:'♥',c:'red',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:200,label:'ベット 200'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:200,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'5th Street',cls:'street-5th'},
+        {type:'studCard', cards:[
+            {r:'5',s:'♠',c:'black',up:true},
+            {r:'Q',s:'♣',c:'black',up:true},
+            {r:'8',s:'♦',c:'red',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'6th Street',cls:'street-6th'},
+        {type:'studCard', cards:[
+            {r:'6',s:'♦',c:'red',up:true},
+            {r:'9',s:'♠',c:'black',up:true},
+            {r:'2',s:'♥',c:'red',up:true},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'7th Street',cls:'street-7th'},
+        {type:'studCard', cards:[
+            {r:'8',s:'♣',c:'black'},
+            {r:'7',s:'♦',c:'red'},
+            {r:'4',s:'♣',c:'black'},
+            null
+        ]},
+        {type:'action',seat:0,act:'bet',cls:'act-bet',amount:400,label:'ベット 400'},
+        {type:'action',seat:1,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'action',seat:2,act:'call',cls:'act-call',amount:400,label:'コール'},
+        {type:'collect'},
+        {type:'round',name:'Showdown',cls:'street-showdown'},
+        {type:'showdown',seats:[0,1,2]},
+        {type:'result',winner:0,hand:'Hi: A-5ストレート / Lo: 6-5-4-3-A',pot:0},
+    ]
+}
+];
+
+// ==================== ENGINE ====================
+let handIdx = 0, step = 0, playing = false, speed = 1, pot = 0;
+let bets = [], chips = [], boardShown = 0, timeoutId = null, currentStreetEl = null;
+const $ = id => document.getElementById(id);
+const $log = $('log-entries'), $board = $('board'), $potAmt = $('pot-amount');
+const $infoPanel = $('info-panel'), $banner = $('table-banner');
+const $gc = $('game-change'), $drawInfo = $('draw-info');
+const fmt = n => n.toLocaleString();
+
+const actClsMap = {fold:'la-fold',check:'la-check',call:'la-call',raise:'la-raise',bet:'la-bet',allin:'la-allin',draw:'la-draw',stand:'la-stand'};
+
+function hand() { return HANDS[handIdx]; }
+
+function makeCard(c, cls='board-card') {
+    const d = document.createElement('div');
+    d.className = `${cls} ${c.c}`;
+    d.innerHTML = `<span class="rank">${c.r}</span><span class="suit">${c.s}</span>`;
+    return d;
+}
+
+function setupSeats() {
+    const h = hand();
+    for (let i = 0; i < 5; i++) {
+        const el = $(`seat-${i}`);
+        if (i >= h.players.length) { el.style.display = 'none'; continue; }
+        el.style.display = '';
+        const p = h.players[i];
+        el.querySelector('.seat-name').textContent = p.name;
+        el.querySelector('.seat-pos').textContent = p.pos;
+        el.querySelector('.seat-pos').style.background = p.posColor;
+        el.querySelector('.seat-chips').textContent = fmt(p.chips);
+        el.querySelector('.seat-cards').innerHTML = '';
+        el.querySelector('.seat-action').className = 'seat-action';
+        el.querySelector('.seat-bet').classList.remove('show');
+    }
+    chips = h.players.map(p => p.chips);
+    bets = h.players.map(() => 0);
+}
+
+function dealCards() {
+    const h = hand();
+    h.players.forEach((p, i) => {
+        const cont = $(`seat-${i}`).querySelector('.seat-cards');
+        cont.innerHTML = '';
+        p.cards.forEach(c => {
+            const el = document.createElement('div');
+            el.className = `seat-card faceup ${c.c} hidden-card`;
+            el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+            cont.appendChild(el);
+        });
+        setTimeout(() => {
+            cont.querySelectorAll('.seat-card').forEach((el, j) => {
+                setTimeout(() => el.classList.remove('hidden-card'), j * 120);
+            });
+        }, i * 150);
+    });
+}
+
+function studDeal(cardsPerSeat) {
+    const h = hand();
+    cardsPerSeat.forEach((seatCards, i) => {
+        if (!seatCards || i >= h.players.length) return;
+        const cont = $(`seat-${i}`).querySelector('.seat-cards');
+        cont.innerHTML = '';
+        seatCards.forEach((c, j) => {
+            const el = document.createElement('div');
+            const cardCls = c.up ? 'faceup' : 'downcard';
+            el.className = `seat-card ${cardCls} ${c.c} hidden-card`;
+            el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+            cont.appendChild(el);
+            setTimeout(() => el.classList.remove('hidden-card'), i * 200 + j * 150);
+        });
+    });
+}
+
+function studAddCard(cardsPerSeat) {
+    const h = hand();
+    cardsPerSeat.forEach((c, i) => {
+        if (!c || i >= h.players.length) return;
+        const cont = $(`seat-${i}`).querySelector('.seat-cards');
+        const el = document.createElement('div');
+        const cardCls = c.up ? 'faceup' : 'downcard';
+        el.className = `seat-card ${cardCls} ${c.c} hidden-card`;
+        el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+        cont.appendChild(el);
+        setTimeout(() => el.classList.remove('hidden-card'), i * 150);
+    });
+}
+
+function drawCards(seat, discardCount, newCards) {
+    const cont = $(`seat-${seat}`).querySelector('.seat-cards');
+    const cards = cont.querySelectorAll('.seat-card');
+    const h = hand();
+
+    if (discardCount === 0) {
+        // Stand pat - just show action
+        return;
+    }
+
+    // Discard last N cards
+    const startIdx = cards.length - discardCount;
+    for (let i = startIdx; i < cards.length; i++) {
+        cards[i].classList.add('discarding');
+    }
+
+    setTimeout(() => {
+        // Remove discarded, add new
+        for (let i = cards.length - 1; i >= startIdx; i--) {
+            cont.removeChild(cards[i]);
+        }
+        newCards.forEach((c, j) => {
+            const el = document.createElement('div');
+            el.className = `seat-card faceup ${c.c} drawing`;
+            el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+            cont.appendChild(el);
+            setTimeout(() => {
+                el.classList.remove('drawing');
+                el.classList.add('drawn');
+            }, j * 120 + 50);
+        });
+        // Update player cards data for showdown
+        if (h.players[seat]) {
+            const pCards = h.players[seat].cards;
+            pCards.splice(startIdx, discardCount);
+            newCards.forEach(c => pCards.push(c));
+        }
+    }, 350);
+}
+
+function showAction(seat, act, cls, label) {
+    document.querySelectorAll('.seat.active').forEach(s => s.classList.remove('active'));
+    const seatEl = $(`seat-${seat}`);
+    seatEl.classList.add('active');
+    const actionEl = seatEl.querySelector('.seat-action');
+    actionEl.className = `seat-action ${cls}`;
+    actionEl.textContent = act.toUpperCase();
+    actionEl.classList.add('show');
+    if (act === 'fold') setTimeout(() => { seatEl.classList.add('folded'); seatEl.classList.remove('active'); }, 300);
+    addActionLog(seat, act, label);
+}
+
+function setBet(seat, amount) {
+    if (amount <= 0) return;
+    bets[seat] += amount; chips[seat] -= amount;
+    $(`seat-${seat}`).querySelector('.seat-chips').textContent = fmt(chips[seat]);
+    const sbetEl = $(`seat-${seat}`).querySelector('.seat-bet');
+    sbetEl.querySelector('.sbet-val').textContent = fmt(bets[seat]);
+    sbetEl.classList.add('show');
+}
+
+function collectBets() {
+    pot += bets.reduce((a,b) => a+b, 0);
+    $potAmt.textContent = fmt(pot);
+    for (let i = 0; i < hand().players.length; i++) {
+        $(`seat-${i}`).querySelector('.seat-bet').classList.remove('show');
+        bets[i] = 0;
+    }
+    for (let i = 0; i < hand().players.length; i++) {
+        $(`seat-${i}`).querySelector('.seat-action').classList.remove('show');
+    }
+    document.querySelectorAll('.seat.active').forEach(s => s.classList.remove('active'));
+}
+
+function showBoard(count) {
+    const cards = $board.querySelectorAll('.board-card');
+    for (let i = boardShown; i < count; i++) {
+        const idx = i;
+        setTimeout(() => cards[idx].classList.add('show'), (idx - boardShown) * 200);
+    }
+    boardShown = count;
+}
+
+function showdown(seats) {
+    // Cards are already visible — just brighten folded players slightly
+    const h = hand();
+    h.players.forEach((p, seat) => {
+        const seatEl = $(`seat-${seat}`);
+        if (seatEl.classList.contains('folded')) {
+            seatEl.style.opacity = '0.55';
+        }
+        // For stud: flip downcard → faceup at showdown
+        const cards = seatEl.querySelectorAll('.seat-card.downcard');
+        cards.forEach((card, j) => {
+            setTimeout(() => {
+                card.className = card.className.replace('downcard', 'faceup');
+            }, seat * 250 + j * 100);
+        });
+    });
+}
+
+function showResult(winner, handName) {
+    const seatEl = $(`seat-${winner}`);
+    seatEl.classList.remove('active');
+    seatEl.classList.add('winner');
+    $('result-hand').textContent = handName;
+    $('result-winner').textContent = `${hand().players[winner].name} won ${fmt(pot)}`;
+    $('result-overlay').classList.add('show');
+    chips[winner] += pot;
+    $(`seat-${winner}`).querySelector('.seat-chips').textContent = fmt(chips[winner]);
+    addResultLog(`${hand().players[winner].name} won ${fmt(pot)}`);
+    $potAmt.textContent = '0';
+}
+
+// Log functions
+function addRoundLog(name, cls) {
+    const col = document.createElement('div');
+    col.className = `log-street ${cls}`;
+    col.innerHTML = `<div class="log-street-name">${name}</div>`;
+    $log.appendChild(col);
+    setTimeout(() => col.classList.add('show'), 30);
+    currentStreetEl = col;
+}
+
+function addActionLog(seat, actType, label) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action';
+    const cls = actClsMap[actType] || 'la-blind';
+    div.innerHTML = `<span class="la-name">${hand().players[seat].name}</span> <span class="la-act ${cls}">${label}</span>`;
+    currentStreetEl.appendChild(div);
+    setTimeout(() => div.classList.add('show'), 30);
+}
+
+function addBlindLog(seat, label) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action';
+    div.innerHTML = `<span class="la-name">${hand().players[seat].name}</span> <span class="la-act la-blind">${label}</span>`;
+    currentStreetEl.appendChild(div);
+    setTimeout(() => div.classList.add('show'), 30);
+}
+
+function addStudCardLog(cardsPerSeat) {
+    if (!currentStreetEl) return;
+    const h = hand();
+    cardsPerSeat.forEach((c, i) => {
+        if (!c || i >= h.players.length) return;
+        const div = document.createElement('div');
+        div.className = 'log-action';
+        const upDown = c.up ? 'アップ' : 'ダウン';
+        const cardStr = c.r + c.s;
+        div.innerHTML = `<span class="la-name">${h.players[i].name}</span> <span class="la-act la-deal">${cardStr} (${upDown})</span>`;
+        currentStreetEl.appendChild(div);
+        setTimeout(() => div.classList.add('show'), 30);
+    });
+}
+
+function addDrawLog(seat, label) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action';
+    const cls = label.includes('スタンド') ? 'la-stand' : 'la-draw';
+    div.innerHTML = `<span class="la-name">${hand().players[seat].name}</span> <span class="la-act ${cls}">${label}</span>`;
+    currentStreetEl.appendChild(div);
+    setTimeout(() => div.classList.add('show'), 30);
+}
+
+function addResultLog(text) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action';
+    div.innerHTML = `<span class="la-act la-win">${text}</span>`;
+    currentStreetEl.appendChild(div);
+    setTimeout(() => div.classList.add('show'), 30);
+}
+
+function showGameChange(game, badges) {
+    $('gc-game-name').textContent = game;
+    $('gc-badges').innerHTML = badges.map(b => `<span class="gc-badge ${b.c}">${b.t}</span>`).join('');
+    $gc.classList.add('show');
+}
+
+function resetTable() {
+    step = 0; pot = 0; boardShown = 0; currentStreetEl = null;
+    $board.innerHTML = ''; $potAmt.textContent = '0';
+    $infoPanel.style.opacity = '0'; $log.innerHTML = '';
+    $drawInfo.classList.remove('show'); $drawInfo.textContent = '';
+    $('result-overlay').classList.remove('show');
+    $gc.classList.remove('show');
+    for (let i = 0; i < 5; i++) {
+        const s = $(`seat-${i}`);
+        s.classList.remove('show','folded','active','winner');
+        s.querySelector('.seat-cards').innerHTML = '';
+        s.querySelector('.seat-action').className = 'seat-action';
+        s.querySelector('.seat-bet').classList.remove('show');
+    }
+}
+
+function startHand() {
+    resetTable();
+    const h = hand();
+    $('hand-counter').textContent = `Hand ${handIdx+1} / ${HANDS.length}`;
+    showGameChange(h.game, h.badges);
+}
+
+function getDelay(base) { return base / speed; }
+
+function runStep() {
+    const h = hand();
+    if (step >= h.timeline.length) {
+        // Next hand after pause
+        setTimeout(() => {
+            handIdx = (handIdx + 1) % HANDS.length;
+            startHand();
+            if (playing) timeoutId = setTimeout(runStep, getDelay(2500));
+        }, getDelay(3500));
+        return;
+    }
+
+    const ev = h.timeline[step];
+    let nextDelay = 700;
+
+    switch (ev.type) {
+        case 'deal':
+            $gc.classList.remove('show');
+            $banner.innerHTML = h.bannerHTML;
+            $infoPanel.style.opacity = '1';
+            if (h.board.length > 0) {
+                $board.innerHTML = '';
+                h.board.forEach(c => $board.appendChild(makeCard(c)));
+            }
+            setupSeats();
+            document.querySelectorAll('.seat').forEach((s, i) => {
+                if (i < h.players.length) setTimeout(() => s.classList.add('show'), i * 80);
+            });
+            setTimeout(() => dealCards(), 400);
+            nextDelay = 1600;
+            break;
+        case 'round':
+            addRoundLog(ev.name, ev.cls);
+            nextDelay = 400;
+            break;
+        case 'blind':
+            setBet(ev.seat, ev.amount);
+            addBlindLog(ev.seat, ev.label);
+            nextDelay = 300;
+            break;
+        case 'action':
+            showAction(ev.seat, ev.act, ev.cls, ev.label);
+            setBet(ev.seat, ev.amount);
+            nextDelay = ev.act === 'fold' ? 500 : 750;
+            break;
+        case 'collect':
+            collectBets();
+            nextDelay = 500;
+            break;
+        case 'board':
+            showBoard(ev.count);
+            nextDelay = ev.count === 3 ? 1000 : 700;
+            break;
+        case 'drawInfo':
+            $drawInfo.textContent = ev.text;
+            $drawInfo.classList.add('show');
+            nextDelay = 600;
+            break;
+        case 'hideDrawInfo':
+            $drawInfo.classList.remove('show');
+            nextDelay = 300;
+            break;
+        case 'draw':
+            drawCards(ev.seat, ev.discard, ev.newCards);
+            addDrawLog(ev.seat, ev.label);
+            // Show action label
+            const drawEl = $(`seat-${ev.seat}`).querySelector('.seat-action');
+            drawEl.className = `seat-action ${ev.discard === 0 ? 'act-stand' : 'act-draw'}`;
+            drawEl.textContent = ev.discard === 0 ? 'STAND' : `DRAW ${ev.discard}`;
+            drawEl.classList.add('show');
+            nextDelay = 800;
+            break;
+        case 'studDeal':
+            $gc.classList.remove('show');
+            $banner.innerHTML = h.bannerHTML;
+            $infoPanel.style.opacity = '1';
+            setupSeats();
+            document.querySelectorAll('.seat').forEach((s, i) => {
+                if (i < h.players.length) setTimeout(() => s.classList.add('show'), i * 80);
+            });
+            setTimeout(() => studDeal(ev.cards), 400);
+            nextDelay = 1600;
+            break;
+        case 'studCard':
+            studAddCard(ev.cards);
+            addStudCardLog(ev.cards);
+            nextDelay = 800;
+            break;
+        case 'showdown':
+            showdown(ev.seats);
+            nextDelay = 1300;
+            break;
+        case 'result':
+            showResult(ev.winner, ev.hand);
+            nextDelay = 3000;
+            break;
+    }
+
+    step++;
+    if (playing) timeoutId = setTimeout(runStep, getDelay(nextDelay));
+}
+
+// Controls
+$('btn-play').addEventListener('click', () => {
+    if (playing) { playing = false; clearTimeout(timeoutId); $('btn-play').innerHTML = '&#9654;'; }
+    else { playing = true; $('btn-play').innerHTML = '&#10074;&#10074;'; runStep(); }
+});
+$('btn-restart').addEventListener('click', () => {
+    clearTimeout(timeoutId); playing = false; $('btn-play').innerHTML = '&#9654;';
+    handIdx = 0; resetTable();
+});
+const speeds = [1,1.5,2,3]; let speedIdx = 0;
+$('btn-speed').addEventListener('click', () => {
+    speedIdx = (speedIdx+1) % speeds.length; speed = speeds[speedIdx];
+    $('btn-speed').textContent = speed + 'x';
+});
+
+// Init & auto-play
+resetTable();
+setTimeout(() => { handIdx = 0; startHand(); playing = true; $('btn-play').innerHTML = '&#10074;&#10074;'; setTimeout(runStep, getDelay(2500)); }, 800);
+</script>
+</body>
+</html>

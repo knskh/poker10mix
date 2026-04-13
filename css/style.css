@@ -1239,7 +1239,7 @@ body {
 
 /* Hand history */
 .hand-history-section h3 { color: var(--text-dim); font-size: 13px; margin-bottom: 8px; }
-.hand-history-list { max-height: 400px; overflow-y: auto; }
+.hand-history-list { max-height: 70vh; overflow-y: auto; }
 
 /* Compact list */
 .hh-list { display: flex; flex-direction: column; gap: 2px; }
@@ -1332,6 +1332,10 @@ body {
 .hh-draw-pname { font-size: 10px; color: #aaa; min-width: 50px; }
 .hh-draw-label { font-size: 10px; color: #999; font-weight: bold; }
 .hh-stud-down { opacity: 0.6; }
+.hh-draw-diff { font-size: 11px; color: #c084fc; }
+.hh-draw-diff .mini-card { font-size: 11px; }
+.hh-stud-deal { font-size: 11px; color: #fbbf24; }
+.hh-stud-deal .mini-card { font-size: 11px; }
 .hh-action { font-size: 12px; color: var(--text); padding: 2px 0; line-height: 1.5; display: flex; align-items: center; gap: 6px; }
 .hh-action-pos {
     font-size: 9px; font-weight: bold; color: var(--text-dim); background: #333;
@@ -1354,6 +1358,23 @@ body {
 }
 .hh-result-label { font-size: 13px; font-weight: bold; color: var(--text); }
 .hh-result-win { font-size: 12px; font-weight: bold; color: #4caf50; }
+.hh-replay-wrap { padding: 8px 0; text-align: center; display: flex; gap: 8px; justify-content: center; }
+.btn-hh-replay, .btn-hh-share {
+    border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px;
+    font-weight: bold; cursor: pointer; transition: background 0.2s, transform 0.1s; color: #fff;
+}
+.btn-hh-replay { background: linear-gradient(135deg, #1565c0, #0d47a1); }
+.btn-hh-replay:hover { background: linear-gradient(135deg, #1976d2, #1565c0); }
+.btn-hh-share { background: linear-gradient(135deg, #2e7d32, #1b5e20); }
+.btn-hh-share:hover { background: linear-gradient(135deg, #388e3c, #2e7d32); }
+.btn-hh-replay:active, .btn-hh-share:active { transform: scale(0.97); }
+#hh-toast {
+    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,30,30,0.95); color: #4ade80; padding: 10px 24px;
+    border-radius: 8px; font-size: 13px; font-weight: bold; z-index: 9999;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+#hh-toast.show { opacity: 1; }
 
 /* ============================================================
    RESPONSIVE - Tablet (max-width: 860px)
@@ -1540,7 +1561,7 @@ body {
     .graph-filters { gap: 4px; }
 
     /* Hand history */
-    .hand-history-list { max-height: 300px; }
+    .hand-history-list { max-height: 60vh; }
     .hh-row { font-size: 12px; padding: 5px 8px; }
     .hh-num { font-size: 10px; }
     .mini-card { font-size: 11px; padding: 1px 3px; }
