@@ -698,6 +698,39 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'sitout_request': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room || !room.game || !room.game.running) break;
+            const seat = room.seatMap[client.id];
+            if (seat === undefined) break;
+            if (room.sitout && room.sitout[seat]) break; // already sitting out
+
+            // Mark as sitout
+            if (!room.sitout) room.sitout = {};
+            room.sitout[seat] = true;
+            if (!room.sitoutTime) room.sitoutTime = {};
+            room.sitoutTime[seat] = Date.now();
+
+            // If it's currently this player's turn, auto-fold immediately
+            if (room.pending && room.pending.playerId === seat) {
+                clearTimeout(room.pending.timer);
+                const p = room.pending;
+                room.pending = null;
+                if (p.type === 'action') {
+                    broadcastLog(room, `${client.name} が離席しました（フォールド）`, 'important');
+                    const foldAction = { type: 'fold' };
+                    p.resolve(foldAction);
+                } else if (p.type === 'draw') {
+                    broadcastLog(room, `${client.name} が離席しました（スタンドパット）`, 'important');
+                    p.resolve([]);
+                }
+            } else {
+                broadcastLog(room, `${client.name} が離席しました`, 'important');
+            }
+            broadcastGameState(room);
+            break;
+        }
+
         case 'chat': {
             const text = (msg.message || '').slice(0, 200);
             const chatRoomId = msg.roomId || client.roomId;

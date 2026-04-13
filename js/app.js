@@ -1183,9 +1183,18 @@ function setupGameScreen() {
         client.leaveZoom();
     });
 
-    // Zoom sit-out button
+    // Sit-out button (works for both Zoom and regular rooms)
     document.getElementById('btn-zoom-sitout').addEventListener('click', () => {
-        client.zoomSitout();
+        if (isInZoom) {
+            client.zoomSitout();
+        } else if (activeTableId) {
+            // Check if already sitting out — toggle to rejoin
+            if (currentState && currentState.mySitout) {
+                client.rejoinGame(activeTableId);
+            } else {
+                client.sitoutRequest(activeTableId);
+            }
+        }
     });
 
     // Zoom sit-out overlay buttons
@@ -1343,6 +1352,16 @@ function onGameState(state) {
     detectBetAnimations(state);
 
     ui.renderFromServer(state);
+
+    // Update sitout button label
+    const sitoutBtn = document.getElementById('btn-zoom-sitout');
+    if (sitoutBtn && !isInZoom) {
+        if (state.mySitout) {
+            sitoutBtn.textContent = '🔄 復帰する';
+        } else {
+            sitoutBtn.textContent = '💤 離席';
+        }
+    }
 
     // Show folded-state buttons when player is folded and not acting
     showFoldedButtons(state);
