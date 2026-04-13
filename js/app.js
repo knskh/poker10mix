@@ -86,6 +86,229 @@ let lastHandResult = null; // full hand result from server
 let titleFlashInterval = null; // tab title flash timer
 let focusMode = localStorage.getItem('poker10mix_focus') === 'on'; // focus mode state
 
+// ==========================================
+// Multi-Table Management
+// ==========================================
+const tables = new Map(); // roomId -> table context
+let activeTableId = null;
+const MAX_TABLES = 3;
+
+function createTableContext(roomId) {
+    return {
+        roomId,
+        room: null,
+        state: null,
+        lastGameId: null,
+        preAction: null,
+        turnTimer: null,
+        turnTimerStart: 0,
+        turnTimeLimit: 45,
+        currentTurnBB: 100,
+        handLogs: [],
+        startingHandCards: [],
+        cardSnapshots: [],
+        showdownPlayers: null,
+        lastHandResult: null,
+        logHTML: '',        // saved game-log innerHTML
+        chatHTML: '',       // saved chat-log innerHTML
+        isMyTurn: false,    // for badge notification
+        gameName: '',       // for tab label
+    };
+}
+
+function saveActiveTableState() {
+    if (!activeTableId) return;
+    const ctx = tables.get(activeTableId);
+    if (!ctx) return;
+    ctx.room = currentRoom;
+    ctx.state = currentState;
+    ctx.lastGameId = lastGameId;
+    ctx.preAction = preAction;
+    ctx.turnTimer = turnTimer;
+    ctx.turnTimerStart = turnTimerStart;
+    ctx.turnTimeLimit = turnTimeLimit;
+    ctx.currentTurnBB = currentTurnBB;
+    ctx.handLogs = currentHandLogs;
+    ctx.startingHandCards = startingHandCards;
+    ctx.cardSnapshots = cardSnapshots;
+    ctx.showdownPlayers = showdownPlayers;
+    ctx.lastHandResult = lastHandResult;
+    ctx.logHTML = document.getElementById('game-log').innerHTML;
+    ctx.chatHTML = document.getElementById('chat-log').innerHTML;
+}
+
+function restoreTableState(roomId) {
+    const ctx = tables.get(roomId);
+    if (!ctx) return;
+    currentRoom = ctx.room;
+    currentState = ctx.state;
+    lastGameId = ctx.lastGameId;
+    preAction = ctx.preAction;
+    turnTimer = ctx.turnTimer;
+    turnTimerStart = ctx.turnTimerStart;
+    turnTimeLimit = ctx.turnTimeLimit;
+    currentTurnBB = ctx.currentTurnBB;
+    currentHandLogs = ctx.handLogs;
+    startingHandCards = ctx.startingHandCards;
+    cardSnapshots = ctx.cardSnapshots;
+    showdownPlayers = ctx.showdownPlayers;
+    lastHandResult = ctx.lastHandResult;
+    document.getElementById('game-log').innerHTML = ctx.logHTML;
+    document.getElementById('chat-log').innerHTML = ctx.chatHTML;
+}
+
+function switchToTable(roomId) {
+    if (activeTableId === roomId) return;
+    // Save current table
+    saveActiveTableState();
+    // Hide action bars
+    document.getElementById('action-bar').classList.add('hidden');
+    document.getElementById('draw-action-bar').classList.add('hidden');
+    document.getElementById('bet-numpad').classList.add('hidden');
+    document.getElementById('bet-numpad').classList.remove('visible');
+    // Restore target table
+    activeTableId = roomId;
+    restoreTableState(roomId);
+    // Clear turn badge for this table
+    const ctx = tables.get(roomId);
+    if (ctx) ctx.isMyTurn = false;
+    // Re-render game
+    if (currentState) {
+        ui.renderTable(currentState);
+        ui.renderPlayerHand(currentState);
+    }
+    renderTableTabs();
+}
+
+function renderTableTabs() {
+    const tabsEl = document.getElementById('table-tabs');
+    // Always show tab bar when in game screen (for the + button)
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen.classList.contains('hidden') || tables.size === 0) {
+        tabsEl.classList.add('hidden');
+        return;
+    }
+    tabsEl.classList.remove('hidden');
+    tabsEl.innerHTML = '';
+    for (const [rid, ctx] of tables) {
+        const tab = document.createElement('div');
+        tab.className = 'table-tab' + (rid === activeTableId ? ' active' : '');
+        const label = ctx.gameName || ctx.roomId;
+        tab.innerHTML = `<span>${label}</span><span class="tab-badge ${ctx.isMyTurn && rid !== activeTableId ? 'visible' : ''}"></span>` +
+            (tables.size > 1 ? `<span class="tab-close">×</span>` : '');
+        tab.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) {
+                if (confirm('このテーブルを退出しますか？')) {
+                    client.leaveRoom(rid);
+                    removeTable(rid);
+                }
+                return;
+            }
+            switchToTable(rid);
+        });
+        tabsEl.appendChild(tab);
+    }
+    // Add "+" button
+    const addBtn = document.createElement('div');
+    addBtn.className = 'table-tab-add' + (tables.size >= MAX_TABLES ? ' disabled' : '');
+    addBtn.textContent = '+';
+    addBtn.title = tables.size >= MAX_TABLES ? '最大3テーブルまで' : 'テーブル追加';
+    addBtn.addEventListener('click', () => {
+        if (tables.size >= MAX_TABLES) return;
+        openAddTableModal();
+    });
+    tabsEl.appendChild(addBtn);
+}
+
+function removeTable(roomId) {
+    const ctx = tables.get(roomId);
+    if (ctx && ctx.turnTimer) clearInterval(ctx.turnTimer);
+    tables.delete(roomId);
+    if (activeTableId === roomId) {
+        if (tables.size > 0) {
+            const nextId = tables.keys().next().value;
+            activeTableId = nextId;
+            restoreTableState(nextId);
+            if (currentState) {
+                ui.renderTable(currentState);
+                ui.renderPlayerHand(currentState);
+            }
+        } else {
+            activeTableId = null;
+            showScreen('lobby');
+        }
+    }
+    renderTableTabs();
+}
+
+function getOrCreateTable(roomId) {
+    if (!tables.has(roomId)) {
+        tables.set(roomId, createTableContext(roomId));
+    }
+    return tables.get(roomId);
+}
+
+// ==========================================
+// Add Table Modal (lobby from game screen)
+// ==========================================
+let addTableRoomListCache = [];
+
+function openAddTableModal() {
+    const modal = document.getElementById('add-table-modal');
+    modal.classList.remove('hidden');
+    // Request fresh room list
+    client.getRooms();
+    renderAddTableRooms();
+}
+
+function renderAddTableRooms() {
+    const container = document.getElementById('add-table-rooms');
+    const roomList = addTableRoomListCache;
+    // Filter out rooms we're already in
+    const available = roomList.filter(r => !tables.has(r.id));
+    if (available.length === 0) {
+        container.innerHTML = '<div class="add-table-empty">参加可能なルームがありません</div>';
+        return;
+    }
+    container.innerHTML = '';
+    for (const r of available) {
+        const full = r.playerCount >= 6;
+        const item = document.createElement('div');
+        item.className = 'add-table-room-item' + (full ? ' room-full' : '');
+        const statusCls = r.playing ? 'playing' : 'waiting';
+        const statusText = r.playing ? '進行中' : '待機中';
+        item.innerHTML = `<div>
+            <div class="add-table-room-name">${r.hostName}のルーム (${r.id})</div>
+            <div class="add-table-room-info">${r.playerCount}/6人${r.gameName ? ' · ' + r.gameName : ''}</div>
+        </div>
+        <span class="add-table-room-status ${statusCls}">${statusText}</span>`;
+        if (!full) {
+            item.addEventListener('click', () => {
+                client.joinRoom(r.id);
+                document.getElementById('add-table-modal').classList.add('hidden');
+            });
+        }
+        container.appendChild(item);
+    }
+}
+
+function setupAddTableModal() {
+    const closeBtn = document.getElementById('btn-add-table-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('add-table-modal').classList.add('hidden');
+        });
+    }
+    const createBtn = document.getElementById('btn-add-table-create');
+    if (createBtn) {
+        createBtn.addEventListener('click', () => {
+            if (tables.size >= MAX_TABLES) return;
+            client.createRoom();
+            document.getElementById('add-table-modal').classList.add('hidden');
+        });
+    }
+}
+
 function loadHandHistory() {
     try {
         const raw = localStorage.getItem('poker10mix_hand_history');
@@ -276,6 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPreActions();
     setupPresetSettingsModal();
     setupFocusMode();
+    setupAddTableModal();
 
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
@@ -293,32 +517,156 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('connection-status').textContent = '接続中...';
         document.getElementById('connection-status').classList.remove('hidden');
     });
-    client.on('room_list', renderRoomList);
-    client.on('room_joined', onRoomJoined);
-    client.on('room_updated', onRoomUpdated);
-    client.on('room_left', () => showScreen('lobby'));
-    client.on('game_started', onGameStarted);
-    client.on('hand_start', onHandStart);
-    client.on('game_state', onGameState);
-    client.on('your_turn', onYourTurn);
-    client.on('your_draw', onYourDraw);
+    client.on('room_list', (data) => {
+        renderRoomList(data);
+        // Update add-table modal cache
+        addTableRoomListCache = data.rooms || [];
+        const modal = document.getElementById('add-table-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            renderAddTableRooms();
+        }
+    });
+    client.on('room_joined', (msg) => {
+        const rid = msg.roomId || msg.room.id;
+        getOrCreateTable(rid);
+        // If this is the first or only table, or we're in lobby, make it active
+        if (!activeTableId || tables.size === 1) {
+            activeTableId = rid;
+        }
+        onRoomJoined(msg.room, rid);
+        renderTableTabs();
+    });
+    client.on('room_updated', (msg) => {
+        const rid = msg.roomId || (msg.room && msg.room.id);
+        if (rid && rid === activeTableId) {
+            onRoomUpdated(msg.room || msg);
+        } else if (rid) {
+            const ctx = tables.get(rid);
+            if (ctx) ctx.room = msg.room || msg;
+        }
+    });
+    client.on('room_left', (msg) => {
+        const rid = msg.roomId;
+        if (rid) {
+            removeTable(rid);
+        } else {
+            showScreen('lobby');
+        }
+    });
+    client.on('game_started', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) {
+            // Background table started — switch to it
+            switchToTable(rid);
+        }
+        onGameStarted(msg);
+        const ctx = tables.get(activeTableId);
+        if (ctx) ctx.gameName = '';
+        renderTableTabs();
+    });
+    client.on('hand_start', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) {
+            const ctx = tables.get(rid);
+            if (ctx) {
+                ctx.handLogs = [];
+                ctx.startingHandCards = [];
+                ctx.cardSnapshots = [];
+                ctx.showdownPlayers = null;
+                ctx.lastHandResult = null;
+                ctx.isMyTurn = false;
+            }
+            return;
+        }
+        onHandStart();
+    });
+    client.on('game_state', (msg) => {
+        const rid = msg.roomId;
+        const state = msg.state;
+        if (rid && rid !== activeTableId) {
+            const ctx = tables.get(rid);
+            if (ctx) {
+                ctx.state = state;
+                if (state.gameName) ctx.gameName = state.gameName;
+            }
+            renderTableTabs();
+            return;
+        }
+        onGameState(state);
+        const ctx = tables.get(activeTableId);
+        if (ctx && state.gameName) ctx.gameName = state.gameName;
+        renderTableTabs();
+    });
+    client.on('your_turn', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) {
+            const ctx = tables.get(rid);
+            if (ctx) ctx.isMyTurn = true;
+            renderTableTabs();
+            // Auto-switch to the table that needs attention
+            switchToTable(rid);
+        }
+        onYourTurn(msg);
+    });
+    client.on('your_draw', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) {
+            const ctx = tables.get(rid);
+            if (ctx) ctx.isMyTurn = true;
+            renderTableTabs();
+            switchToTable(rid);
+        }
+        onYourDraw({ hand: msg.hand, timeLimit: msg.timeLimit });
+    });
     client.on('log', (d) => {
+        const rid = d.roomId;
+        if (rid && rid !== activeTableId) {
+            const ctx = tables.get(rid);
+            if (ctx) ctx.handLogs.push(d.message);
+            return;
+        }
         ui.addLog(d.message, d.cls);
         currentHandLogs.push(d.message);
     });
-    client.on('chat', onChat);
+    client.on('chat', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) return; // ignore chat from background tables
+        onChat(msg);
+    });
     client.on('lobby_chat', onLobbyChat);
-    client.on('game_over', onGameOver);
+    client.on('game_over', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) {
+            removeTable(rid);
+            return;
+        }
+        onGameOver(msg);
+        if (rid) removeTable(rid);
+    });
     client.on('stats_data', renderStats);
-    client.on('hand_result', onHandResult);
+    client.on('hand_result', (msg) => {
+        const rid = msg.roomId;
+        if (rid && rid !== activeTableId) {
+            const ctx = tables.get(rid);
+            if (ctx) ctx.lastHandResult = msg;
+            return;
+        }
+        onHandResult(msg);
+    });
     client.on('stats_update', onStatsUpdate);
     client.on('auth_result', onAuthResult);
     client.on('zoom_joined', onZoomJoined);
     client.on('zoom_waiting', onZoomWaiting);
     client.on('zoom_left', onZoomLeft);
     client.on('zoom_sitout', onZoomSitout);
-    client.on('emote', onEmote);
-    client.on('reaction', onReaction);
+    client.on('emote', (msg) => {
+        if (msg.roomId && msg.roomId !== activeTableId) return;
+        onEmote(msg);
+    });
+    client.on('reaction', (msg) => {
+        if (msg.roomId && msg.roomId !== activeTableId) return;
+        onReaction(msg);
+    });
     client.on('big_hand', onBigHand);
     client.on('auto_kicked', () => {
         alert('10分間離席のため自動退室されました');
@@ -598,7 +946,7 @@ function setupRoomScreen() {
                 return;
             }
             if (cb.checked) mySelectedGames.add(i); else mySelectedGames.delete(i);
-            client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames] });
+            client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames], roomId: activeTableId });
         });
         const nameSpan = document.createElement('span');
         nameSpan.className = 'game-cb-name';
@@ -625,17 +973,20 @@ function setupRoomScreen() {
         client.updateSettings({ startingChips: parseInt(e.target.value) });
     });
 
-    document.getElementById('btn-start-game').addEventListener('click', () => client.startGame());
+    document.getElementById('btn-start-game').addEventListener('click', () => client.startGame(activeTableId));
     document.getElementById('btn-leave-room').addEventListener('click', () => {
-        client.leaveRoom();
-        showScreen('lobby');
+        client.leaveRoom(activeTableId);
+        if (activeTableId) removeTable(activeTableId);
+        else showScreen('lobby');
     });
 }
 
-function onRoomJoined(room) {
+function onRoomJoined(room, roomId) {
     currentRoom = room;
+    const ctx = tables.get(roomId || room.id);
+    if (ctx) ctx.room = room;
     // Send my current game selection to server on join
-    client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames] });
+    client.send({ type: 'update_game_selection', selectedGames: [...mySelectedGames], roomId: roomId || room.id });
 
     if (room.playing) {
         // Mid-game join: go directly to game screen
@@ -788,13 +1139,13 @@ function setupGameScreen() {
         if (ui.selectedCards.size === 0) {
             if (!confirm('カードを選択していません。スタンドパット（交換なし）と同じですが、ドローしますか？')) return;
         }
-        client.sendDraw([...ui.selectedCards]);
+        client.sendDraw([...ui.selectedCards], activeTableId);
         ui.selectedCards.clear();
         document.getElementById('draw-action-bar').classList.add('hidden');
         ui.pendingDraw = false;
     });
     document.getElementById('btn-stand-pat').addEventListener('click', () => {
-        client.sendDraw([]);
+        client.sendDraw([], activeTableId);
         ui.selectedCards.clear();
         document.getElementById('draw-action-bar').classList.add('hidden');
         ui.pendingDraw = false;
@@ -814,15 +1165,16 @@ function setupGameScreen() {
 
     // Stats button
     document.getElementById('btn-ingame-stats').addEventListener('click', () => {
-        client.getStats();
+        client.getStats(activeTableId);
         document.getElementById('stats-modal').classList.remove('hidden');
     });
 
     // Back to room button
     document.getElementById('btn-back-room').addEventListener('click', () => {
         if (confirm('ルームに戻りますか？（ゲームを離脱します）')) {
-            client.leaveRoom();
-            showScreen('lobby');
+            client.leaveRoom(activeTableId);
+            if (activeTableId) removeTable(activeTableId);
+            else showScreen('lobby');
         }
     });
 
@@ -1606,13 +1958,13 @@ function onYourTurn(data) {
         let executed = false;
         if (preAction === 'fold') {
             const fold = actions.find(a => a.type === 'fold');
-            if (fold) { client.sendAction({ type: 'fold' }); executed = true; }
+            if (fold) { client.sendAction({ type: 'fold' }, activeTableId); executed = true; }
         } else if (preAction === 'check-fold') {
             const check = actions.find(a => a.type === 'check');
-            if (check) { client.sendAction({ type: 'check' }); executed = true; }
+            if (check) { client.sendAction({ type: 'check' }, activeTableId); executed = true; }
             else {
                 const fold = actions.find(a => a.type === 'fold');
-                if (fold) { client.sendAction({ type: 'fold' }); executed = true; }
+                if (fold) { client.sendAction({ type: 'fold' }, activeTableId); executed = true; }
             }
         }
         clearPreAction();
@@ -1996,7 +2348,7 @@ function sendActionAndHide(action) {
             card.classList.add('fold-anim');
         });
     }
-    client.sendAction(action);
+    client.sendAction(action, activeTableId);
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('bet-numpad').classList.add('hidden');
     document.getElementById('bet-numpad').classList.remove('visible');
@@ -2102,7 +2454,7 @@ function showFoldedButtons(state) {
         leaveBtn.textContent = '退室する';
         leaveBtn.addEventListener('click', () => {
             if (isInZoom) client.leaveZoom();
-            else client.leaveRoom();
+            else { client.leaveRoom(activeTableId); removeTable(activeTableId); }
         });
         btnDiv.appendChild(leaveBtn);
     } else if (isSitout) {
@@ -2124,7 +2476,7 @@ function showFoldedButtons(state) {
         rejoinBtn.className = 'btn-action btn-call';
         rejoinBtn.textContent = '復帰する';
         rejoinBtn.addEventListener('click', () => {
-            client.rejoinGame();
+            client.rejoinGame(activeTableId);
         });
         btnDiv.appendChild(rejoinBtn);
 
@@ -2133,7 +2485,7 @@ function showFoldedButtons(state) {
         leaveBtn.textContent = '退室する';
         leaveBtn.addEventListener('click', () => {
             if (isInZoom) client.leaveZoom();
-            else client.leaveRoom();
+            else { client.leaveRoom(activeTableId); removeTable(activeTableId); }
         });
         btnDiv.appendChild(leaveBtn);
     } else {
@@ -2150,7 +2502,7 @@ function showFoldedButtons(state) {
             rebuyBtn.className = 'btn-action btn-call';
             rebuyBtn.textContent = `チップ補充 (${rebuyAmount.toLocaleString()})`;
             rebuyBtn.addEventListener('click', () => {
-                client.rebuyChips(rebuyAmount);
+                client.rebuyChips(rebuyAmount, activeTableId);
                 rebuyBtn.disabled = true;
                 rebuyBtn.textContent = '補充済み';
             });
@@ -2162,9 +2514,18 @@ function showFoldedButtons(state) {
         leaveBtn.textContent = '退室';
         leaveBtn.addEventListener('click', () => {
             if (isInZoom) client.leaveZoom();
-            else client.leaveRoom();
+            else { client.leaveRoom(activeTableId); removeTable(activeTableId); }
         });
         btnDiv.appendChild(leaveBtn);
+    }
+
+    // Add table button (shown when under max tables)
+    if (tables.size < MAX_TABLES) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn-action btn-check';
+        addBtn.textContent = '+ テーブル追加';
+        addBtn.addEventListener('click', () => openAddTableModal());
+        btnDiv.appendChild(addBtn);
     }
 }
 
@@ -2236,8 +2597,8 @@ function showSessionSummary(ranking) {
 
     lobbyBtn.onclick = () => {
         overlay.classList.add('hidden');
-        client.leaveRoom();
-        showScreen('lobby');
+        // Table is already removed by game_over handler
+        if (tables.size === 0) showScreen('lobby');
     };
 
     const shareBtn = document.getElementById('btn-ss-share');
@@ -3053,7 +3414,7 @@ function setupChat() {
         if (!input || !send) return;
         send.addEventListener('click', () => {
             const msg = input.value.trim();
-            if (msg) { client.sendChat(msg); input.value = ''; }
+            if (msg) { client.sendChat(msg, activeTableId); input.value = ''; }
         });
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') send.click();
@@ -3076,7 +3437,7 @@ function setupChat() {
                 e.stopPropagation();
                 const msg = btn.dataset.msg;
                 if (msg) {
-                    client.sendChat(msg);
+                    client.sendChat(msg, activeTableId);
                     showQuickChatFloat(msg);
                 }
                 qcPalette.classList.add('hidden');

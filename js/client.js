@@ -5,6 +5,7 @@ class PokerClient {
         this.clientId = null;
         this.name = '';
         this.roomId = null;
+        this.roomIds = []; // multi-table: up to 3
         this.connected = false;
         this.handlers = {};
         this.reconnectTimer = null;
@@ -59,36 +60,45 @@ class PokerClient {
                 this.emit('room_list', { rooms: msg.rooms, zoomCount: msg.zoomCount || 0 });
                 break;
             case 'room_joined':
-                this.roomId = msg.room.id;
-                this.emit('room_joined', msg.room);
+                if (msg.roomId) {
+                    this.roomId = msg.roomId;
+                    if (!this.roomIds.includes(msg.roomId)) this.roomIds.push(msg.roomId);
+                } else {
+                    this.roomId = msg.room.id;
+                    if (!this.roomIds.includes(msg.room.id)) this.roomIds.push(msg.room.id);
+                }
+                this.emit('room_joined', msg);
                 break;
             case 'room_updated':
-                this.emit('room_updated', msg.room);
+                this.emit('room_updated', msg);
                 break;
-            case 'room_left':
-                this.roomId = null;
-                this.emit('room_left');
+            case 'room_left': {
+                const leftId = msg.roomId || this.roomId;
+                this.roomIds = this.roomIds.filter(id => id !== leftId);
+                this.roomId = this.roomIds.length > 0 ? this.roomIds[this.roomIds.length - 1] : null;
+                this.emit('room_left', msg);
                 break;
+            }
             case 'game_started':
                 this.emit('game_started', msg);
                 break;
             case 'hand_start':
-                this.emit('hand_start');
+                this.emit('hand_start', msg);
                 break;
             case 'game_state':
-                this.emit('game_state', msg.state);
+                this.emit('game_state', msg);
                 break;
             case 'your_turn':
                 this.emit('your_turn', msg);
                 break;
             case 'your_draw':
-                this.emit('your_draw', { hand: msg.hand, timeLimit: msg.timeLimit });
+                this.emit('your_draw', msg);
                 break;
             case 'log':
-                this.emit('log', { message: msg.message, cls: msg.cls });
+                this.emit('log', msg);
                 break;
             case 'chat':
-                this.emit('chat', { from: msg.from, message: msg.message });
+                this.emit('chat', msg);
                 break;
             case 'lobby_chat':
                 this.emit('lobby_chat', { from: msg.from, message: msg.message });
@@ -121,13 +131,13 @@ class PokerClient {
                 this.emit('zoom_sitout');
                 break;
             case 'emote':
-                this.emit('emote', { seat: msg.seat, emote: msg.emote, from: msg.from });
+                this.emit('emote', msg);
                 break;
             case 'reaction':
-                this.emit('reaction', { emote: msg.emote, from: msg.from });
+                this.emit('reaction', msg);
                 break;
             case 'big_hand':
-                this.emit('big_hand', { roomId: msg.roomId, winner: msg.winner, pot: msg.pot, handRank: msg.handRank, gameName: msg.gameName });
+                this.emit('big_hand', msg);
                 break;
             case 'auto_kicked':
                 this.emit('auto_kicked');
@@ -145,16 +155,16 @@ class PokerClient {
     zoomSitout() { this.send({ type: 'zoom_sitout' }); }
     zoomRejoin() { this.send({ type: 'zoom_rejoin' }); }
     joinRoom(roomId) { this.send({ type: 'join_room', roomId }); }
-    leaveRoom() { this.send({ type: 'leave_room' }); }
-    updateSettings(settings) { this.send({ type: 'update_settings', settings }); }
-    startGame() { this.send({ type: 'start_game' }); }
-    sendAction(action) { this.send({ type: 'action', action }); }
-    sendDraw(discards) { this.send({ type: 'draw', discards }); }
-    sendChat(message) { this.send({ type: 'chat', message }); }
-    rejoinGame() { this.send({ type: 'rejoin_game' }); }
-    sendEmote(emote) { this.send({ type: 'emote', emote }); }
-    sendReaction(emote) { this.send({ type: 'reaction', emote }); }
-    rebuyChips(amount) { this.send({ type: 'rebuy_chips', amount }); }
-    getStats() { this.send({ type: 'get_stats' }); }
+    leaveRoom(roomId) { this.send({ type: 'leave_room', roomId: roomId || this.roomId }); }
+    updateSettings(settings, roomId) { this.send({ type: 'update_settings', settings, roomId: roomId || this.roomId }); }
+    startGame(roomId) { this.send({ type: 'start_game', roomId: roomId || this.roomId }); }
+    sendAction(action, roomId) { this.send({ type: 'action', action, roomId: roomId || this.roomId }); }
+    sendDraw(discards, roomId) { this.send({ type: 'draw', discards, roomId: roomId || this.roomId }); }
+    sendChat(message, roomId) { this.send({ type: 'chat', message, roomId: roomId || this.roomId }); }
+    rejoinGame(roomId) { this.send({ type: 'rejoin_game', roomId: roomId || this.roomId }); }
+    sendEmote(emote, roomId) { this.send({ type: 'emote', emote, roomId: roomId || this.roomId }); }
+    sendReaction(emote, roomId) { this.send({ type: 'reaction', emote, roomId: roomId || this.roomId }); }
+    rebuyChips(amount, roomId) { this.send({ type: 'rebuy_chips', amount, roomId: roomId || this.roomId }); }
+    getStats(roomId) { this.send({ type: 'get_stats', roomId: roomId || this.roomId }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
 }
