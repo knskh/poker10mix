@@ -205,11 +205,6 @@ class PokerUI {
             + ` <span class="game-type-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
         gameNameEl.innerHTML = s.gameName + badgesHtml;
 
-        // Table game banner (persistent on felt)
-        const banner = document.getElementById('table-game-banner');
-        if (banner) {
-            banner.innerHTML = s.gameName + `<span class="banner-badges">${badgesHtml}</span>`;
-        }
         document.getElementById('game-rotation').textContent =
             `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
         document.getElementById('rules-content').textContent = s.gameRules || '';

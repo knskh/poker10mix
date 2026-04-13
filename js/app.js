@@ -119,6 +119,147 @@ function hasPlayerNote(name) {
     return !!loadPlayerNotes()[name];
 }
 
+// ==========================================
+// Bet Preset Settings (localStorage)
+// ==========================================
+const PRESET_STORAGE_KEY = 'poker10mix_bet_presets';
+const DEFAULT_PRESETS = {
+    'preflop-open': [2, 2.5, 3, 3.5, 4],
+    'preflop-raise': [2, 2.5, 3, 4],
+    'postflop': [0.33, 0.5, 0.66, 1.0]
+};
+
+function loadBetPresets() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY));
+        if (saved && saved['preflop-open'] && saved['preflop-raise'] && saved['postflop']) return saved;
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+}
+
+function saveBetPresets(presets) {
+    try { localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets)); } catch (e) {}
+}
+
+let currentPresets = loadBetPresets();
+
+function setupPresetSettingsModal() {
+    const modal = document.getElementById('preset-settings-modal');
+    const editArea = document.getElementById('preset-edit-area');
+    let editingTab = 'preflop-open';
+    let tempPresets = null;
+
+    const unitHints = {
+        'preflop-open': 'BB倍率 (例: 2, 2.5, 3)',
+        'preflop-raise': 'レイズ倍率 (例: 2, 2.5, 3)',
+        'postflop': 'ポット比率 (例: 0.33, 0.5, 1.0)'
+    };
+    const labelFns = {
+        'preflop-open': v => `${v}bb`,
+        'preflop-raise': v => `${v}x`,
+        'postflop': v => v >= 1 ? 'Pot' : `${Math.round(v * 100)}%`
+    };
+
+    function renderEditArea() {
+        editArea.innerHTML = '';
+        const hint = document.createElement('div');
+        hint.className = 'preset-unit-hint';
+        hint.textContent = unitHints[editingTab];
+        editArea.appendChild(hint);
+
+        const values = tempPresets[editingTab];
+        values.forEach((val, i) => {
+            const row = document.createElement('div');
+            row.className = 'preset-row';
+            const label = document.createElement('span');
+            label.className = 'preset-row-label';
+            label.textContent = labelFns[editingTab](val);
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'preset-row-input';
+            input.value = val;
+            input.step = editingTab === 'postflop' ? '0.01' : '0.5';
+            input.min = '0';
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (!isNaN(v) && v > 0) {
+                    tempPresets[editingTab][i] = v;
+                    label.textContent = labelFns[editingTab](v);
+                }
+            });
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'preset-row-remove';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', () => {
+                tempPresets[editingTab].splice(i, 1);
+                renderEditArea();
+            });
+            row.appendChild(label);
+            row.appendChild(input);
+            row.appendChild(removeBtn);
+            editArea.appendChild(row);
+        });
+
+        const addBtn = document.createElement('div');
+        addBtn.className = 'preset-add-btn';
+        addBtn.textContent = '+ 追加';
+        addBtn.addEventListener('click', () => {
+            const last = values.length > 0 ? values[values.length - 1] : 1;
+            tempPresets[editingTab].push(editingTab === 'postflop' ? Math.min(last + 0.25, 2.0) : last + 0.5);
+            renderEditArea();
+        });
+        editArea.appendChild(addBtn);
+    }
+
+    // Tab clicks
+    document.querySelectorAll('.preset-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            editingTab = tab.dataset.tab;
+            renderEditArea();
+        });
+    });
+
+    // Open modal
+    document.getElementById('btn-preset-settings').addEventListener('click', () => {
+        tempPresets = JSON.parse(JSON.stringify(currentPresets));
+        editingTab = 'preflop-open';
+        document.querySelectorAll('.preset-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === editingTab));
+        renderEditArea();
+        modal.classList.remove('hidden');
+        // Close hamburger menu
+        document.getElementById('top-bar-menu').classList.add('hidden');
+    });
+
+    // Save
+    document.getElementById('preset-save-btn').addEventListener('click', () => {
+        // Sort each tab's values
+        for (const key of Object.keys(tempPresets)) {
+            tempPresets[key].sort((a, b) => a - b);
+        }
+        currentPresets = tempPresets;
+        saveBetPresets(currentPresets);
+        modal.classList.add('hidden');
+    });
+
+    // Reset
+    document.getElementById('preset-reset-btn').addEventListener('click', () => {
+        tempPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+        renderEditArea();
+    });
+
+    // Close
+    document.getElementById('preset-close-btn').addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    // Click outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+    });
+}
+
 // Save hand history on tab close/reload
 window.addEventListener('beforeunload', () => {
     saveCurrentHand();
@@ -134,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupChat();
     setupPreActions();
     setupEmotes();
+    setupPresetSettingsModal();
     setupFocusMode();
 
     // Request notification permission
@@ -725,11 +867,11 @@ function setupGameScreen() {
         updateRaiseBtnText(e.target.value);
     }, true);
 
-    // Slider area swipe gesture for preset switching
+    // Slider area swipe gesture for preset switching (segment bar)
     const sliderArea = document.getElementById('bet-slider-area');
     let swipeStartY = null;
     sliderArea.addEventListener('touchstart', (e) => {
-        if (e.target.id === 'bet-slider') return; // don't interfere with slider drag
+        if (e.target.id === 'bet-slider') return;
         swipeStartY = e.touches[0].clientY;
     }, { passive: true });
     sliderArea.addEventListener('touchend', (e) => {
@@ -737,16 +879,16 @@ function setupGameScreen() {
         const dy = swipeStartY - (e.changedTouches[0] ? e.changedTouches[0].clientY : swipeStartY);
         swipeStartY = null;
         if (Math.abs(dy) < 30) return;
-        const presetBtns = [...document.querySelectorAll('#bet-presets .btn-preset')];
-        if (presetBtns.length === 0) return;
-        const activeIdx = presetBtns.findIndex(b => b.classList.contains('active'));
+        const segments = [...document.querySelectorAll('#bet-presets .preset-segment')];
+        if (segments.length === 0) return;
+        const activeIdx = segments.findIndex(s => s.classList.contains('active'));
         let nextIdx;
-        if (dy > 0) { // swipe up = higher preset
-            nextIdx = activeIdx < 0 ? presetBtns.length - 1 : Math.min(presetBtns.length - 1, activeIdx + 1);
-        } else { // swipe down = lower preset
+        if (dy > 0) {
+            nextIdx = activeIdx < 0 ? segments.length - 1 : Math.min(segments.length - 1, activeIdx + 1);
+        } else {
             nextIdx = activeIdx < 0 ? 0 : Math.max(0, activeIdx - 1);
         }
-        presetBtns[nextIdx].click();
+        segments[nextIdx].click();
     }, { passive: true });
 
     // Slider ± buttons
@@ -814,16 +956,16 @@ function setupGameScreen() {
             slider.dispatchEvent(new Event('input'));
         } else if (hasSlider && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
             e.preventDefault();
-            const presetBtns = [...document.querySelectorAll('#bet-presets .btn-preset')];
-            if (presetBtns.length === 0) return;
-            const activeIdx = presetBtns.findIndex(b => b.classList.contains('active'));
+            const segments = [...document.querySelectorAll('#bet-presets .preset-segment')];
+            if (segments.length === 0) return;
+            const activeIdx = segments.findIndex(s => s.classList.contains('active'));
             let nextIdx;
             if (e.key === 'ArrowUp') {
-                nextIdx = activeIdx < 0 ? presetBtns.length - 1 : Math.max(0, activeIdx - 1);
+                nextIdx = activeIdx < 0 ? segments.length - 1 : Math.max(0, activeIdx - 1);
             } else {
-                nextIdx = activeIdx < 0 ? 0 : Math.min(presetBtns.length - 1, activeIdx + 1);
+                nextIdx = activeIdx < 0 ? 0 : Math.min(segments.length - 1, activeIdx + 1);
             }
-            presetBtns[nextIdx].click();
+            segments[nextIdx].click();
         } else if (e.key === 'Enter' && hasSlider) {
             e.preventDefault();
             const raiseBtn = document.getElementById('btn-raise-main');
@@ -1801,6 +1943,31 @@ function showActionButtons(actions, turnData) {
     }
 }
 
+// Non-linear slider helpers for segment bar
+let presetSliderPresetMax = 0;
+let presetSliderBetMin = 0;
+let presetSliderBetMax = 0;
+
+function presetSliderToValue(s) {
+    const half = 500;
+    if (s <= half) {
+        return presetSliderBetMin + (presetSliderPresetMax - presetSliderBetMin) * (s / half);
+    } else {
+        return presetSliderPresetMax + (presetSliderBetMax - presetSliderPresetMax) * ((s - half) / half);
+    }
+}
+
+function presetValueToSlider(val) {
+    const half = 500;
+    if (val <= presetSliderPresetMax) {
+        const range = presetSliderPresetMax - presetSliderBetMin;
+        return range > 0 ? half * (val - presetSliderBetMin) / range : 0;
+    } else {
+        const range = presetSliderBetMax - presetSliderPresetMax;
+        return range > 0 ? half + half * (val - presetSliderPresetMax) / range : 1000;
+    }
+}
+
 function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction) {
     const presetsDiv = document.getElementById('bet-presets');
     presetsDiv.innerHTML = '';
@@ -1811,21 +1978,19 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
     const tableBet = (turnData && turnData.currentBet) || 0;
 
     if (sliderAction) {
-        // Preflop unopened: BB-based buttons
         if (isFirstRound && tableBet <= bb) {
-            [2, 2.5, 3, 3.5, 4].forEach(mult => {
+            currentPresets['preflop-open'].forEach(mult => {
                 const targetTotal = Math.round(bb * mult);
                 presets.push({ label: `${mult}bb`, targetTotal });
             });
         } else if (isFirstRound && tableBet > bb) {
-            // Preflop facing raise: multipliers of current bet
-            [2, 2.5, 3, 4].forEach(mult => {
+            currentPresets['preflop-raise'].forEach(mult => {
                 const targetTotal = Math.round(tableBet * mult);
                 presets.push({ label: `${mult}x`, targetTotal });
             });
         } else if (!isFirstRound) {
-            // Postflop: pot percentages
-            [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
+            currentPresets['postflop'].forEach(pct => {
+                const label = pct >= 1 ? 'Pot' : `${Math.round(pct * 100)}%`;
                 const targetTotal = Math.round(pot * pct) + tableBet;
                 presets.push({ label, targetTotal });
             });
@@ -1837,41 +2002,137 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
         });
 
-        for (const p of filtered) {
-            const btn = document.createElement('button');
-            btn.className = 'btn-preset';
-            btn.textContent = p.label;
-            btn.addEventListener('click', () => {
+        // Build segment bar
+        const bar = document.createElement('div');
+        bar.className = 'preset-segment-bar';
+        const track = document.createElement('div');
+        track.className = 'segment-track';
+        bar.appendChild(track);
+
+        const allItems = [...filtered];
+        let allinItem = null;
+        if (allInAction) {
+            const amount = allInAction.total || allInAction.amount;
+            allinItem = { label: 'All-In', targetTotal: amount, isAllin: true };
+            allItems.push(allinItem);
+        }
+
+        // Setup non-linear slider mapping
+        presetSliderBetMin = sliderMin + sliderOffset;
+        presetSliderBetMax = sliderMax + sliderOffset;
+        presetSliderPresetMax = filtered.length > 0 ? filtered[filtered.length - 1].targetTotal : presetSliderBetMin;
+
+        // Convert real slider to 0-1000 internal range
+        const slider = document.getElementById('bet-slider');
+        const realMin = parseInt(slider.min);
+        const realMax = parseInt(slider.max);
+        let ignoreSliderSync = false;
+
+        allItems.forEach((p, i) => {
+            const seg = document.createElement('div');
+            seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '');
+            seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
+            seg.addEventListener('click', () => {
+                ignoreSliderSync = true;
+                // Set slider to correct position
                 const outOfPocket = p.targetTotal - sliderOffset;
-                const slider = document.getElementById('bet-slider');
-                if (slider) slider.value = outOfPocket;
+                if (p.isAllin) {
+                    slider.value = realMax;
+                } else {
+                    // Map target to non-linear position, then back to real slider
+                    const nlPos = presetValueToSlider(p.targetTotal);
+                    slider.value = Math.round(realMin + (realMax - realMin) * nlPos / 1000);
+                }
                 const input = document.getElementById('bet-amount-input');
                 if (input) input.value = p.targetTotal;
                 updateRaiseBtnText(p.targetTotal);
-                presetsDiv.querySelectorAll('.btn-preset:not(.btn-preset-allin)').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
+                setSegActive(i);
+                requestAnimationFrame(() => ignoreSliderSync = false);
             });
-            presetsDiv.appendChild(btn);
-        }
-    }
+            bar.appendChild(seg);
+        });
 
-    // All-in preset button (last, distinct style)
-    if (allInAction) {
+        function setSegActive(index) {
+            const segments = bar.querySelectorAll('.preset-segment');
+            segments.forEach((s, i) => s.classList.toggle('active', i === index));
+            // Move track
+            if (index < 0 || index >= segments.length) {
+                track.style.opacity = '0';
+                return;
+            }
+            track.style.opacity = '1';
+            const seg = segments[index];
+            const barRect = bar.getBoundingClientRect();
+            const segRect = seg.getBoundingClientRect();
+            const expand = 8;
+            const rawLeft = segRect.left - barRect.left - expand;
+            const rawWidth = segRect.width + expand * 2;
+            const minL = 3, maxR = barRect.width - 3;
+            const left = Math.max(minL, rawLeft);
+            const right = Math.min(maxR, rawLeft + rawWidth);
+            track.style.left = left + 'px';
+            track.style.width = (right - left) + 'px';
+            if (seg.classList.contains('segment-allin')) track.classList.add('track-allin');
+            else track.classList.remove('track-allin');
+        }
+
+        // Sync slider → segment highlight
+        function onSliderInput() {
+            if (ignoreSliderSync) return;
+            const rawVal = parseInt(slider.value);
+            // Convert real slider position to non-linear 0-1000
+            const nlPos = (rawVal - realMin) / (realMax - realMin) * 1000;
+            const betVal = presetSliderToValue(nlPos);
+            const rounded = Math.round(betVal / 50) * 50;
+            const input = document.getElementById('bet-amount-input');
+            if (input) input.value = Math.max(sliderOffset + parseInt(slider.min), Math.round(betVal));
+            updateRaiseBtnText(Math.round(betVal));
+
+            // Find closest preset
+            let closest = -1, minDist = Infinity;
+            const presetRange = presetSliderPresetMax - presetSliderBetMin;
+            const allinRange = presetSliderBetMax - presetSliderPresetMax;
+            allItems.forEach((p, i) => {
+                const dist = Math.abs(p.targetTotal - betVal);
+                const threshold = p.isAllin ? allinRange * 0.05 : Math.max(presetRange * 0.08, 15);
+                if (dist <= threshold && dist < minDist) {
+                    minDist = dist;
+                    closest = i;
+                }
+            });
+            setSegActive(closest);
+        }
+
+        // Remove previous listener and add new one
+        slider._presetListener && slider.removeEventListener('input', slider._presetListener);
+        slider._presetListener = onSliderInput;
+        slider.addEventListener('input', onSliderInput);
+
+        presetsDiv.appendChild(bar);
+        // Initial track state
+        requestAnimationFrame(() => setSegActive(-1));
+
+    } else if (allInAction) {
+        // No slider action but all-in exists — simple all-in button
         const amount = allInAction.total || allInAction.amount;
-        const btn = document.createElement('button');
-        btn.className = 'btn-preset btn-preset-allin';
-        btn.textContent = `All-In ${amount.toLocaleString()}`;
-        btn.addEventListener('click', () => {
+        const bar = document.createElement('div');
+        bar.className = 'preset-segment-bar';
+        const track = document.createElement('div');
+        track.className = 'segment-track';
+        bar.appendChild(track);
+        const seg = document.createElement('div');
+        seg.className = 'preset-segment segment-allin';
+        seg.innerHTML = `All-In<span class="segment-value">${amount.toLocaleString()}</span>`;
+        seg.addEventListener('click', () => {
             const slider = document.getElementById('bet-slider');
             if (slider) slider.value = parseInt(slider.max);
             const total = parseInt(slider.max) + sliderOffset;
             const input = document.getElementById('bet-amount-input');
             if (input) input.value = total;
             updateRaiseBtnText(total);
-            presetsDiv.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
         });
-        presetsDiv.appendChild(btn);
+        bar.appendChild(seg);
+        presetsDiv.appendChild(bar);
     }
 
     if (presetsDiv.children.length > 0) {
@@ -3529,12 +3790,4 @@ function showGameChangeOverlay(state) {
         }, 400);
     }, 1800);
 
-    // Highlight banner
-    const banner = document.getElementById('table-game-banner');
-    if (banner) {
-        banner.classList.remove('banner-highlight');
-        void banner.offsetWidth; // force reflow for re-animation
-        banner.classList.add('banner-highlight');
-        setTimeout(() => banner.classList.remove('banner-highlight'), 1500);
-    }
 }

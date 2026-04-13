@@ -170,6 +170,7 @@
                         <button id="btn-menu-history" class="menu-item">📋 ハンド履歴</button>
                         <button id="btn-focus-mode" class="menu-item">🎯 フォーカス OFF</button>
                         <button id="btn-theme-toggle" class="menu-item">🎨 テーマ</button>
+                        <button id="btn-preset-settings" class="menu-item">🎚️ プリセット設定</button>
                         <div id="game-rules-btn" class="menu-item" title="ルール表示">❓ ルール</div>
                     </div>
                 </div>
@@ -182,10 +183,26 @@
                 </div>
             </div>
 
+            <div id="preset-settings-modal" class="hidden">
+                <div id="preset-settings-inner">
+                    <h3>プリセット設定</h3>
+                    <div id="preset-tabs">
+                        <button class="preset-tab active" data-tab="preflop-open">Preflop Open</button>
+                        <button class="preset-tab" data-tab="preflop-raise">Facing Raise</button>
+                        <button class="preset-tab" data-tab="postflop">Postflop</button>
+                    </div>
+                    <div id="preset-edit-area"></div>
+                    <div class="preset-modal-actions">
+                        <button id="preset-reset-btn" class="btn-small">デフォルトに戻す</button>
+                        <button id="preset-save-btn" class="btn-small btn-primary">保存</button>
+                        <button id="preset-close-btn" class="btn-small">閉じる</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="table-area">
                 <div id="table-container">
                     <div id="table-felt">
-                        <div id="table-game-banner"></div>
                         <div id="pot-display"></div>
                         <div id="table-info"></div>
                         <div id="community-cards" class="card-row"></div>

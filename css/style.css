@@ -606,6 +606,115 @@ body {
 }
 #rules-content { font-size: 14px; line-height: 1.7; margin-bottom: 16px; white-space: pre-line; }
 
+/* Preset Settings Modal */
+#preset-settings-modal {
+    position: fixed; inset: 0;
+    background: rgba(7,10,19,0.85); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 16px;
+    animation: modal-fade-in 0.25s ease-out;
+}
+#preset-settings-inner {
+    background: rgba(22,26,38,0.98); border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 14px; padding: 20px; max-width: 420px; width: 90%; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    animation: modal-scale-in 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+#preset-settings-inner h3 {
+    font-size: 15px; color: var(--text); margin: 0 0 12px; text-align: center;
+}
+#preset-tabs {
+    display: flex; gap: 4px; margin-bottom: 14px;
+}
+.preset-tab {
+    flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 600;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: #888; cursor: pointer; transition: all 0.15s;
+    text-align: center;
+}
+.preset-tab.active {
+    background: rgba(0,229,255,0.1); border-color: rgba(0,229,255,0.3); color: var(--accent);
+}
+#preset-edit-area {
+    display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
+}
+.preset-row {
+    display: flex; align-items: center; gap: 8px;
+}
+.preset-row-label {
+    font-size: 12px; color: #aaa; min-width: 50px;
+}
+.preset-row-input {
+    flex: 1; padding: 6px 8px; font-size: 13px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px; color: var(--text); outline: none;
+    transition: border-color 0.15s;
+}
+.preset-row-input:focus {
+    border-color: var(--accent);
+}
+.preset-row-input::placeholder { color: #555; }
+.preset-row-remove {
+    width: 28px; height: 28px; font-size: 14px; line-height: 1;
+    background: rgba(239,83,80,0.15); border: 1px solid rgba(239,83,80,0.3);
+    border-radius: 6px; color: #ef5350; cursor: pointer; transition: all 0.15s;
+}
+.preset-row-remove:hover { background: rgba(239,83,80,0.3); }
+.preset-add-btn {
+    padding: 6px; font-size: 12px; text-align: center;
+    background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 6px; color: #888; cursor: pointer; transition: all 0.15s;
+}
+.preset-add-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+.preset-modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+}
+.preset-modal-actions .btn-primary {
+    background: rgba(0,229,255,0.15); border-color: rgba(0,229,255,0.4); color: var(--accent);
+}
+.preset-modal-actions .btn-primary:hover {
+    background: rgba(0,229,255,0.25);
+}
+.preset-unit-hint {
+    font-size: 10px; color: #666; margin-bottom: 6px;
+}
+
+/* Segment bar presets (replaces old .btn-preset pills) */
+.preset-segment-bar {
+    display: flex; position: relative;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 3px;
+    width: 100%; overflow: hidden;
+}
+.preset-segment-bar .segment-track {
+    position: absolute; top: 3px; bottom: 3px; left: 3px;
+    border-radius: 8px;
+    background: rgba(0,229,255,0.15); border: 1px solid rgba(0,229,255,0.4);
+    box-shadow: 0 0 10px rgba(0,229,255,0.2);
+    transition: left 0.25s cubic-bezier(0.4,0,0.2,1), width 0.25s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none; z-index: 1;
+}
+.preset-segment {
+    flex: 1; text-align: center; padding: 8px 4px;
+    font-size: 12px; font-weight: 600; color: #999;
+    cursor: pointer; position: relative; z-index: 2;
+    transition: color 0.2s; user-select: none; touch-action: manipulation;
+    white-space: nowrap;
+}
+.preset-segment:hover { color: #ccc; }
+.preset-segment.active { color: var(--accent); }
+.preset-segment .segment-value {
+    display: block; font-size: 9px; font-weight: 400; color: #666; margin-top: 1px;
+    transition: color 0.2s;
+}
+.preset-segment.active .segment-value { color: rgba(0,229,255,0.6); }
+.preset-segment.segment-allin.active { color: #ce93d8; }
+.segment-track.track-allin {
+    background: rgba(106,27,154,0.25); border-color: rgba(156,39,176,0.5);
+    box-shadow: 0 0 10px rgba(156,39,176,0.2);
+}
+
 /* === Table Area === */
 #table-area {
     flex: 1; display: flex; align-items: center; justify-content: center;
@@ -686,25 +795,6 @@ body {
     );
 }
 
-/* Game name banner on table */
-#table-game-banner {
-    position: absolute; top: 8%; left: 50%; transform: translateX(-50%);
-    text-align: center; z-index: 8; pointer-events: none;
-    font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.85);
-    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
-    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 20px; padding: 2px 14px;
-    white-space: nowrap; letter-spacing: 0.5px;
-    transition: opacity 0.3s, transform 0.3s;
-}
-#table-game-banner .banner-badges {
-    display: inline-flex; gap: 3px; margin-left: 5px; vertical-align: middle;
-}
-#table-game-banner.banner-highlight {
-    color: #fff;
-    background: rgba(0,0,0,0.7); border-color: rgba(255,215,0,0.4);
-    animation: banner-pulse 1.5s ease-out;
-}
 @keyframes banner-pulse {
     0% { transform: translateX(-50%) scale(1.15); border-color: rgba(255,215,0,0.8); }
     100% { transform: translateX(-50%) scale(1); border-color: rgba(255,255,255,0.12); }
@@ -1240,21 +1330,7 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 4px; }
-.btn-preset {
-    padding: 7px 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
-    background: rgba(255,255,255,0.09); color: #ddd; cursor: pointer; font-weight: 600;
-    transition: all 0.12s; white-space: nowrap; flex: 1; min-width: 0; text-align: center;
-    -webkit-user-select: none; user-select: none; touch-action: manipulation;
-}
-.btn-preset:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4); }
-.btn-preset.active { background: rgba(0,229,255,0.2); color: var(--gold); border-color: var(--gold); }
-/* All-in preset: distinct purple */
-.btn-preset-allin {
-    background: rgba(106,27,154,0.35); border-color: rgba(156,39,176,0.5);
-    color: #ce93d8; flex: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-}
-.btn-preset-allin:hover { background: rgba(106,27,154,0.6); color: #fff; border-color: #9c27b0; }
+#bet-presets { margin-bottom: 4px; }
 
 /* Folded/sitout state message in action panel */
 .folded-msg {
@@ -1503,7 +1579,10 @@ body {
     flex: 1; overflow-y: auto; padding: 6px 10px;
     font-size: 11px; color: var(--text-dim);
     background: #111318; line-height: 1.5;
-    display: flex; flex-direction: column; justify-content: flex-end;
+    display: flex; flex-direction: column;
+}
+#game-log::before {
+    content: ''; flex: 1;
 }
 .game-chat-bar {
     flex-shrink: 0; border-top: 1px solid #2a2d35;
@@ -1521,7 +1600,10 @@ body {
     flex: 1; overflow-y: auto; padding: 6px 10px;
     font-size: 11px; color: var(--text-dim);
     background: #111318; line-height: 1.5;
-    display: flex; flex-direction: column; justify-content: flex-end;
+    display: flex; flex-direction: column;
+}
+#chat-log::before {
+    content: ''; flex: 1;
 }
 #chat-log .chat-entry { padding: 2px 0; }
 #chat-log .chat-msg { color: #81c784; }
@@ -1824,7 +1906,6 @@ body {
             inset 0 0 20px rgba(0,0,0,0.4),
             0 2px 12px rgba(0,0,0,0.5);
     }
-    #table-game-banner { font-size: 10px; padding: 2px 10px; top: 5%; }
     #pot-display { font-size: 11px; padding: 2px 8px; }
     .pot-label { font-size: 9px; }
     .pot-amount { font-size: 12px; }
@@ -1833,9 +1914,9 @@ body {
     .gc-label { font-size: 12px; }
     #table-info { font-size: 10px; top: 38%; }
 
-    /* Bet Presets */
-    #bet-presets { gap: 3px; }
-    .btn-preset { padding: 6px 4px; font-size: 11px; }
+    /* Segment bar mobile */
+    .preset-segment { padding: 6px 2px; font-size: 11px; }
+    .preset-segment .segment-value { font-size: 8px; }
 
     /* Cards */
     .card { width: 26px; height: 36px; border-radius: 3px; }
@@ -2350,11 +2431,6 @@ body {
         font-size: 10px;
         padding: 4px 8px;
     }
-}
-
-/* Bet presets larger pill style */
-.btn-preset {
-    border-radius: 20px;
 }
 
 /* Slider value tooltip */
