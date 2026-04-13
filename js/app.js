@@ -1717,7 +1717,18 @@ document.addEventListener('click', (e) => {
     }
 });
 
+function triggerTurnFlash() {
+    const flash = document.getElementById('turn-flash');
+    if (!flash) return;
+    flash.classList.remove('flash-active');
+    void flash.offsetWidth; // force reflow
+    flash.classList.add('flash-active');
+    flash.addEventListener('animationend', () => flash.classList.remove('flash-active'), { once: true });
+}
+
 function notifyYourTurn() {
+    // Turn flash effect
+    triggerTurnFlash();
     // Title flash when tab is hidden
     if (document.hidden) {
         if (!titleFlashInterval) {
@@ -2162,6 +2173,13 @@ function setupSlider(min, max, currentBet) {
 }
 
 function sendActionAndHide(action) {
+    // Fold card animation
+    if (action.type === 'fold') {
+        document.querySelectorAll('#player-cards .card').forEach((card, i) => {
+            card.style.animationDelay = (i * 0.1) + 's';
+            card.classList.add('fold-anim');
+        });
+    }
     client.sendAction(action);
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('bet-slider-area').classList.remove('visible');
@@ -2190,69 +2208,44 @@ function stopTurnTimer() {
 // ==========================================
 function clearPreAction() {
     preAction = null;
-    const overlay = document.getElementById('pre-action-overlay');
-    if (overlay) {
-        overlay.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
-    }
+    const bar = document.getElementById('pre-action-bar');
+    if (bar) bar.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
 }
 
 function hidePreActionBar() {
-    const overlay = document.getElementById('pre-action-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    const bar = document.getElementById('pre-action-bar');
+    if (bar) bar.classList.add('hidden');
 }
 
 function showPreActionBar() {
-    const overlay = document.getElementById('pre-action-overlay');
-    if (overlay) overlay.classList.remove('hidden');
+    const bar = document.getElementById('pre-action-bar');
+    if (bar) bar.classList.remove('hidden');
 }
 
 function setupPreActions() {
-    // Pre-action overlay is created dynamically on the seat
-}
-
-function ensurePreActionOverlay(seatIdx) {
-    let overlay = document.getElementById('pre-action-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'pre-action-overlay';
-        overlay.className = 'hidden';
-        overlay.innerHTML =
-            '<button class="pre-action-btn" data-action="check-fold">チェック/フォールド</button>' +
-            '<button class="pre-action-btn" data-action="fold">フォールド</button>';
-        overlay.addEventListener('click', (e) => {
-            const btn = e.target.closest('.pre-action-btn');
-            if (!btn) return;
-            const action = btn.dataset.action;
-            if (btn.classList.contains('active')) {
-                btn.classList.remove('active');
-                preAction = null;
-            } else {
-                overlay.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                preAction = action;
-            }
-        });
-        document.getElementById('table-felt').appendChild(overlay);
-    }
-    // Position near the player's seat
-    const seatEl = document.getElementById('seat-' + seatIdx);
-    if (seatEl) {
-        const seatStyle = getComputedStyle(seatEl);
-        overlay.style.left = seatStyle.left;
-        overlay.style.bottom = 'auto';
-        // Place above the seat
-        const seatTop = parseFloat(seatStyle.top) || parseFloat(seatStyle.bottom);
-        overlay.style.top = (parseFloat(seatStyle.top) - 30) + '%';
-        overlay.style.transform = 'translateX(-50%)';
-    }
-    return overlay;
+    const bar = document.getElementById('pre-action-bar');
+    bar.innerHTML =
+        '<button class="pre-action-btn" data-action="check-fold">チェック/フォールド</button>' +
+        '<button class="pre-action-btn" data-action="fold">フォールド</button>';
+    bar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.pre-action-btn');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (btn.classList.contains('active')) {
+            btn.classList.remove('active');
+            preAction = null;
+        } else {
+            bar.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            preAction = action;
+        }
+    });
 }
 
 function updatePreActionVisibility(state) {
     if (!state || !state.mySeatIndex && state.mySeatIndex !== 0) { hidePreActionBar(); return; }
     const me = state.players[state.mySeatIndex];
     if (me && !me.folded && !state.mySitout && state.currentPlayer !== state.mySeatIndex) {
-        ensurePreActionOverlay(state.mySeatIndex);
         showPreActionBar();
     } else {
         hidePreActionBar();
@@ -3329,6 +3322,16 @@ function updateChatBadge() {
     } else if (badge) {
         badge.remove();
     }
+    // Sync bottom nav chat badge
+    const navBadge = document.getElementById('nav-chat-badge');
+    if (navBadge) {
+        if (chatUnreadCount > 0) {
+            navBadge.classList.remove('hidden');
+            navBadge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
+        } else {
+            navBadge.classList.add('hidden');
+        }
+    }
 }
 
 function onChat(data) {
@@ -3791,3 +3794,96 @@ function showGameChangeOverlay(state) {
     }, 1800);
 
 }
+
+// ==========================================
+// 案2: Ripple effect + vibration on action buttons
+// ==========================================
+function setupActionRipple() {
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-action');
+        if (!btn) return;
+
+        // Haptic feedback on mobile
+        if (navigator.vibrate) navigator.vibrate(30);
+
+        // Ripple effect
+        const rect = btn.getBoundingClientRect();
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+        btn.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove());
+    });
+}
+
+// ==========================================
+// 案3: Bottom Navigation Bar (mobile)
+// ==========================================
+function setupBottomNav() {
+    const nav = document.getElementById('bottom-nav');
+    if (!nav) return;
+
+    function updateNavVisibility() {
+        const gameScreen = document.getElementById('game-screen');
+        const isMobile = window.innerWidth <= 600;
+        if (isMobile && gameScreen && !gameScreen.classList.contains('hidden')) {
+            nav.classList.add('visible');
+        } else {
+            nav.classList.remove('visible');
+        }
+    }
+
+    window.addEventListener('resize', updateNavVisibility);
+
+    // Observe game-screen visibility changes
+    const observer = new MutationObserver(updateNavVisibility);
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen) observer.observe(gameScreen, { attributes: true, attributeFilter: ['class'] });
+
+    // Tab switching
+    nav.addEventListener('click', (e) => {
+        const item = e.target.closest('.nav-item');
+        if (!item) return;
+        const tab = item.dataset.tab;
+
+        // Update active state
+        nav.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+
+        switch (tab) {
+            case 'table':
+                // Show table, hide any modals opened by nav
+                document.getElementById('stats-modal')?.classList.add('hidden');
+                document.getElementById('history-modal')?.classList.add('hidden');
+                break;
+            case 'chat':
+                // Switch log panel to chat tab
+                const chatLogTab = document.querySelector('.log-tab[data-tab="chat"]');
+                if (chatLogTab) chatLogTab.click();
+                break;
+            case 'history':
+                // Open hand history modal
+                renderHandHistory('lobby-hand-history');
+                document.getElementById('history-modal')?.classList.remove('hidden');
+                break;
+            case 'stats':
+                // Open stats modal
+                client.getStats();
+                document.getElementById('stats-modal')?.classList.remove('hidden');
+                break;
+            case 'settings':
+                // Toggle hamburger menu
+                document.getElementById('top-bar-menu')?.classList.toggle('hidden');
+                break;
+        }
+    });
+
+    updateNavVisibility();
+}
+
+// Init 案2 + 案3
+setupActionRipple();
+setupBottomNav();
