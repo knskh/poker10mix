@@ -237,7 +237,15 @@ class PokerUI {
         // Positions: [left%, top%] within table-felt
         // Between seat edge and table center, shifted inward for clarity
         // Bet chip positions keyed by visual seat class
-        const betPosByClass = {
+        const isMobile = window.innerWidth <= 600;
+        const betPosByClass = isMobile ? {
+            'seat-bottom':       [50, 68],
+            'seat-bottom-left':  [30, 62],
+            'seat-top-left':     [30, 36],
+            'seat-top':          [50, 28],
+            'seat-top-right':    [70, 36],
+            'seat-bottom-right': [70, 62],
+        } : {
             'seat-bottom':       [50, 72],
             'seat-bottom-left':  [28, 68],
             'seat-top-left':     [28, 30],
