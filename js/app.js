@@ -274,7 +274,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupStatsModal();
     setupChat();
     setupPreActions();
-    setupEmotes();
     setupPresetSettingsModal();
     setupFocusMode();
 
@@ -3139,7 +3138,6 @@ function updateChatBadge() {
 
 function onChat(data) {
     // Room/game chat only (not lobby)
-    ui.addLog(`[${data.from}] ${data.message}`, 'chat');
     appendChatMsg('room-chat-log', data.from, data.message);
     addChatEntry(`[${data.from}] ${data.message}`, 'msg');
     // Show short messages as floating text on table (quick chat style)
@@ -3169,33 +3167,6 @@ function onLobbyChat(data) {
     appendChatMsg('lobby-chat-log', data.from, data.message);
 }
 
-// ==========================================
-// Emote Reactions
-// ==========================================
-function setupEmotes() {
-    const toggle = document.getElementById('emote-toggle');
-    const picker = document.getElementById('emote-picker');
-
-    toggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        picker.classList.toggle('hidden');
-    });
-
-    document.querySelectorAll('.emote-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const emote = btn.dataset.emote;
-            client.sendEmote(emote);
-            picker.classList.add('hidden');
-        });
-    });
-
-    // Close picker when clicking outside
-    document.addEventListener('click', () => {
-        picker.classList.add('hidden');
-    });
-    picker.addEventListener('click', (e) => e.stopPropagation());
-}
 
 function setupFocusMode() {
     const btn = document.getElementById('btn-focus-mode');
@@ -3284,8 +3255,6 @@ function onEmote(data) {
     // Remove after animation
     setTimeout(() => emoteEl.remove(), 2000);
 
-    // Also log it
-    ui.addLog(`${data.from}: ${data.emote}`, 'chat');
 }
 
 // ==========================================

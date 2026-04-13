@@ -1364,37 +1364,6 @@ body {
     box-shadow: 0 0 8px rgba(0,229,255,0.3);
 }
 
-/* Emote toggle button (in top bar) */
-#emote-toggle {
-    width: 28px; height: 28px; font-size: 16px;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 50%; cursor: pointer; margin-left: auto;
-    transition: all 0.15s; user-select: none;
-}
-#emote-toggle:hover { background: rgba(255,255,255,0.15); transform: scale(1.1); }
-
-/* Emote picker (expandable dropdown from top bar) */
-#emote-picker {
-    position: absolute; top: 38px; right: 40px;
-    display: flex; flex-direction: row; gap: 4px;
-    background: rgba(15,20,30,0.95); border: 1px solid rgba(0,229,255,0.25);
-    border-radius: 10px; padding: 6px 8px; z-index: 310;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-    backdrop-filter: blur(10px);
-    animation: emote-picker-in 0.15s ease-out;
-}
-@keyframes emote-picker-in {
-    0% { opacity: 0; transform: translateY(8px) scale(0.9); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-.emote-btn {
-    font-size: 24px; padding: 4px 8px; cursor: pointer;
-    background: transparent; border: 1px solid transparent; border-radius: 8px;
-    transition: all 0.12s; line-height: 1;
-}
-.emote-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); transform: scale(1.15); }
-.emote-btn:active { transform: scale(0.9); }
 
 /* Floating emote animation on table */
 .emote-float {
@@ -1507,8 +1476,6 @@ body {
 #numpad-confirm { color: #4caf50; background: rgba(76,175,80,0.12); border-color: rgba(76,175,80,0.3); }
 
 /* Focus Mode — hide social/distraction elements */
-.focus-mode #emote-toggle,
-.focus-mode #emote-picker,
 .focus-mode #btn-quick-chat,
 .focus-mode #quick-chat-palette,
 .focus-mode .log-tab[data-tab="chat"],
