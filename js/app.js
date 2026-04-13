@@ -85,6 +85,8 @@ let showdownPlayers = null; // opponent cards captured at showdown
 let lastHandResult = null; // full hand result from server
 let titleFlashInterval = null; // tab title flash timer
 let focusMode = localStorage.getItem('poker10mix_focus') === 'on'; // focus mode state
+let sitoutCountdownInterval = null; // local 1-sec sitout countdown
+let sitoutLocalRemaining = null;    // client-side countdown value
 
 // ==========================================
 // Multi-Table Management
@@ -1353,13 +1355,15 @@ function onGameState(state) {
 
     ui.renderFromServer(state);
 
-    // Update sitout button label
+    // Update sitout button label + countdown state
     const sitoutBtn = document.getElementById('btn-zoom-sitout');
     if (sitoutBtn && !isInZoom) {
         if (state.mySitout) {
             sitoutBtn.textContent = '🔄 復帰する';
         } else {
             sitoutBtn.textContent = '💤 離席';
+            // No longer sitout — stop countdown
+            if (sitoutCountdownInterval) stopSitoutCountdown();
         }
     }
 
@@ -2440,6 +2444,40 @@ function updatePreActionVisibility(state) {
     }
 }
 
+function startSitoutCountdown() {
+    if (sitoutCountdownInterval) return; // already running
+    sitoutCountdownInterval = setInterval(() => {
+        if (sitoutLocalRemaining == null || sitoutLocalRemaining <= 0) {
+            stopSitoutCountdown();
+            return;
+        }
+        sitoutLocalRemaining = Math.max(0, sitoutLocalRemaining - 1);
+        const txt = document.getElementById('sitout-timer-text');
+        const bar = document.getElementById('sitout-timer-bar');
+        if (txt) {
+            const m = Math.floor(sitoutLocalRemaining / 60);
+            const s = sitoutLocalRemaining % 60;
+            txt.textContent = `${m}:${String(s).padStart(2, '0')}`;
+            const isUrgent = sitoutLocalRemaining <= 120;
+            txt.className = 'sitout-timer-text' + (isUrgent ? ' urgent' : '');
+        }
+        if (bar) {
+            const pct = (sitoutLocalRemaining / 600) * 100;
+            const isUrgent = sitoutLocalRemaining <= 120;
+            bar.style.width = pct + '%';
+            bar.className = 'sitout-timer-bar' + (isUrgent ? ' urgent' : '');
+        }
+    }, 1000);
+}
+
+function stopSitoutCountdown() {
+    if (sitoutCountdownInterval) {
+        clearInterval(sitoutCountdownInterval);
+        sitoutCountdownInterval = null;
+    }
+    sitoutLocalRemaining = null;
+}
+
 function showFoldedButtons(state) {
     const actionBar = document.getElementById('action-bar');
     const btnDiv = document.getElementById('action-buttons');
@@ -2477,36 +2515,59 @@ function showFoldedButtons(state) {
         });
         btnDiv.appendChild(leaveBtn);
     } else if (isSitout) {
-        // Sitout state — show rejoin + leave
-        const msg = document.createElement('div');
-        msg.className = 'folded-msg sitout-msg';
-        const remaining = me.sitoutRemaining;
-        if (remaining != null) {
-            const m = Math.floor(remaining / 60);
-            const s = remaining % 60;
-            const timeStr = `${m}:${String(s).padStart(2, '0')}`;
-            msg.innerHTML = `離席中 — 自動退室まで <span class="sitout-countdown${remaining <= 120 ? ' sitout-countdown-urgent' : ''}">${timeStr}</span>`;
-        } else {
-            msg.textContent = '離席中 — 10分以内に復帰しないと自動退室されます';
+        // Sitout state — show countdown timer + rejoin + leave
+        const serverRemaining = me.sitoutRemaining;
+        // Sync local countdown from server value
+        if (serverRemaining != null) {
+            sitoutLocalRemaining = serverRemaining;
+        } else if (sitoutLocalRemaining == null) {
+            sitoutLocalRemaining = 600; // default 10 min
         }
-        btnDiv.appendChild(msg);
+
+        const label = document.createElement('div');
+        label.className = 'folded-msg sitout-msg';
+        label.textContent = '💤 離席中';
+        btnDiv.appendChild(label);
+
+        const timerWrap = document.createElement('div');
+        timerWrap.className = 'sitout-timer-wrap';
+        const isUrgent = sitoutLocalRemaining <= 120;
+        const m = Math.floor(sitoutLocalRemaining / 60);
+        const s = sitoutLocalRemaining % 60;
+        timerWrap.innerHTML = `
+            <div class="sitout-timer-label">自動退室まで</div>
+            <div class="sitout-timer-text${isUrgent ? ' urgent' : ''}" id="sitout-timer-text">${m}:${String(s).padStart(2, '0')}</div>
+            <div class="sitout-timer-bar-outer">
+                <div class="sitout-timer-bar${isUrgent ? ' urgent' : ''}" id="sitout-timer-bar" style="width:${(sitoutLocalRemaining / 600) * 100}%"></div>
+            </div>
+        `;
+        btnDiv.appendChild(timerWrap);
+
+        // Start local countdown interval
+        startSitoutCountdown();
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;margin-top:4px;';
 
         const rejoinBtn = document.createElement('button');
         rejoinBtn.className = 'btn-action btn-call';
         rejoinBtn.textContent = '復帰する';
         rejoinBtn.addEventListener('click', () => {
+            stopSitoutCountdown();
             client.rejoinGame(activeTableId);
         });
-        btnDiv.appendChild(rejoinBtn);
+        btnRow.appendChild(rejoinBtn);
 
         const leaveBtn = document.createElement('button');
         leaveBtn.className = 'btn-action btn-fold';
         leaveBtn.textContent = '退室する';
         leaveBtn.addEventListener('click', () => {
+            stopSitoutCountdown();
             if (isInZoom) client.leaveZoom();
             else { client.leaveRoom(activeTableId); removeTable(activeTableId); }
         });
-        btnDiv.appendChild(leaveBtn);
+        btnRow.appendChild(leaveBtn);
+        btnDiv.appendChild(btnRow);
     } else {
         // Just folded — show leave + rebuy if low chips
         const msg = document.createElement('div');

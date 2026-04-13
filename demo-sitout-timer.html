@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>離席タイマー デモ</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; height: 100vh; display: flex; flex-direction: column; }
+
+/* Demo controls */
+#demo-controls {
+    background: rgba(30,40,60,0.9); border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    z-index: 100;
+}
+#demo-controls button {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(50,60,80,0.8); color: #e0e0e0; font-size: 13px; cursor: pointer;
+    transition: background 0.2s;
+}
+#demo-controls button:hover { background: rgba(70,80,110,0.9); }
+#demo-controls button.active { background: #1565c0; border-color: #42a5f5; }
+#demo-controls .label { font-size: 12px; color: rgba(255,255,255,0.5); }
+#demo-controls select {
+    padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(50,60,80,0.8); color: #e0e0e0; font-size: 13px;
+}
+
+/* Main area */
+#table-area { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+
+/* Table */
+#table {
+    position: absolute; top: 32%; left: 50%; transform: translate(-50%,-50%);
+    width: 600px; height: 330px;
+    background: radial-gradient(ellipse at 50% 50%, #1a5c3a, #0e3522 70%, #081f14);
+    border-radius: 50%; border: 4px solid #2a6b4a;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,0,0,0.6);
+}
+
+/* Info panel */
+#info-panel {
+    position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 14px; padding: 6px 20px 8px; z-index: 10;
+    text-align: center; min-width: 160px;
+}
+#table-banner { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.9); margin-bottom: 3px; }
+#pot { display: flex; align-items: baseline; justify-content: center; gap: 5px; }
+#pot-label { font-size: 10px; color: rgba(255,215,0,0.6); }
+#pot-amount { font-size: 18px; font-weight: 700; color: #ffd700; }
+
+/* Seats */
+.seat {
+    position: absolute; width: 105px; text-align: center; z-index: 15;
+}
+.seat.folded { opacity: 0.3; }
+.seat-box {
+    background: rgba(15,20,35,0.9); border-radius: 12px; padding: 5px 8px;
+    border: 2px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: border-color 0.4s, box-shadow 0.4s;
+}
+.seat.active .seat-box { border-color: #38bdf8; box-shadow: 0 0 16px rgba(56,189,248,0.4); }
+.seat.sitout .seat-box { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,0.3); }
+.seat-name { font-size: 11px; font-weight: 700; color: #e0e0e0; }
+.seat-info { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 1px; }
+.seat-pos { font-size: 8px; font-weight: 700; color: #fff; padding: 1px 5px; border-radius: 3px; display: inline-block; }
+.seat-chips { font-size: 11px; font-weight: 700; color: #ffd700; }
+.seat-cards { display: flex; gap: 3px; justify-content: center; margin-top: 3px; }
+.seat-card {
+    width: 24px; height: 34px; border-radius: 3px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 9px; line-height: 1;
+}
+.seat-card.facedown { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
+.seat-card.faceup { background: #fff; }
+.seat-card.faceup.red { color: #dc2626; }
+.seat-card.faceup.black { color: #1a1a1a; }
+
+/* Seat positions */
+.s0 { bottom: -24px; left: 50%; transform: translateX(-50%); }
+.s1 { bottom: 30px; left: 2px; }
+.s2 { top: 30px; left: 2px; }
+.s3 { top: -24px; left: 50%; transform: translateX(-50%); }
+.s4 { top: 30px; right: 2px; }
+.s5 { bottom: 30px; right: 2px; }
+
+/* =============================================
+   SITOUT OVERLAY (on player seat)
+   ============================================= */
+.sitout-badge {
+    position: absolute; top: -8px; right: -8px;
+    background: #f59e0b; color: #000; font-size: 8px; font-weight: 800;
+    padding: 2px 6px; border-radius: 8px; z-index: 20;
+    animation: sitoutPulse 2s ease-in-out infinite;
+}
+@keyframes sitoutPulse { 0%,100%{ opacity:0.8 } 50%{ opacity:1 } }
+
+/* =============================================
+   ACTION BAR — FOLDED / SITOUT STATE
+   ============================================= */
+#action-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(10,14,20,0.95); border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 10px 12px; z-index: 50;
+    transition: transform 0.3s ease;
+}
+#action-bar.hidden { transform: translateY(100%); pointer-events: none; }
+
+.folded-msg {
+    text-align: center; font-size: 13px; color: rgba(255,255,255,0.6);
+    padding: 4px 0 8px;
+}
+.folded-msg.sitout-msg { color: #f59e0b; }
+
+/* =============================================
+   SITOUT COUNTDOWN TIMER
+   ============================================= */
+.sitout-timer-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 4px 0 8px;
+}
+.sitout-timer-label {
+    font-size: 12px; color: rgba(255,255,255,0.5);
+}
+.sitout-timer-bar-outer {
+    width: 100%; max-width: 300px; height: 6px;
+    background: rgba(255,255,255,0.08); border-radius: 3px;
+    overflow: hidden; position: relative;
+}
+.sitout-timer-bar {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, #f59e0b, #eab308);
+    transition: width 1s linear;
+}
+.sitout-timer-bar.urgent {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+    animation: barFlash 1s ease-in-out infinite;
+}
+@keyframes barFlash { 0%,100%{ opacity:1 } 50%{ opacity:0.6 } }
+
+.sitout-timer-text {
+    font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: #f59e0b; letter-spacing: 1px;
+    transition: color 0.5s;
+}
+.sitout-timer-text.urgent {
+    color: #ef4444;
+    animation: timerFlash 1s ease-in-out infinite;
+}
+@keyframes timerFlash { 0%,100%{ opacity:1; transform:scale(1) } 50%{ opacity:0.7; transform:scale(1.05) } }
+
+/* Action buttons row */
+.action-btns {
+    display: flex; gap: 8px; justify-content: center; margin-top: 4px;
+}
+.btn-action {
+    padding: 10px 20px; border-radius: 8px; border: none;
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    min-width: 100px;
+}
+.btn-rejoin { background: #22c55e; color: #fff; }
+.btn-rejoin:hover { background: #16a34a; }
+.btn-leave { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+.btn-leave:hover { background: rgba(239,68,68,0.3); }
+.btn-add-table { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+.btn-add-table:hover { background: rgba(56,189,248,0.25); }
+
+/* =============================================
+   HAMBURGER MENU
+   ============================================= */
+#top-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; z-index: 30;
+}
+#top-bar-left { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); }
+#top-bar-menu-wrap { position: relative; }
+#btn-hamburger {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(30,40,60,0.8); color: #e0e0e0; font-size: 16px; cursor: pointer;
+}
+#top-bar-menu {
+    position: absolute; top: 36px; right: 0; min-width: 160px;
+    background: rgba(20,28,45,0.97); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 6px 0; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    transition: opacity 0.2s, transform 0.2s;
+}
+#top-bar-menu.hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
+.menu-item {
+    display: block; width: 100%; padding: 8px 14px; border: none;
+    background: none; color: #e0e0e0; font-size: 13px; cursor: pointer;
+    text-align: left; transition: background 0.15s;
+}
+.menu-item:hover { background: rgba(255,255,255,0.07); }
+.menu-item.sitout-active { color: #f59e0b; font-weight: 700; }
+
+/* =============================================
+   KICKED OVERLAY
+   ============================================= */
+#kicked-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85); z-index: 200;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.5s;
+}
+#kicked-overlay.show { opacity: 1; pointer-events: auto; }
+.kicked-icon { font-size: 48px; margin-bottom: 12px; }
+.kicked-title { font-size: 20px; font-weight: 800; color: #ef4444; margin-bottom: 8px; }
+.kicked-msg { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 20px; }
+.btn-kicked-lobby {
+    padding: 12px 32px; border-radius: 8px; border: none;
+    background: #1565c0; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+
+/* Narration box */
+#narration {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: rgba(0,0,0,0.8); border: 1px solid rgba(103,232,249,0.3);
+    border-radius: 12px; padding: 12px 24px; z-index: 150;
+    font-size: 15px; font-weight: 600; color: #67e8f9; text-align: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.5s;
+    max-width: 340px;
+}
+#narration.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Demo controls -->
+<div id="demo-controls">
+    <span class="label">離席タイマー デモ</span>
+    <button id="btn-demo-start" class="active">自動再生</button>
+    <select id="speed-select">
+        <option value="1">1x (実時間)</option>
+        <option value="10" selected>10x (6秒=1分)</option>
+        <option value="60">60x (1秒=1分)</option>
+        <option value="300">300x (超高速)</option>
+    </select>
+    <button id="btn-demo-sitout">💤 離席する</button>
+    <button id="btn-demo-rejoin">🔄 復帰する</button>
+    <button id="btn-demo-reset">リセット</button>
+</div>
+
+<!-- Top bar with hamburger -->
+<div id="top-bar">
+    <div id="top-bar-left">Texas Hold'em NL</div>
+    <div id="top-bar-menu-wrap">
+        <button id="btn-hamburger">☰</button>
+        <div id="top-bar-menu" class="hidden">
+            <button class="menu-item" id="menu-sitout">💤 離席</button>
+            <button class="menu-item">📊 Stats</button>
+            <button class="menu-item">🚪 退出</button>
+        </div>
+    </div>
+</div>
+
+<!-- Table area -->
+<div id="table-area">
+    <div id="table">
+        <div id="info-panel">
+            <div id="table-banner">Texas Hold'em NL <span class="badge">Hand #3</span></div>
+            <div id="pot"><span id="pot-label">POT</span><span id="pot-amount">1,500</span></div>
+        </div>
+
+        <!-- Seats -->
+        <div class="seat s0" id="seat-0">
+            <div class="seat-box">
+                <div class="seat-name">あなた</div>
+                <div class="seat-info">
+                    <span class="seat-pos" style="background:#d32f2f">D</span>
+                    <span class="seat-chips">9,800</span>
+                </div>
+                <div class="seat-cards">
+                    <div class="seat-card faceup red"><span>A</span><span>♥</span></div>
+                    <div class="seat-card faceup black"><span>K</span><span>♠</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="seat s2" id="seat-2">
+            <div class="seat-box">
+                <div class="seat-name">Player B</div>
+                <div class="seat-info">
+                    <span class="seat-pos" style="background:#1565c0">BB</span>
+                    <span class="seat-chips">10,200</span>
+                </div>
+                <div class="seat-cards">
+                    <div class="seat-card facedown"></div>
+                    <div class="seat-card facedown"></div>
+                </div>
+            </div>
+        </div>
+        <div class="seat s3" id="seat-3">
+            <div class="seat-box">
+                <div class="seat-name">Player C</div>
+                <div class="seat-info">
+                    <span class="seat-pos" style="background:#666">-</span>
+                    <span class="seat-chips">8,500</span>
+                </div>
+                <div class="seat-cards">
+                    <div class="seat-card facedown"></div>
+                    <div class="seat-card facedown"></div>
+                </div>
+            </div>
+        </div>
+        <div class="seat s5" id="seat-5">
+            <div class="seat-box">
+                <div class="seat-name">Player D</div>
+                <div class="seat-info">
+                    <span class="seat-pos" style="background:#e65100">SB</span>
+                    <span class="seat-chips">11,000</span>
+                </div>
+                <div class="seat-cards">
+                    <div class="seat-card facedown"></div>
+                    <div class="seat-card facedown"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action bar -->
+<div id="action-bar" class="hidden"></div>
+
+<!-- Kicked overlay -->
+<div id="kicked-overlay">
+    <div class="kicked-icon">⏰</div>
+    <div class="kicked-title">自動退室されました</div>
+    <div class="kicked-msg">10分間離席のため退室しました</div>
+    <button class="btn-kicked-lobby" onclick="resetDemo()">ロビーに戻る</button>
+</div>
+
+<!-- Narration -->
+<div id="narration"></div>
+
+<script>
+// ==============================
+// State
+// ==============================
+let isSitout = false;
+let sitoutStartTime = null;
+let sitoutRemaining = 600; // 10 min in seconds
+let countdownInterval = null;
+let speedMultiplier = 10;
+let demoRunning = false;
+let demoTimeout = null;
+
+const TOTAL_SITOUT_TIME = 600; // 10 minutes
+
+// ==============================
+// DOM
+// ==============================
+const actionBar = document.getElementById('action-bar');
+const mySeat = document.getElementById('seat-0');
+const kickedOverlay = document.getElementById('kicked-overlay');
+const narration = document.getElementById('narration');
+const menuSitout = document.getElementById('menu-sitout');
+const hamburger = document.getElementById('btn-hamburger');
+const topBarMenu = document.getElementById('top-bar-menu');
+
+// ==============================
+// Hamburger menu
+// ==============================
+hamburger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    topBarMenu.classList.toggle('hidden');
+});
+document.addEventListener('click', (e) => {
+    if (!topBarMenu.contains(e.target) && e.target !== hamburger) {
+        topBarMenu.classList.add('hidden');
+    }
+});
+
+menuSitout.addEventListener('click', () => {
+    topBarMenu.classList.add('hidden');
+    if (isSitout) {
+        rejoinFromSitout();
+    } else {
+        goSitout();
+    }
+});
+
+// ==============================
+// Sitout logic
+// ==============================
+function goSitout() {
+    if (isSitout) return;
+    isSitout = true;
+    sitoutRemaining = TOTAL_SITOUT_TIME;
+    sitoutStartTime = Date.now();
+
+    // Seat visual
+    mySeat.classList.add('sitout', 'folded');
+    const box = mySeat.querySelector('.seat-box');
+    // Add sitout badge
+    let badge = mySeat.querySelector('.sitout-badge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'sitout-badge';
+        badge.textContent = '離席中';
+        box.style.position = 'relative';
+        box.appendChild(badge);
+    }
+
+    // Menu label
+    menuSitout.textContent = '🔄 復帰する';
+    menuSitout.classList.add('sitout-active');
+
+    // Show action bar with countdown
+    renderSitoutActionBar();
+    startCountdown();
+}
+
+function rejoinFromSitout() {
+    if (!isSitout) return;
+    isSitout = false;
+    stopCountdown();
+
+    // Seat visual
+    mySeat.classList.remove('sitout', 'folded');
+    const badge = mySeat.querySelector('.sitout-badge');
+    if (badge) badge.remove();
+
+    // Menu label
+    menuSitout.textContent = '💤 離席';
+    menuSitout.classList.remove('sitout-active');
+
+    // Action bar → pending rejoin message
+    actionBar.classList.remove('hidden');
+    actionBar.innerHTML = `
+        <div class="folded-msg" style="color:#4ade80;">復帰予約済み — 次のハンドから参加します</div>
+        <div class="action-btns">
+            <button class="btn-action btn-leave" onclick="goSitout()">やっぱり離席</button>
+        </div>
+    `;
+
+    // After a moment, hide action bar (simulate next hand)
+    setTimeout(() => {
+        actionBar.classList.add('hidden');
+        mySeat.querySelector('.seat-cards').innerHTML = `
+            <div class="seat-card faceup red"><span>A</span><span>♥</span></div>
+            <div class="seat-card faceup black"><span>K</span><span>♠</span></div>
+        `;
+    }, 2000 / Math.min(speedMultiplier, 10));
+}
+
+function renderSitoutActionBar() {
+    const m = Math.floor(sitoutRemaining / 60);
+    const s = sitoutRemaining % 60;
+    const timeStr = `${m}:${String(s).padStart(2, '0')}`;
+    const pct = (sitoutRemaining / TOTAL_SITOUT_TIME) * 100;
+    const isUrgent = sitoutRemaining <= 120;
+
+    actionBar.classList.remove('hidden');
+    actionBar.innerHTML = `
+        <div class="folded-msg sitout-msg">💤 離席中</div>
+        <div class="sitout-timer-wrap">
+            <div class="sitout-timer-label">自動退室まで</div>
+            <div class="sitout-timer-text ${isUrgent ? 'urgent' : ''}" id="timer-text">${timeStr}</div>
+            <div class="sitout-timer-bar-outer">
+                <div class="sitout-timer-bar ${isUrgent ? 'urgent' : ''}" id="timer-bar" style="width:${pct}%"></div>
+            </div>
+        </div>
+        <div class="action-btns">
+            <button class="btn-action btn-rejoin" onclick="rejoinFromSitout()">復帰する</button>
+            <button class="btn-action btn-leave" onclick="showKicked()">退室する</button>
+            <button class="btn-action btn-add-table">+ テーブル追加</button>
+        </div>
+    `;
+}
+
+function updateTimerDisplay() {
+    const timerText = document.getElementById('timer-text');
+    const timerBar = document.getElementById('timer-bar');
+    if (!timerText || !timerBar) return;
+
+    const m = Math.floor(sitoutRemaining / 60);
+    const s = sitoutRemaining % 60;
+    const timeStr = `${m}:${String(s).padStart(2, '0')}`;
+    const pct = (sitoutRemaining / TOTAL_SITOUT_TIME) * 100;
+    const isUrgent = sitoutRemaining <= 120;
+
+    timerText.textContent = timeStr;
+    timerText.className = 'sitout-timer-text' + (isUrgent ? ' urgent' : '');
+    timerBar.style.width = pct + '%';
+    timerBar.className = 'sitout-timer-bar' + (isUrgent ? ' urgent' : '');
+}
+
+function startCountdown() {
+    stopCountdown();
+    countdownInterval = setInterval(() => {
+        if (!isSitout) { stopCountdown(); return; }
+        sitoutRemaining = Math.max(0, sitoutRemaining - 1);
+        updateTimerDisplay();
+        if (sitoutRemaining <= 0) {
+            stopCountdown();
+            showKicked();
+        }
+    }, 1000 / speedMultiplier);
+}
+
+function stopCountdown() {
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+}
+
+function showKicked() {
+    isSitout = false;
+    stopCountdown();
+    actionBar.classList.add('hidden');
+    mySeat.classList.add('folded');
+    mySeat.classList.remove('sitout');
+    const badge = mySeat.querySelector('.sitout-badge');
+    if (badge) badge.remove();
+    kickedOverlay.classList.add('show');
+}
+
+function resetDemo() {
+    isSitout = false;
+    stopCountdown();
+    clearDemoTimeout();
+    kickedOverlay.classList.remove('show');
+    actionBar.classList.add('hidden');
+    mySeat.classList.remove('sitout', 'folded');
+    const badge = mySeat.querySelector('.sitout-badge');
+    if (badge) badge.remove();
+    menuSitout.textContent = '💤 離席';
+    menuSitout.classList.remove('sitout-active');
+    narration.classList.remove('show');
+    mySeat.querySelector('.seat-cards').innerHTML = `
+        <div class="seat-card faceup red"><span>A</span><span>♥</span></div>
+        <div class="seat-card faceup black"><span>K</span><span>♠</span></div>
+    `;
+    demoRunning = false;
+    document.getElementById('btn-demo-start').classList.remove('active');
+}
+
+// ==============================
+// Narration
+// ==============================
+function showNarration(text, duration) {
+    narration.textContent = text;
+    narration.classList.add('show');
+    return new Promise(resolve => {
+        setTimeout(() => {
+            narration.classList.remove('show');
+            setTimeout(resolve, 400);
+        }, duration);
+    });
+}
+
+// ==============================
+// Demo auto-play
+// ==============================
+let demoTimeouts = [];
+function clearDemoTimeout() {
+    demoTimeouts.forEach(t => clearTimeout(t));
+    demoTimeouts = [];
+}
+
+function wait(ms) {
+    return new Promise(resolve => {
+        const t = setTimeout(resolve, ms);
+        demoTimeouts.push(t);
+    });
+}
+
+async function runDemo() {
+    resetDemo();
+    demoRunning = true;
+    document.getElementById('btn-demo-start').classList.add('active');
+
+    await wait(500);
+    await showNarration('ハンバーガーメニューの「離席」ボタンを押す', 2000);
+    await wait(300);
+
+    // Open menu
+    topBarMenu.classList.remove('hidden');
+    await wait(1200);
+
+    // Highlight sitout button
+    menuSitout.style.background = 'rgba(245,158,11,0.2)';
+    await wait(800);
+    menuSitout.style.background = '';
+    topBarMenu.classList.add('hidden');
+
+    // Go sitout
+    goSitout();
+    await wait(500);
+
+    await showNarration('10分のカウントダウンが開始', 2500);
+    await wait(1000);
+
+    // Wait until 8 min remaining (2 min elapsed = 120 ticks)
+    const waitFor8min = Math.max(500, (120 * 1000) / speedMultiplier);
+    await showNarration('カウントダウン進行中...', Math.min(waitFor8min, 5000));
+    await wait(waitFor8min - Math.min(waitFor8min, 5000));
+
+    if (!demoRunning || !isSitout) return;
+    await showNarration('残り2分を切ると赤く点滅して警告', 3000);
+
+    // Wait until kicked
+    const waitForEnd = Math.max(500, (sitoutRemaining * 1000) / speedMultiplier);
+    await wait(waitForEnd + 1000);
+
+    if (!demoRunning) return;
+    await wait(2000);
+    await showNarration('10分経過 → 自動退室', 3000);
+
+    demoRunning = false;
+    document.getElementById('btn-demo-start').classList.remove('active');
+}
+
+// ==============================
+// Demo controls
+// ==============================
+document.getElementById('btn-demo-start').addEventListener('click', () => {
+    if (demoRunning) {
+        resetDemo();
+    } else {
+        runDemo();
+    }
+});
+
+document.getElementById('btn-demo-sitout').addEventListener('click', () => {
+    if (isSitout) return;
+    goSitout();
+});
+
+document.getElementById('btn-demo-rejoin').addEventListener('click', () => {
+    rejoinFromSitout();
+});
+
+document.getElementById('btn-demo-reset').addEventListener('click', () => {
+    resetDemo();
+});
+
+document.getElementById('speed-select').addEventListener('change', (e) => {
+    speedMultiplier = parseInt(e.target.value);
+    // Restart countdown with new speed
+    if (isSitout) startCountdown();
+});
+</script>
+</body>
+</html>
