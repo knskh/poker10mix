@@ -6,12 +6,13 @@
 <title>mix-1 - デモアニメーション</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; overflow: hidden; height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+#table-area { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; }
 
 /* TABLE */
 #table {
-    position: absolute; top: 48%; left: 50%; transform: translate(-50%,-50%);
-    width: 700px; height: 400px;
+    position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%) scale(var(--table-scale,1));
+    width: 650px; height: 360px;
     background: radial-gradient(ellipse at 50% 50%, #1a5c3a, #0e3522 70%, #081f14);
     border-radius: 50%; border: 4px solid #2a6b4a;
     box-shadow: inset 0 0 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,0,0,0.6);
@@ -153,13 +154,133 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
 /* Game change overlay */
 #game-change {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85); z-index: 100;
-    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 42%, #1a2235 0%, #111827 35%, #0d1117 65%);
+    z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
     opacity: 0; pointer-events: none; transition: opacity 0.5s;
 }
 #game-change.show { opacity: 1; pointer-events: auto; }
+
+/* Reconstructed logo container */
+.gc-logo-container {
+    position: relative; width: 280px; height: 280px; margin-bottom: 10px;
+}
+
+/* Center glow */
+.gc-center-glow {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-52%);
+    width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(56,189,248,0.18) 0%, rgba(56,189,248,0.05) 40%, transparent 70%);
+    animation: gcGlowBreathe 4s ease-in-out infinite;
+}
+@keyframes gcGlowBreathe {
+    0%,100% { transform: translate(-50%,-52%) scale(1); opacity: 0.7; }
+    50%     { transform: translate(-50%,-52%) scale(1.2); opacity: 1; }
+}
+
+/* Neon rings */
+.gc-neon-ring {
+    position: absolute; top: 50%; left: 50%; border-radius: 50%;
+    border: 2.5px solid rgba(56,189,248,0.5);
+    box-shadow: 0 0 15px rgba(56,189,248,0.25), 0 0 40px rgba(56,189,248,0.08), inset 0 0 15px rgba(56,189,248,0.1);
+}
+.gc-ring-main {
+    width: 170px; height: 170px; transform: translate(-50%,-52%);
+    animation: gcRingBreathe 5s ease-in-out infinite;
+}
+.gc-ring-sub {
+    width: 190px; height: 160px;
+    transform: translate(-50%,-52%) rotateX(15deg) rotateZ(-25deg);
+    border-color: rgba(56,189,248,0.2);
+    box-shadow: 0 0 10px rgba(56,189,248,0.1);
+    animation: gcRingBreathe 6s ease-in-out infinite -1.5s;
+}
+.gc-ring-sub2 {
+    width: 200px; height: 150px;
+    transform: translate(-50%,-52%) rotateX(-20deg) rotateZ(20deg);
+    border-color: rgba(56,189,248,0.12);
+    box-shadow: 0 0 8px rgba(56,189,248,0.06);
+}
+@keyframes gcRingBreathe {
+    0%,100% { transform: translate(-50%,-52%) scale(1); border-color: rgba(56,189,248,0.5); }
+    50%     { transform: translate(-50%,-52%) scale(1.06); border-color: rgba(56,189,248,0.7); }
+}
+
+/* Logo text */
+.gc-logo-text {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-55%);
+    font-size: 48px; font-weight: 900; letter-spacing: -1px; z-index: 5;
+    background: linear-gradient(180deg, rgba(200,230,255,0.95) 0%, rgba(56,189,248,0.9) 50%, rgba(0,200,220,1) 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 12px rgba(56,189,248,0.4));
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Glass bubbles */
+.gc-bubble {
+    position: absolute; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.28), rgba(200,230,255,0.08) 40%, rgba(56,189,248,0.03) 70%, transparent);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 0 12px rgba(56,189,248,0.1), inset 0 -4px 12px rgba(255,255,255,0.04);
+}
+.gc-bubble::before {
+    content: ''; position: absolute; top: 14%; left: 22%; width: 32%; height: 22%;
+    border-radius: 50%; background: rgba(255,255,255,0.22);
+    filter: blur(2px); transform: rotate(-25deg);
+}
+.gc-bubble::after {
+    content: ''; position: absolute; bottom: 18%; right: 18%; width: 15%; height: 10%;
+    border-radius: 50%; background: rgba(255,255,255,0.08); filter: blur(1px);
+}
+
+/* Bubble positions (matching logo layout) */
+.gc-bub-a { width: 70px; height: 70px; top: 8%;  left: 8%;  }
+.gc-bub-b { width: 48px; height: 48px; top: 22%; right: 4%; }
+.gc-bub-c { width: 30px; height: 30px; top: 5%;  right: 22%; }
+.gc-bub-d { width: 58px; height: 58px; bottom: 10%; left: 20%; }
+.gc-bub-e { width: 24px; height: 24px; bottom: 25%; right: 10%; }
+.gc-bub-f { width: 18px; height: 18px; top: 42%; left: 2%;  }
+
+/* Breathe animations */
+.gc-bub-a { animation: gcBreA 6s ease-in-out infinite; }
+.gc-bub-b { animation: gcBreB 7s ease-in-out infinite -1.5s; }
+.gc-bub-c { animation: gcBreC 5s ease-in-out infinite -0.8s; }
+.gc-bub-d { animation: gcBreD 8s ease-in-out infinite -2s; }
+.gc-bub-e { animation: gcBreE 5.5s ease-in-out infinite -3s; }
+.gc-bub-f { animation: gcBreF 4.5s ease-in-out infinite -1s; }
+
+@keyframes gcBreA {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.8; }
+    30%     { transform: translate(12px,-8px) scale(1.15); opacity: 1; }
+    60%     { transform: translate(-6px,10px) scale(0.9); opacity: 0.6; }
+}
+@keyframes gcBreB {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.75; }
+    40%     { transform: translate(-10px,14px) scale(1.2); opacity: 0.95; }
+    70%     { transform: translate(8px,-6px) scale(0.85); opacity: 0.55; }
+}
+@keyframes gcBreC {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.7; }
+    50%     { transform: translate(-8px,6px) scale(1.35); opacity: 1; }
+}
+@keyframes gcBreD {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.8; }
+    35%     { transform: translate(15px,-10px) scale(1.1); opacity: 0.95; }
+    65%     { transform: translate(-8px,5px) scale(0.88); opacity: 0.6; }
+}
+@keyframes gcBreE {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.7; }
+    50%     { transform: translate(10px,8px) scale(1.3); opacity: 1; }
+}
+@keyframes gcBreF {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.65; }
+    40%     { transform: translate(6px,-10px) scale(1.4); opacity: 0.95; }
+    80%     { transform: translate(-4px,4px) scale(0.8); opacity: 0.5; }
+}
+
+/* Game info */
 .gc-inner { text-align: center; }
-.gc-label { font-size: 14px; color: #67e8f9; letter-spacing: 3px; margin-bottom: 8px; }
+.gc-label { font-size: 12px; color: #67e8f9; letter-spacing: 3px; margin-bottom: 6px; opacity: 0.7; }
 .gc-name { font-size: 32px; font-weight: 900; color: #fff; text-shadow: 0 0 30px rgba(56,189,248,0.5);
     transform: scale(0.5); opacity: 0; transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s; }
 #game-change.show .gc-name { transform: scale(1); opacity: 1; }
@@ -172,10 +293,9 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
 
 /* Action log */
 #action-log {
-    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-    width: 90%; max-width: 900px; max-height: 130px; overflow: hidden;
-    background: rgba(10,14,20,0.92); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 10px; padding: 6px 10px; z-index: 30; font-size: 10px;
+    flex: 0 0 auto; max-height: 160px; overflow: hidden;
+    background: rgba(10,14,20,0.95); border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 10px; font-size: 10px;
 }
 #log-entries { display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; }
 #log-entries::-webkit-scrollbar { height: 3px; }
@@ -220,6 +340,7 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
 </style>
 </head>
 <body>
+<div id="table-area">
 <div id="title"><img src="logos/logo.png" alt="mix-1"><div class="sub">デモアニメーション</div></div>
 <div id="hand-counter"></div>
 <div id="table">
@@ -237,13 +358,33 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
     <div class="seat s4" id="seat-4"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
     <div id="result-overlay"><div class="result-hand" id="result-hand"></div><div class="result-winner" id="result-winner"></div></div>
 </div>
-<div id="game-change"><div class="gc-inner"><div class="gc-label">GAME CHANGE</div><div class="gc-name" id="gc-game-name"></div><div class="gc-badges" id="gc-badges"></div></div></div>
-<div id="action-log"><div id="log-entries"></div></div>
+<div id="game-change">
+    <div class="gc-logo-container">
+        <div class="gc-center-glow"></div>
+        <div class="gc-neon-ring gc-ring-main"></div>
+        <div class="gc-neon-ring gc-ring-sub"></div>
+        <div class="gc-neon-ring gc-ring-sub2"></div>
+        <div class="gc-logo-text">mix-1</div>
+        <div class="gc-bubble gc-bub-a"></div>
+        <div class="gc-bubble gc-bub-b"></div>
+        <div class="gc-bubble gc-bub-c"></div>
+        <div class="gc-bubble gc-bub-d"></div>
+        <div class="gc-bubble gc-bub-e"></div>
+        <div class="gc-bubble gc-bub-f"></div>
+    </div>
+    <div class="gc-inner">
+        <div class="gc-label">GAME CHANGE</div>
+        <div class="gc-name" id="gc-game-name"></div>
+        <div class="gc-badges" id="gc-badges"></div>
+    </div>
+</div>
 <div id="controls">
     <div class="ctrl-btn" id="btn-restart" title="最初から">&#9198;</div>
     <div class="ctrl-btn play" id="btn-play" title="再生/一時停止">&#9654;</div>
     <div class="ctrl-btn" id="btn-speed" title="速度変更">1x</div>
 </div>
+</div><!-- end table-area -->
+<div id="action-log"><div id="log-entries"></div></div>
 
 <script>
 // ==================== HANDS DATA ====================
@@ -1016,6 +1157,17 @@ $('btn-speed').addEventListener('click', () => {
     speedIdx = (speedIdx+1) % speeds.length; speed = speeds[speedIdx];
     $('btn-speed').textContent = speed + 'x';
 });
+
+// Dynamic table scaling
+function scaleTable() {
+    const area = document.getElementById('table-area');
+    const refW = 760, refH = 520;
+    const w = area.clientWidth, h = area.clientHeight;
+    const s = Math.min(w / refW, h / refH, 1);
+    document.getElementById('table').style.setProperty('--table-scale', s);
+}
+scaleTable();
+window.addEventListener('resize', scaleTable);
 
 // Init & auto-play
 resetTable();

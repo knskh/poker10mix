@@ -395,13 +395,32 @@ class PokerUI {
         if (s.gameType === 'stud' && !p.folded) {
             const cardsDiv = document.createElement('div');
             cardsDiv.className = 'seat-cards';
-            totalCards = (p.downCount || 0) + (p.upCards ? p.upCards.length : 0);
-            for (let d = 0; d < p.downCount; d++) {
-                cardsDiv.appendChild(this.createCardEl(null, true));
+            const dc = p.downCount || 0;
+            const uc = p.upCards ? p.upCards.length : 0;
+            totalCards = dc + uc;
+            let ci = 0;
+            for (let d = 0; d < dc; d++) {
+                const cel = this.createCardEl(null, true);
+                if (totalCards >= 3) {
+                    const info = this.studStreetInfo(dc, uc, ci);
+                    cel.style.borderColor = info.color;
+                    cel.style.borderWidth = '2px';
+                    cel.style.borderStyle = 'solid';
+                }
+                cardsDiv.appendChild(cel);
+                ci++;
             }
             if (p.upCards) {
                 for (const card of p.upCards) {
-                    cardsDiv.appendChild(this.createCardEl(card, false));
+                    const cel = this.createCardEl(card, false);
+                    if (totalCards >= 3) {
+                        const info = this.studStreetInfo(dc, uc, ci);
+                        cel.style.borderColor = info.color;
+                        cel.style.borderWidth = '2px';
+                        cel.style.borderStyle = 'solid';
+                    }
+                    cardsDiv.appendChild(cel);
+                    ci++;
                 }
             }
             cardsDiv.classList.add(`seat-cards-${Math.min(totalCards, 7)}`);
@@ -539,16 +558,32 @@ class PokerUI {
 
         let hasCards = false;
         if (s.gameType === 'stud' && !p.folded) {
+            const dc = p.downCount || 0;
+            const uc = p.upCards ? p.upCards.length : 0;
+            const total = dc + uc;
+            let ci = 0;
             // Down cards
-            for (let d = 0; d < (p.downCount || 0); d++) {
-                cardsDiv.appendChild(this.createCardEl(null, true));
+            for (let d = 0; d < dc; d++) {
+                const cel = this.createCardEl(null, true);
+                if (total >= 3) {
+                    const info = this.studStreetInfo(dc, uc, ci);
+                    this.applyStudStreetStyle(cel, info, true);
+                }
+                cardsDiv.appendChild(cel);
                 hasCards = true;
+                ci++;
             }
             // Up cards
             if (p.upCards) {
                 for (const card of p.upCards) {
-                    cardsDiv.appendChild(this.createCardEl(card, false));
+                    const cel = this.createCardEl(card, false);
+                    if (total >= 3) {
+                        const info = this.studStreetInfo(dc, uc, ci);
+                        this.applyStudStreetStyle(cel, info, true);
+                    }
+                    cardsDiv.appendChild(cel);
                     hasCards = true;
+                    ci++;
                 }
             }
         } else if (!p.folded && p.cardCount > 0) {
@@ -610,6 +645,37 @@ class PokerUI {
         document.getElementById('game-screen').appendChild(popup);
     }
 
+    // Stud street info: returns { street, color, label } for card at index i
+    studStreetInfo(downCount, upCount, cardIndex) {
+        // Card order: down[0], down[1], up[0](3rd), up[1](4th), up[2](5th), up[3](6th), down[2](7th)
+        const total = downCount + upCount;
+        const STREETS = [
+            { street: '3rd', color: '#999', label: '3rd' },
+            { street: '4th', color: '#67e8f9', label: '4th' },
+            { street: '5th', color: '#fbbf24', label: '5th' },
+            { street: '6th', color: '#f472b6', label: '6th' },
+            { street: '7th', color: '#4ade80', label: '7th' },
+        ];
+        if (total <= 3 || cardIndex < 3) return STREETS[0]; // 3rd street (initial 3 cards)
+        // Cards 3-6 map to 4th-7th
+        if (cardIndex < 7) return STREETS[cardIndex - 2];
+        return STREETS[0];
+    }
+
+    applyStudStreetStyle(cardEl, streetInfo, showLabel) {
+        cardEl.style.borderColor = streetInfo.color;
+        cardEl.style.borderWidth = '2px';
+        cardEl.style.borderStyle = 'solid';
+        if (showLabel && streetInfo.street !== '3rd') {
+            const lbl = document.createElement('div');
+            lbl.className = 'stud-street-label';
+            lbl.style.color = streetInfo.color;
+            lbl.textContent = streetInfo.label;
+            cardEl.style.position = 'relative';
+            cardEl.appendChild(lbl);
+        }
+    }
+
     renderPlayerHand(s) {
         const me = s.players[s.mySeatIndex];
         const container = document.getElementById('player-cards');
@@ -624,12 +690,23 @@ class PokerUI {
         }
         if (cards.length === 0) return;
 
+        const downCount = (me.downCards || []).length;
+        const upCount = (me.upCards || []).length;
+
         for (let i = 0; i < cards.length; i++) {
             const cardEl = this.createCardEl(cards[i], false);
             cardEl.classList.add('card-selectable');
 
             if (this.selectedCards.has(i)) {
                 cardEl.classList.add('card-selected');
+            }
+
+            // Stud street styling
+            if (s.gameType === 'stud' && cards.length >= 3) {
+                const info = this.studStreetInfo(downCount, upCount, i);
+                this.applyStudStreetStyle(cardEl, info, true);
+                // Add gap before 4th street card
+                if (i === 3) cardEl.style.marginLeft = '6px';
             }
 
             // Draw selection
