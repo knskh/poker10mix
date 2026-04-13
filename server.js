@@ -336,6 +336,7 @@ function getStateForPlayer(game, room, playerSeat) {
                 sitoutRemaining: (room.sitout && room.sitout[i] && room.sitoutTime && room.sitoutTime[i])
                     ? Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - room.sitoutTime[i])) / 1000))
                     : null,
+                pendingRejoin: !!(room.pendingRejoin && room.pendingRejoin[i]),
                 hand: showCards ? p.hand : [],
                 upCards: gc.type === 'stud' ? p.upCards : [],
                 downCards: (isMe && gc.type === 'stud') ? p.downCards : [],
@@ -684,7 +685,9 @@ function handleMessage(ws, client, msg) {
                 room.sitout[seat] = false;
                 delete room.sitoutTime[seat];
                 room.consecutiveTimeouts[seat] = 0;
-                broadcastLog(room, `${client.name} が復帰しました`, 'important');
+                if (!room.pendingRejoin) room.pendingRejoin = {};
+                room.pendingRejoin[seat] = true;
+                broadcastLog(room, `${client.name} が次のハンドから復帰します`, 'important');
                 broadcastGameState(room);
             }
             break;
@@ -948,6 +951,9 @@ function startGame(room) {
 
     // Stats hooks
     game.onHandStart = () => {
+        // Clear pending rejoin flags
+        room.pendingRejoin = {};
+
         // Evict players who have been absent for 3+ consecutive hands
         game.players.forEach((p, seat) => {
             if (!p.connected && p.chips > 0) {

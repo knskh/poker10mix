@@ -2013,7 +2013,22 @@ function showFoldedButtons(state) {
     presetsDiv.innerHTML = '';
     presetsDiv.classList.add('hidden');
 
-    if (isSitout) {
+    if (me.pendingRejoin) {
+        // Pending rejoin — waiting for next hand
+        const msg = document.createElement('div');
+        msg.className = 'folded-msg pending-rejoin-msg';
+        msg.textContent = '復帰予約済み — 次のハンドから参加します';
+        btnDiv.appendChild(msg);
+
+        const leaveBtn = document.createElement('button');
+        leaveBtn.className = 'btn-action btn-fold';
+        leaveBtn.textContent = '退室する';
+        leaveBtn.addEventListener('click', () => {
+            if (isInZoom) client.leaveZoom();
+            else client.leaveRoom();
+        });
+        btnDiv.appendChild(leaveBtn);
+    } else if (isSitout) {
         // Sitout state — show rejoin + leave
         const msg = document.createElement('div');
         msg.className = 'folded-msg sitout-msg';
