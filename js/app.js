@@ -168,8 +168,6 @@ function switchToTable(roomId) {
     // Hide action bars
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('draw-action-bar').classList.add('hidden');
-    document.getElementById('bet-numpad').classList.add('hidden');
-    document.getElementById('bet-numpad').classList.remove('visible');
     // Restore target table
     activeTableId = roomId;
     restoreTableState(roomId);
@@ -1147,9 +1145,6 @@ function setupGameScreen() {
         document.getElementById('history-modal').classList.remove('hidden');
     });
 
-    // Numpad interaction
-    setupNumpad();
-
     // Draw buttons
     document.getElementById('btn-draw').addEventListener('click', () => {
         if (ui.selectedCards.size === 0) {
@@ -2037,6 +2032,11 @@ function updateRaiseBtnText(totalChips) {
     const parts = btn.textContent.split(' ');
     const label = parts[0]; // レイズ or ベット
     btn.textContent = `${label} ${Number(totalChips).toLocaleString()}`;
+    // Sync input box
+    const input = document.getElementById('raise-input');
+    if (input && document.activeElement !== input) {
+        input.value = Number(totalChips).toLocaleString();
+    }
 }
 
 // Current raise amount (out-of-pocket) for the raise button
@@ -2052,8 +2052,6 @@ function showActionButtons(actions, turnData) {
     btnDiv.innerHTML = '';
     presetsDiv.classList.add('hidden');
     presetsDiv.innerHTML = '';
-    document.getElementById('bet-numpad').classList.add('hidden');
-    document.getElementById('bet-numpad').classList.remove('visible');
 
     currentTurnBB = turnData.bigBlind || 0;
     const isStud = !currentTurnBB;
@@ -2089,6 +2087,56 @@ function showActionButtons(actions, turnData) {
             const initTotal = action.min + pendingCurrentBet;
             const label = action.type === 'raise' ? 'レイズ' : 'ベット';
 
+            // Row: [input box] [raise button]
+            const raiseRow = document.createElement('div');
+            raiseRow.className = 'raise-row';
+
+            const input = document.createElement('input');
+            input.id = 'raise-input';
+            input.type = 'tel';
+            input.className = 'raise-input';
+            input.value = initTotal.toLocaleString();
+            input.autocomplete = 'off';
+            input.addEventListener('focus', () => input.select());
+            input.addEventListener('input', () => {
+                const raw = input.value.replace(/[^0-9]/g, '');
+                const totalInput = parseInt(raw) || 0;
+                input.value = totalInput ? totalInput.toLocaleString() : '';
+                const outOfPocket = totalInput - pendingCurrentBet;
+                if (outOfPocket >= varMin && outOfPocket <= varMax) {
+                    pendingRaiseAmount = outOfPocket;
+                    pendingRaiseType = varAction;
+                    updateRaiseBtnText(totalInput);
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                    const raw = input.value.replace(/[^0-9]/g, '');
+                    const totalInput = parseInt(raw) || 0;
+                    const outOfPocket = totalInput - pendingCurrentBet;
+                    const clamped = Math.min(varMax, Math.max(varMin, outOfPocket));
+                    pendingRaiseAmount = clamped;
+                    pendingRaiseType = varAction;
+                    const clampedTotal = clamped + pendingCurrentBet;
+                    input.value = clampedTotal.toLocaleString();
+                    updateRaiseBtnText(clampedTotal);
+                }
+            });
+            input.addEventListener('blur', () => {
+                const raw = input.value.replace(/[^0-9]/g, '');
+                const totalInput = parseInt(raw) || 0;
+                const outOfPocket = totalInput - pendingCurrentBet;
+                const clamped = Math.min(varMax, Math.max(varMin, outOfPocket));
+                pendingRaiseAmount = clamped;
+                pendingRaiseType = varAction;
+                const clampedTotal = clamped + pendingCurrentBet;
+                input.value = clampedTotal.toLocaleString();
+                updateRaiseBtnText(clampedTotal);
+            });
+            raiseRow.appendChild(input);
+
             const btn = document.createElement('button');
             btn.id = 'btn-raise-main';
             btn.className = `btn-action btn-${action.type}`;
@@ -2096,7 +2144,9 @@ function showActionButtons(actions, turnData) {
             btn.addEventListener('click', () => {
                 sendActionAndHide({ type: pendingRaiseType, amount: pendingRaiseAmount });
             });
-            btnDiv.appendChild(btn);
+            raiseRow.appendChild(btn);
+
+            btnDiv.appendChild(raiseRow);
         } else {
             const btn = document.createElement('button');
             btn.className = `btn-action btn-${action.type}`;
@@ -2224,34 +2274,12 @@ function renderBetPresets(turnData, varAction, varMin, varMax, allInAction) {
             const amount = allInAction.total || allInAction.amount;
             allItems.push({ label: 'All-In', targetTotal: amount, isAllin: true });
         }
-        // "その他" button to open numpad
-        allItems.push({ label: 'その他', targetTotal: 0, isCustom: true });
 
         allItems.forEach((p, i) => {
             const seg = document.createElement('div');
-            seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '') + (p.isCustom ? ' segment-custom' : '');
-            if (p.isCustom) {
-                seg.innerHTML = `${p.label}<span class="segment-value">numpad</span>`;
-            } else {
-                seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
-            }
+            seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '');
+            seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
             seg.addEventListener('click', () => {
-                if (p.isCustom) {
-                    // Open numpad
-                    const numpad = document.getElementById('bet-numpad');
-                    numpad.classList.remove('hidden');
-                    numpad.classList.add('visible');
-                    // Initialize numpad with current raise amount
-                    const total = pendingRaiseAmount + pendingCurrentBet;
-                    document.getElementById('numpad-value').textContent = total.toLocaleString();
-                    numpadBuffer = String(total);
-                    setSegActive(i);
-                    return;
-                }
-                // Close numpad if open
-                document.getElementById('bet-numpad').classList.add('hidden');
-                document.getElementById('bet-numpad').classList.remove('visible');
-
                 if (p.isAllin) {
                     pendingRaiseAmount = allInAction.amount;
                     pendingRaiseType = 'allin';
@@ -2293,7 +2321,7 @@ function renderBetPresets(turnData, varAction, varMin, varMax, allInAction) {
         presetsDiv.appendChild(bar);
         // Auto-select first preset
         requestAnimationFrame(() => {
-            if (allItems.length > 0 && !allItems[0].isCustom) {
+            if (allItems.length > 0) {
                 const firstSeg = bar.querySelector('.preset-segment');
                 if (firstSeg) firstSeg.click();
             } else {
@@ -2333,52 +2361,6 @@ function renderBetPresets(turnData, varAction, varMin, varMax, allInAction) {
     }
 }
 
-// Numpad logic
-let numpadBuffer = '0';
-function setupNumpad() {
-    const numpadEl = document.getElementById('bet-numpad');
-    const display = document.getElementById('numpad-value');
-
-    // Digit keys
-    numpadEl.querySelectorAll('.numpad-key[data-val]').forEach(key => {
-        key.addEventListener('click', () => {
-            const digit = key.dataset.val;
-            if (numpadBuffer === '0') {
-                numpadBuffer = digit;
-            } else if (numpadBuffer.length < 8) {
-                numpadBuffer += digit;
-            }
-            display.textContent = Number(numpadBuffer).toLocaleString();
-        });
-    });
-
-    // Clear
-    document.getElementById('numpad-clear').addEventListener('click', () => {
-        numpadBuffer = '0';
-        display.textContent = '0';
-    });
-
-    // Backspace
-    document.getElementById('numpad-back').addEventListener('click', () => {
-        numpadBuffer = numpadBuffer.length > 1 ? numpadBuffer.slice(0, -1) : '0';
-        display.textContent = Number(numpadBuffer).toLocaleString();
-    });
-
-    // OK — confirm custom amount
-    document.getElementById('numpad-confirm').addEventListener('click', () => {
-        const totalInput = parseInt(numpadBuffer) || 0;
-        const outOfPocket = totalInput - pendingCurrentBet;
-        // Clamp to valid range
-        const btn = document.getElementById('btn-raise-main');
-        if (!btn) return;
-        pendingRaiseAmount = Math.max(1, outOfPocket);
-        pendingRaiseType = pendingRaiseType === 'allin' ? 'raise' : pendingRaiseType;
-        updateRaiseBtnText(totalInput);
-        // Hide numpad
-        numpadEl.classList.add('hidden');
-        numpadEl.classList.remove('visible');
-    });
-}
 
 function processPendingSwitch() {
     myTurnOnActiveTable = false;
@@ -2404,8 +2386,6 @@ function sendActionAndHide(action) {
     }
     client.sendAction(action, activeTableId);
     document.getElementById('action-bar').classList.add('hidden');
-    document.getElementById('bet-numpad').classList.add('hidden');
-    document.getElementById('bet-numpad').classList.remove('visible');
     stopTurnTimer();
     processPendingSwitch();
 }
