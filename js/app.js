@@ -2087,7 +2087,7 @@ function showActionButtons(actions, turnData) {
             const initTotal = action.min + pendingCurrentBet;
             const label = action.type === 'raise' ? 'レイズ' : 'ベット';
 
-            // Row: [input box] [raise button]
+            // Row: [raise button] [input box]
             const raiseRow = document.createElement('div');
             raiseRow.className = 'raise-row';
 
@@ -2135,8 +2135,6 @@ function showActionButtons(actions, turnData) {
                 input.value = clampedTotal.toLocaleString();
                 updateRaiseBtnText(clampedTotal);
             });
-            raiseRow.appendChild(input);
-
             const btn = document.createElement('button');
             btn.id = 'btn-raise-main';
             btn.className = `btn-action btn-${action.type}`;
@@ -2145,6 +2143,7 @@ function showActionButtons(actions, turnData) {
                 sendActionAndHide({ type: pendingRaiseType, amount: pendingRaiseAmount });
             });
             raiseRow.appendChild(btn);
+            raiseRow.appendChild(input);
 
             btnDiv.appendChild(raiseRow);
         } else {
