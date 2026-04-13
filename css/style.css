@@ -1970,7 +1970,8 @@ body {
     #pot-display { font-size: 11px; padding: 2px 8px; }
     .pot-label { font-size: 9px; }
     .pot-amount { font-size: 12px; }
-    .table-bet-chip { font-size: 9px; padding: 2px 6px; }
+    .table-bet-chip { font-size: 9px; padding: 1px 5px 1px 4px; }
+    .chip-icon { width: 8px; height: 8px; }
     .gc-name { font-size: 22px; }
     .gc-label { font-size: 12px; }
     #table-info { font-size: 10px; top: 38%; }
@@ -2089,6 +2090,9 @@ body {
 
     .seat-name { font-size: 9px; }
     .seat-chips { font-size: 8px; }
+    .seat-bet { font-size: 8px; }
+    .table-bet-chip { font-size: 8px; padding: 1px 4px 1px 3px; }
+    .chip-icon { width: 7px; height: 7px; }
     .btn-action { padding: 12px 10px; font-size: 14px; min-width: 60px; }
     #player-cards .card { width: 36px; height: 48px; }
     #player-cards .card-rank { font-size: 14px; }
