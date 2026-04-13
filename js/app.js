@@ -781,94 +781,8 @@ function setupGameScreen() {
         document.getElementById('history-modal').classList.remove('hidden');
     });
 
-    // Bet slider and raise-input sync (event delegation since inputs are created dynamically)
-    const betSlider = document.getElementById('bet-slider');
-
-    betSlider.addEventListener('input', (e) => {
-        const total = parseInt(e.target.value) + sliderOffset;
-        const betInput = document.getElementById('bet-amount-input');
-        if (betInput) betInput.value = total;
-        updateRaiseBtnText(total);
-        const tip = document.getElementById('slider-value-tip');
-        if (tip) {
-            const bb = currentTurnBB || 100;
-            const bbVal = total / bb;
-            const bbText = Number.isInteger(bbVal) ? bbVal : bbVal.toFixed(1);
-            tip.textContent = `${Number(total).toLocaleString()} (${bbText}bb)`;
-        }
-    });
-
-    document.addEventListener('input', (e) => {
-        if (e.target.id !== 'bet-amount-input') return;
-        let val = parseInt(e.target.value) || 0;
-        let sliderVal = val - sliderOffset;
-        if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
-        if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
-        betSlider.value = sliderVal;
-        updateRaiseBtnText(val);
-    });
-
-    document.addEventListener('blur', (e) => {
-        if (e.target.id !== 'bet-amount-input') return;
-        let val = parseInt(e.target.value) || 0;
-        let sliderVal = val - sliderOffset;
-        if (sliderVal < parseInt(betSlider.min)) sliderVal = parseInt(betSlider.min);
-        if (sliderVal > parseInt(betSlider.max)) sliderVal = parseInt(betSlider.max);
-        e.target.value = sliderVal + sliderOffset;
-        betSlider.value = sliderVal;
-        updateRaiseBtnText(e.target.value);
-    }, true);
-
-    // Slider area swipe gesture for preset switching (segment bar)
-    const sliderArea = document.getElementById('bet-slider-area');
-    let swipeStartY = null;
-    sliderArea.addEventListener('touchstart', (e) => {
-        if (e.target.id === 'bet-slider') return;
-        swipeStartY = e.touches[0].clientY;
-    }, { passive: true });
-    sliderArea.addEventListener('touchend', (e) => {
-        if (swipeStartY === null) return;
-        const dy = swipeStartY - (e.changedTouches[0] ? e.changedTouches[0].clientY : swipeStartY);
-        swipeStartY = null;
-        if (Math.abs(dy) < 30) return;
-        const segments = [...document.querySelectorAll('#bet-presets .preset-segment')];
-        if (segments.length === 0) return;
-        const activeIdx = segments.findIndex(s => s.classList.contains('active'));
-        let nextIdx;
-        if (dy > 0) {
-            nextIdx = activeIdx < 0 ? segments.length - 1 : Math.min(segments.length - 1, activeIdx + 1);
-        } else {
-            nextIdx = activeIdx < 0 ? 0 : Math.max(0, activeIdx - 1);
-        }
-        segments[nextIdx].click();
-    }, { passive: true });
-
-    // Slider ± buttons
-    const sliderMinusBtn = document.getElementById('btn-slider-minus');
-    const sliderPlusBtn = document.getElementById('btn-slider-plus');
-    function adjustSlider(delta) {
-        const slider = document.getElementById('bet-slider');
-        const bb = currentTurnBB || 100;
-        let val = parseInt(slider.value) + delta * bb;
-        val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val));
-        slider.value = val;
-        slider.dispatchEvent(new Event('input'));
-    }
-    // Single click
-    sliderMinusBtn.addEventListener('click', () => adjustSlider(-1));
-    sliderPlusBtn.addEventListener('click', () => adjustSlider(1));
-    // Long-press repeat
-    let adjInterval = null;
-    const startRepeat = (delta) => {
-        adjInterval = setInterval(() => adjustSlider(delta), 150);
-    };
-    const stopRepeat = () => { if (adjInterval) { clearInterval(adjInterval); adjInterval = null; } };
-    sliderMinusBtn.addEventListener('pointerdown', () => { setTimeout(() => { if (!adjInterval) startRepeat(-1); }, 300); });
-    sliderMinusBtn.addEventListener('pointerup', stopRepeat);
-    sliderMinusBtn.addEventListener('pointerleave', stopRepeat);
-    sliderPlusBtn.addEventListener('pointerdown', () => { setTimeout(() => { if (!adjInterval) startRepeat(1); }, 300); });
-    sliderPlusBtn.addEventListener('pointerup', stopRepeat);
-    sliderPlusBtn.addEventListener('pointerleave', stopRepeat);
+    // Numpad interaction
+    setupNumpad();
 
     // Draw buttons
     document.getElementById('btn-draw').addEventListener('click', () => {
@@ -887,38 +801,12 @@ function setupGameScreen() {
         ui.pendingDraw = false;
     });
 
-    // Keyboard shortcuts for slider / action bar
+    // Keyboard shortcut: Enter to confirm raise
     document.addEventListener('keydown', (e) => {
-        // Skip if typing in an input field
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         const actionBar = document.getElementById('action-bar');
         if (actionBar.classList.contains('hidden')) return;
-
-        const slider = document.getElementById('bet-slider');
-        const sliderArea = document.getElementById('bet-slider-area');
-        const hasSlider = sliderArea && sliderArea.classList.contains('visible');
-
-        if (hasSlider && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-            e.preventDefault();
-            const step = parseInt(slider.step) || 50;
-            let val = parseInt(slider.value);
-            if (e.key === 'ArrowLeft') val = Math.max(parseInt(slider.min), val - step);
-            else val = Math.min(parseInt(slider.max), val + step);
-            slider.value = val;
-            slider.dispatchEvent(new Event('input'));
-        } else if (hasSlider && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-            e.preventDefault();
-            const segments = [...document.querySelectorAll('#bet-presets .preset-segment')];
-            if (segments.length === 0) return;
-            const activeIdx = segments.findIndex(s => s.classList.contains('active'));
-            let nextIdx;
-            if (e.key === 'ArrowUp') {
-                nextIdx = activeIdx < 0 ? segments.length - 1 : Math.max(0, activeIdx - 1);
-            } else {
-                nextIdx = activeIdx < 0 ? 0 : Math.min(segments.length - 1, activeIdx + 1);
-            }
-            segments[nextIdx].click();
-        } else if (e.key === 'Enter' && hasSlider) {
+        if (e.key === 'Enter') {
             e.preventDefault();
             const raiseBtn = document.getElementById('btn-raise-main');
             if (raiseBtn) raiseBtn.click();
@@ -1760,6 +1648,11 @@ function updateRaiseBtnText(totalChips) {
     btn.textContent = `${label} ${Number(totalChips).toLocaleString()}`;
 }
 
+// Current raise amount (out-of-pocket) for the raise button
+let pendingRaiseAmount = 0;
+let pendingRaiseType = 'raise';
+let pendingCurrentBet = 0;
+
 function showActionButtons(actions, turnData) {
     const bar = document.getElementById('action-bar');
     const btnDiv = document.getElementById('action-buttons');
@@ -1768,14 +1661,15 @@ function showActionButtons(actions, turnData) {
     btnDiv.innerHTML = '';
     presetsDiv.classList.add('hidden');
     presetsDiv.innerHTML = '';
-    document.getElementById('bet-slider-area').classList.remove('visible');
+    document.getElementById('bet-numpad').classList.add('hidden');
+    document.getElementById('bet-numpad').classList.remove('visible');
 
     currentTurnBB = turnData.bigBlind || 0;
     const isStud = !currentTurnBB;
 
-    let hasSlider = false;
-    let sliderAction = null;
-    let sliderMin = 0, sliderMax = 0;
+    let hasVariable = false;
+    let varAction = null;
+    let varMin = 0, varMax = 0;
 
     // Sort: raise/bet (top) → call/check → fold (bottom); allin goes to presets
     const order = ['raise', 'bet', 'call', 'check', 'fold'];
@@ -1784,49 +1678,34 @@ function showActionButtons(actions, turnData) {
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     });
 
-    let allInAction = null; // collected separately → shown as preset
+    let allInAction = null;
 
     for (const action of sorted) {
-        // Allin: skip button, save for preset
         if (action.type === 'allin') {
             allInAction = action;
             continue;
         }
 
         if ((action.type === 'bet' || action.type === 'raise') && action.min !== undefined) {
-            // Variable raise/bet: row with button + amount input
-            hasSlider = true;
-            sliderAction = action.type;
-            sliderMin = action.min;
-            sliderMax = action.max;
-            const curBet = action.currentBet || 0;
-            setupSlider(action.min, action.max, curBet);
+            hasVariable = true;
+            varAction = action.type;
+            varMin = action.min;
+            varMax = action.max;
+            pendingCurrentBet = action.currentBet || 0;
+            pendingRaiseType = action.type;
+            pendingRaiseAmount = action.min;
 
-            const initTotal = action.min + curBet;
+            const initTotal = action.min + pendingCurrentBet;
             const label = action.type === 'raise' ? 'レイズ' : 'ベット';
-
-            const row = document.createElement('div');
-            row.className = 'action-raise-row';
 
             const btn = document.createElement('button');
             btn.id = 'btn-raise-main';
             btn.className = `btn-action btn-${action.type}`;
             btn.textContent = `${label} ${initTotal.toLocaleString()}`;
             btn.addEventListener('click', () => {
-                const val = parseInt(document.getElementById('bet-slider').value);
-                sendActionAndHide({ type: action.type, amount: val });
+                sendActionAndHide({ type: pendingRaiseType, amount: pendingRaiseAmount });
             });
-
-            const inp = document.createElement('input');
-            inp.type = 'number';
-            inp.id = 'bet-amount-input';
-            inp.className = 'bet-raise-input';
-            inp.inputMode = 'numeric';
-            inp.value = initTotal;
-
-            row.appendChild(btn);
-            row.appendChild(inp);
-            btnDiv.appendChild(row);
+            btnDiv.appendChild(btn);
         } else {
             const btn = document.createElement('button');
             btn.className = `btn-action btn-${action.type}`;
@@ -1901,13 +1780,13 @@ function showActionButtons(actions, turnData) {
         }
     }
 
-    if (hasSlider || allInAction) {
-        renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction);
+    if (hasVariable || allInAction) {
+        renderBetPresets(turnData, varAction, varMin, varMax, allInAction);
     }
 }
 
 
-function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction) {
+function renderBetPresets(turnData, varAction, varMin, varMax, allInAction) {
     const presetsDiv = document.getElementById('bet-presets');
     presetsDiv.innerHTML = '';
     const presets = [];
@@ -1915,8 +1794,9 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
     const pot = (turnData && turnData.pot) || 0;
     const isFirstRound = turnData && turnData.isFirstRound;
     const tableBet = (turnData && turnData.currentBet) || 0;
+    const curBet = pendingCurrentBet;
 
-    if (sliderAction) {
+    if (varAction) {
         if (isFirstRound && tableBet <= bb) {
             currentPresets['preflop-open'].forEach(mult => {
                 const targetTotal = Math.round(bb * mult);
@@ -1935,10 +1815,10 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             });
         }
 
-        // Filter out presets outside slider range
+        // Filter out presets outside valid range
         const filtered = presets.filter(p => {
-            const outOfPocket = p.targetTotal - sliderOffset;
-            return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
+            const outOfPocket = p.targetTotal - curBet;
+            return outOfPocket <= varMax && outOfPocket >= varMin;
         });
 
         // Build segment bar
@@ -1953,18 +1833,44 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             const amount = allInAction.total || allInAction.amount;
             allItems.push({ label: 'All-In', targetTotal: amount, isAllin: true });
         }
-
-        const slider = document.getElementById('bet-slider');
+        // "その他" button to open numpad
+        allItems.push({ label: 'その他', targetTotal: 0, isCustom: true });
 
         allItems.forEach((p, i) => {
             const seg = document.createElement('div');
-            seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '');
-            seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
+            seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '') + (p.isCustom ? ' segment-custom' : '');
+            if (p.isCustom) {
+                seg.innerHTML = `${p.label}<span class="segment-value">numpad</span>`;
+            } else {
+                seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
+            }
             seg.addEventListener('click', () => {
-                // Set slider directly (linear)
-                const outOfPocket = p.targetTotal - sliderOffset;
-                slider.value = Math.min(parseInt(slider.max), Math.max(parseInt(slider.min), outOfPocket));
-                slider.dispatchEvent(new Event('input'));
+                if (p.isCustom) {
+                    // Open numpad
+                    const numpad = document.getElementById('bet-numpad');
+                    numpad.classList.remove('hidden');
+                    numpad.classList.add('visible');
+                    // Initialize numpad with current raise amount
+                    const total = pendingRaiseAmount + pendingCurrentBet;
+                    document.getElementById('numpad-value').textContent = total.toLocaleString();
+                    numpadBuffer = String(total);
+                    setSegActive(i);
+                    return;
+                }
+                // Close numpad if open
+                document.getElementById('bet-numpad').classList.add('hidden');
+                document.getElementById('bet-numpad').classList.remove('visible');
+
+                if (p.isAllin) {
+                    pendingRaiseAmount = allInAction.amount;
+                    pendingRaiseType = 'allin';
+                } else {
+                    const outOfPocket = p.targetTotal - curBet;
+                    pendingRaiseAmount = Math.min(varMax, Math.max(varMin, outOfPocket));
+                    pendingRaiseType = varAction;
+                }
+                const total = p.isAllin ? (allInAction.total || allInAction.amount + curBet) : p.targetTotal;
+                updateRaiseBtnText(total);
                 setSegActive(i);
             });
             bar.appendChild(seg);
@@ -1993,30 +1899,19 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             else track.classList.remove('track-allin');
         }
 
-        // Sync slider → segment highlight (linear)
-        function onSliderInput() {
-            const total = parseInt(slider.value) + sliderOffset;
-            let closest = -1, minDist = Infinity;
-            allItems.forEach((p, i) => {
-                const dist = Math.abs(p.targetTotal - total);
-                const threshold = p.isAllin ? (sliderMax * 0.05) : Math.max(bb * 0.3, 15);
-                if (dist <= threshold && dist < minDist) {
-                    minDist = dist;
-                    closest = i;
-                }
-            });
-            setSegActive(closest);
-        }
-
-        slider._presetListener && slider.removeEventListener('input', slider._presetListener);
-        slider._presetListener = onSliderInput;
-        slider.addEventListener('input', onSliderInput);
-
         presetsDiv.appendChild(bar);
-        requestAnimationFrame(() => setSegActive(-1));
+        // Auto-select first preset
+        requestAnimationFrame(() => {
+            if (allItems.length > 0 && !allItems[0].isCustom) {
+                const firstSeg = bar.querySelector('.preset-segment');
+                if (firstSeg) firstSeg.click();
+            } else {
+                setSegActive(-1);
+            }
+        });
 
     } else if (allInAction) {
-        // No slider action but all-in exists — simple all-in button
+        // No variable action but all-in exists
         const amount = allInAction.total || allInAction.amount;
         const bar = document.createElement('div');
         bar.className = 'preset-segment-bar';
@@ -2027,12 +1922,16 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
         seg.className = 'preset-segment segment-allin';
         seg.innerHTML = `All-In<span class="segment-value">${amount.toLocaleString()}</span>`;
         seg.addEventListener('click', () => {
-            const slider = document.getElementById('bet-slider');
-            if (slider) slider.value = parseInt(slider.max);
-            const total = parseInt(slider.max) + sliderOffset;
-            const input = document.getElementById('bet-amount-input');
-            if (input) input.value = total;
-            updateRaiseBtnText(total);
+            pendingRaiseAmount = allInAction.amount;
+            pendingRaiseType = 'allin';
+            updateRaiseBtnText(amount);
+            track.style.opacity = '1';
+            const barRect = bar.getBoundingClientRect();
+            const segRect = seg.getBoundingClientRect();
+            track.style.left = '3px';
+            track.style.width = (barRect.width - 6) + 'px';
+            track.classList.add('track-allin');
+            seg.classList.add('active');
         });
         bar.appendChild(seg);
         presetsDiv.appendChild(bar);
@@ -2043,25 +1942,51 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
     }
 }
 
-let sliderOffset = 0; // currentBet to add for total display
-function setupSlider(min, max, currentBet) {
-    const slider = document.getElementById('bet-slider');
-    slider.min = min; slider.max = max; slider.value = min;
-    slider.step = Math.max(Math.floor(min / 2), 10);
-    sliderOffset = currentBet || 0;
-    // bet-amount-input is created dynamically in the raise row
-    const input = document.getElementById('bet-amount-input');
-    if (input) input.value = min + sliderOffset;
-    // Update slider tooltip and show slider
-    const tip = document.getElementById('slider-value-tip');
-    if (tip) {
-        const total = min + sliderOffset;
-        const bb = currentTurnBB || 100;
-        const bbVal = total / bb;
-        const bbText = Number.isInteger(bbVal) ? bbVal : bbVal.toFixed(1);
-        tip.textContent = `${Number(total).toLocaleString()} (${bbText}bb)`;
-    }
-    document.getElementById('bet-slider-area').classList.add('visible');
+// Numpad logic
+let numpadBuffer = '0';
+function setupNumpad() {
+    const numpadEl = document.getElementById('bet-numpad');
+    const display = document.getElementById('numpad-value');
+
+    // Digit keys
+    numpadEl.querySelectorAll('.numpad-key[data-val]').forEach(key => {
+        key.addEventListener('click', () => {
+            const digit = key.dataset.val;
+            if (numpadBuffer === '0') {
+                numpadBuffer = digit;
+            } else if (numpadBuffer.length < 8) {
+                numpadBuffer += digit;
+            }
+            display.textContent = Number(numpadBuffer).toLocaleString();
+        });
+    });
+
+    // Clear
+    document.getElementById('numpad-clear').addEventListener('click', () => {
+        numpadBuffer = '0';
+        display.textContent = '0';
+    });
+
+    // Backspace
+    document.getElementById('numpad-back').addEventListener('click', () => {
+        numpadBuffer = numpadBuffer.length > 1 ? numpadBuffer.slice(0, -1) : '0';
+        display.textContent = Number(numpadBuffer).toLocaleString();
+    });
+
+    // OK — confirm custom amount
+    document.getElementById('numpad-confirm').addEventListener('click', () => {
+        const totalInput = parseInt(numpadBuffer) || 0;
+        const outOfPocket = totalInput - pendingCurrentBet;
+        // Clamp to valid range
+        const btn = document.getElementById('btn-raise-main');
+        if (!btn) return;
+        pendingRaiseAmount = Math.max(1, outOfPocket);
+        pendingRaiseType = pendingRaiseType === 'allin' ? 'raise' : pendingRaiseType;
+        updateRaiseBtnText(totalInput);
+        // Hide numpad
+        numpadEl.classList.add('hidden');
+        numpadEl.classList.remove('visible');
+    });
 }
 
 function sendActionAndHide(action) {
@@ -2074,7 +1999,8 @@ function sendActionAndHide(action) {
     }
     client.sendAction(action);
     document.getElementById('action-bar').classList.add('hidden');
-    document.getElementById('bet-slider-area').classList.remove('visible');
+    document.getElementById('bet-numpad').classList.add('hidden');
+    document.getElementById('bet-numpad').classList.remove('visible');
     stopTurnTimer();
 }
 
