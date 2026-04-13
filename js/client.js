@@ -123,6 +123,12 @@ class PokerClient {
             case 'emote':
                 this.emit('emote', { seat: msg.seat, emote: msg.emote, from: msg.from });
                 break;
+            case 'reaction':
+                this.emit('reaction', { emote: msg.emote, from: msg.from });
+                break;
+            case 'big_hand':
+                this.emit('big_hand', { roomId: msg.roomId, winner: msg.winner, pot: msg.pot, handRank: msg.handRank, gameName: msg.gameName });
+                break;
             case 'quiz_start':
                 this.emit('quiz_start', { category: msg.category, display: msg.display, wordLength: msg.wordLength });
                 break;
@@ -156,6 +162,7 @@ class PokerClient {
     sendChat(message) { this.send({ type: 'chat', message }); }
     rejoinGame() { this.send({ type: 'rejoin_game' }); }
     sendEmote(emote) { this.send({ type: 'emote', emote }); }
+    sendReaction(emote) { this.send({ type: 'reaction', emote }); }
     rebuyChips(amount) { this.send({ type: 'rebuy_chips', amount }); }
     getStats() { this.send({ type: 'get_stats' }); }
     getRooms() { this.send({ type: 'get_rooms' }); }

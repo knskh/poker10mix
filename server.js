@@ -890,6 +890,19 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'reaction': {
+            const emote = (msg.emote || '').slice(0, 4);
+            const room = rooms.get(client.roomId);
+            if (room) {
+                broadcastToRoom(room, { type: 'reaction', emote, from: client.name });
+            } else if (client.inZoom) {
+                for (const [ws2, c2] of clients) {
+                    if (c2.inZoom) send(ws2, { type: 'reaction', emote, from: client.name });
+                }
+            }
+            break;
+        }
+
         case 'rebuy_chips': {
             const room = rooms.get(client.roomId);
             if (!room || !room.game) break;
@@ -1227,6 +1240,43 @@ function startGame(room) {
         broadcastToRoom(room, handResult);
         room.stats.endHand(game.players, hadShowdown);
         broadcastStatsUpdate(room);
+
+        // Big hand detection → broadcast to lobby
+        const bigBlind = game.bigBlind || 100;
+        const potThreshold = bigBlind * 50;
+        // Calculate pot from chip changes
+        let totalPot = 0;
+        let winnerName = '';
+        let maxGain = 0;
+        for (const p of handResult.players) {
+            if (!p.name) continue;
+            const diff = p.chips - p.startChips;
+            if (diff < 0) totalPot += Math.abs(diff);
+            if (diff > maxGain) { maxGain = diff; winnerName = p.name; }
+        }
+        if (totalPot >= potThreshold && winnerName) {
+            // Determine hand rank of winner
+            let handRank = '';
+            if (hadShowdown) {
+                const winner = handResult.players.find(p => p.name === winnerName);
+                if (winner && winner.cards && winner.cards.length > 0) {
+                    try {
+                        const evalCards = winner.cards.map(c => ({ rank: c.rank, suit: c.suit }));
+                        const cc = (handResult.communityCards || []).map(c => ({ rank: c.rank, suit: c.suit }));
+                        const allCards = [...evalCards, ...cc];
+                        if (allCards.length >= 5) {
+                            const result = bestHighHand(allCards);
+                            if (result && result.desc) handRank = result.desc;
+                        }
+                    } catch (e) {}
+                }
+            }
+            for (const [ws2, c2] of clients) {
+                if (!c2.roomId && !c2.inZoom) {
+                    send(ws2, { type: 'big_hand', roomId: room.id, winner: winnerName, pot: totalPot, handRank, gameName: gc.name });
+                }
+            }
+        }
     };
 
     room.game = game;
@@ -1485,6 +1535,41 @@ function createZoomTable(members) {
         }
         stats.endHand(game.players, hadShowdown);
         broadcastZoomStatsUpdate(table);
+
+        // Big hand detection → broadcast to lobby
+        const bigBlind = game.bigBlind || 100;
+        const potThreshold = bigBlind * 50;
+        let totalPot = 0;
+        let winnerName = '';
+        let maxGain = 0;
+        for (const p of handResult.players) {
+            if (!p.name) continue;
+            const diff = p.chips - p.startChips;
+            if (diff < 0) totalPot += Math.abs(diff);
+            if (diff > maxGain) { maxGain = diff; winnerName = p.name; }
+        }
+        if (totalPot >= potThreshold && winnerName) {
+            let handRank = '';
+            if (hadShowdown) {
+                const winner = handResult.players.find(p => p.name === winnerName);
+                if (winner && winner.cards && winner.cards.length > 0) {
+                    try {
+                        const evalCards = winner.cards.map(c => ({ rank: c.rank, suit: c.suit }));
+                        const cc = (handResult.communityCards || []).map(c => ({ rank: c.rank, suit: c.suit }));
+                        const allCards = [...evalCards, ...cc];
+                        if (allCards.length >= 5) {
+                            const result = bestHighHand(allCards);
+                            if (result && result.desc) handRank = result.desc;
+                        }
+                    } catch (e) {}
+                }
+            }
+            for (const [ws2, c2] of clients) {
+                if (!c2.roomId && !c2.inZoom) {
+                    send(ws2, { type: 'big_hand', roomId: 'ZOOM', winner: winnerName, pot: totalPot, handRank, gameName: gc.name });
+                }
+            }
+        }
     };
 
     game.onGetPlayerAction = (actions, player) => {

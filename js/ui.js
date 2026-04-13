@@ -151,6 +151,9 @@ class PokerUI {
     constructor() {
         this.selectedCards = new Set();
         this.pendingDraw = false;
+        this._prevCCCount = 0; // previous community card count for deal animation
+        this._prevMyCardCount = 0; // previous player card count
+        this._prevFolded = {}; // track fold state per seat index
         this._setupResize();
     }
 
@@ -262,14 +265,36 @@ class PokerUI {
             }
         });
 
-        // Community cards
+        // Community cards with deal animation
         const ccDiv = document.getElementById('community-cards');
+        const prevCC = this._prevCCCount;
+        const newCC = (s.gameType === 'community' && s.communityCards) ? s.communityCards.length : 0;
         ccDiv.innerHTML = '';
         if (s.gameType === 'community' && s.communityCards) {
-            for (const card of s.communityCards) {
-                ccDiv.appendChild(this.createCardEl(card, false));
+            for (let ci = 0; ci < s.communityCards.length; ci++) {
+                const cardEl = this.createCardEl(s.communityCards[ci], false);
+                if (ci >= prevCC && newCC > prevCC) {
+                    cardEl.classList.add('card-deal', `card-deal-${ci}`);
+                }
+                ccDiv.appendChild(cardEl);
+            }
+            // Show round name flash when new cards dealt
+            if (newCC > prevCC && prevCC >= 0) {
+                let roundName = '';
+                if (newCC === 3 && prevCC === 0) roundName = 'FLOP';
+                else if (newCC === 4 && prevCC === 3) roundName = 'TURN';
+                else if (newCC === 5 && prevCC === 4) roundName = 'RIVER';
+                if (roundName) {
+                    const flash = document.createElement('div');
+                    flash.className = 'round-flash';
+                    flash.textContent = roundName;
+                    const tableFelt = document.getElementById('table-felt');
+                    tableFelt.appendChild(flash);
+                    setTimeout(() => flash.remove(), 1300);
+                }
             }
         }
+        this._prevCCCount = newCC;
 
         // Seats - hide unused, show used
         for (let i = 0; i < 6; i++) {
@@ -329,6 +354,15 @@ class PokerUI {
         const el = document.getElementById(`seat-${idx}`);
         const isMe = idx === s.mySeatIndex;
 
+        // Detect fold transition → play card fold-out animation
+        const wasFolded = this._prevFolded[idx] || false;
+        const justFolded = p.folded && !wasFolded;
+        this._prevFolded[idx] = p.folded;
+
+        if (justFolded) {
+            this._playFoldAnimation(el);
+        }
+
         el.innerHTML = '';
 
         if (p.folded) el.classList.add('folded');
@@ -359,7 +393,8 @@ class PokerUI {
         const nameDiv = document.createElement('div');
         nameDiv.className = 'seat-name';
         nameDiv.style.cursor = 'pointer';
-        nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '');
+        const noteIcon = (typeof hasPlayerNote === 'function' && hasPlayerNote(p.name)) ? ' 📝' : '';
+        nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + (!p.connected ? ' [離席]' : '') + noteIcon;
         const playerData = p;
         const gameState = s;
         const seatIdx = idx;
@@ -442,8 +477,30 @@ class PokerUI {
             el.appendChild(cardsDiv);
         }
 
+        // Showdown hand rank label
+        if (s.isShowdown && !p.folded) {
+            let sdCards;
+            if (s.gameType === 'stud') {
+                sdCards = [...(p.downCards || []), ...(p.upCards || [])];
+            } else {
+                sdCards = p.hand || [];
+            }
+            if (sdCards.length >= 2) {
+                const desc = describeHand(s.gameId, s.gameType, sdCards, s.communityCards || []);
+                if (desc) {
+                    const isWinner = typeof lastHandResult !== 'undefined' && lastHandResult && lastHandResult.players
+                        ? lastHandResult.players.some(lp => lp.name === p.name && lp.chips - lp.startChips > 0)
+                        : false;
+                    const rankDiv = document.createElement('div');
+                    rankDiv.className = 'seat-hand-rank ' + (isWinner ? 'rank-winner' : 'rank-loser');
+                    rankDiv.textContent = desc;
+                    el.appendChild(rankDiv);
+                }
+            }
+        }
+
         // Last action
-        if (p.lastAction) {
+        if (p.lastAction && !s.isShowdown) {
             const actionDiv = document.createElement('div');
             const actionClass = { fold:'action-fold', check:'action-check', call:'action-call', bet:'action-bet', raise:'action-raise', allin:'action-allin' };
             actionDiv.className = 'seat-action-label' + (actionClass[p.lastAction] ? ' ' + actionClass[p.lastAction] : '');
@@ -532,6 +589,39 @@ class PokerUI {
         const wrap = el.querySelector('.bubble-timer-wrap');
         if (wrap) wrap.remove();
         el.classList.remove('seat-timed-out');
+    }
+
+    _playFoldAnimation(seatEl) {
+        // Capture existing card elements before innerHTML is cleared
+        const cards = seatEl.querySelectorAll('.seat-cards .card');
+        if (cards.length === 0) return;
+
+        // Get seat position for animation direction
+        const seatRect = seatEl.getBoundingClientRect();
+        const tableFelt = document.getElementById('table-felt');
+        if (!tableFelt) return;
+        const feltRect = tableFelt.getBoundingClientRect();
+        const feltCenterX = feltRect.left + feltRect.width / 2;
+
+        // Direction: slide towards center then fade
+        const slideX = seatRect.left < feltCenterX ? 30 : -30;
+
+        // Create floating clones of the cards
+        cards.forEach((card, i) => {
+            const clone = card.cloneNode(true);
+            clone.className = 'card card-fold-out';
+            const cardRect = card.getBoundingClientRect();
+            clone.style.position = 'fixed';
+            clone.style.left = cardRect.left + 'px';
+            clone.style.top = cardRect.top + 'px';
+            clone.style.width = cardRect.width + 'px';
+            clone.style.height = cardRect.height + 'px';
+            clone.style.zIndex = '150';
+            clone.style.animationDelay = (i * 0.06) + 's';
+            clone.style.setProperty('--fold-slide-x', slideX + 'px');
+            document.body.appendChild(clone);
+            setTimeout(() => clone.remove(), 600 + i * 60);
+        });
     }
 
     showSeatPopup(p, s, idx) {
@@ -624,6 +714,45 @@ class PokerUI {
         info.textContent = `${p.chips.toLocaleString()} chips`;
         inner.appendChild(info);
 
+        // Player note section
+        const noteSection = document.createElement('div');
+        noteSection.className = 'seat-popup-note-section';
+        const existingNote = typeof getPlayerNote === 'function' ? getPlayerNote(p.name) : '';
+        const noteInput = document.createElement('textarea');
+        noteInput.className = 'seat-popup-note-input';
+        noteInput.placeholder = 'メモを入力...';
+        noteInput.value = existingNote;
+        noteInput.maxLength = 200;
+        noteInput.rows = 2;
+        noteInput.addEventListener('click', (e) => e.stopPropagation());
+        noteSection.appendChild(noteInput);
+        const noteBtnRow = document.createElement('div');
+        noteBtnRow.className = 'seat-popup-note-btns';
+        const saveNoteBtn = document.createElement('button');
+        saveNoteBtn.className = 'btn-small seat-popup-note-save';
+        saveNoteBtn.textContent = '📝 保存';
+        saveNoteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof setPlayerNote === 'function') setPlayerNote(p.name, noteInput.value);
+            saveNoteBtn.textContent = '✓ 保存済';
+            setTimeout(() => { saveNoteBtn.textContent = '📝 保存'; }, 1200);
+        });
+        noteBtnRow.appendChild(saveNoteBtn);
+        if (existingNote) {
+            const delNoteBtn = document.createElement('button');
+            delNoteBtn.className = 'btn-small seat-popup-note-del';
+            delNoteBtn.textContent = '削除';
+            delNoteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                noteInput.value = '';
+                if (typeof setPlayerNote === 'function') setPlayerNote(p.name, '');
+                delNoteBtn.remove();
+            });
+            noteBtnRow.appendChild(delNoteBtn);
+        }
+        noteSection.appendChild(noteBtnRow);
+        inner.appendChild(noteSection);
+
         // Stats button
         const statsBtn = document.createElement('button');
         statsBtn.className = 'btn-small seat-popup-stats-btn';
@@ -693,9 +822,16 @@ class PokerUI {
         const downCount = (me.downCards || []).length;
         const upCount = (me.upCards || []).length;
 
+        const prevMyCount = this._prevMyCardCount;
         for (let i = 0; i < cards.length; i++) {
             const cardEl = this.createCardEl(cards[i], false);
             cardEl.classList.add('card-selectable');
+
+            // Slide-in animation for newly dealt cards
+            if (i >= prevMyCount && cards.length > prevMyCount) {
+                cardEl.classList.add('card-slide-in');
+                cardEl.style.animationDelay = (i * 0.08) + 's';
+            }
 
             if (this.selectedCards.has(i)) {
                 cardEl.classList.add('card-selected');
@@ -738,6 +874,7 @@ class PokerUI {
                 container.appendChild(rankLabel);
             }
         }
+        this._prevMyCardCount = cards.length;
     }
 
     createCardEl(card, faceDown) {
@@ -762,7 +899,21 @@ class PokerUI {
         const log = document.getElementById('game-log');
         if (!log) return;
         const entry = document.createElement('div');
-        entry.className = 'log-entry' + (cls ? ` log-${cls}` : '');
+        let classes = 'log-entry';
+        if (cls) classes += ` log-${cls}`;
+        // Auto-detect action type for color coding
+        if (!cls || cls === '') {
+            if (/フォールド/.test(msg)) classes += ' log-act-fold';
+            else if (/オールイン/.test(msg)) classes += ' log-act-allin';
+            else if (/レイズ|ベット/.test(msg)) classes += ' log-act-raise';
+            else if (/コール/.test(msg)) classes += ' log-act-call';
+            else if (/チェック/.test(msg)) classes += ' log-act-check';
+        }
+        // Highlight own actions
+        if (typeof client !== 'undefined' && client.name && msg.includes(client.name)) {
+            classes += ' log-self';
+        }
+        entry.className = classes;
         entry.textContent = msg;
         log.appendChild(entry);
         log.scrollTop = log.scrollHeight;

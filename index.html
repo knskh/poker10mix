@@ -69,6 +69,7 @@
                     <div id="room-list-body" class="room-card-grid"></div>
                 </div>
             </div>
+            <div id="big-hand-feed" class="big-hand-feed hidden"></div>
             <div class="room-chat">
                 <div id="lobby-chat-log" class="room-chat-log"></div>
                 <div class="chat-bar">
@@ -214,6 +215,36 @@
                         <div class="chat-bar game-chat-bar hidden">
                             <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
                             <button id="btn-game-chat-send" class="btn-small">送信</button>
+                            <button id="btn-quick-chat" class="btn-small btn-quick-chat" title="クイックチャット">💬</button>
+                        </div>
+                        <div id="quick-chat-palette" class="hidden">
+                            <div class="qc-category">
+                                <div class="qc-label">挨拶</div>
+                                <div class="qc-items">
+                                    <button class="qc-btn" data-msg="よろしく！">よろしく！</button>
+                                    <button class="qc-btn" data-msg="gg">gg</button>
+                                    <button class="qc-btn" data-msg="またね！">またね！</button>
+                                    <button class="qc-btn" data-msg="おつかれ！">おつかれ！</button>
+                                </div>
+                            </div>
+                            <div class="qc-category">
+                                <div class="qc-label">リアクション</div>
+                                <div class="qc-items">
+                                    <button class="qc-btn" data-msg="ナイスハンド！">ナイスハンド！</button>
+                                    <button class="qc-btn" data-msg="えぐい…">えぐい…</button>
+                                    <button class="qc-btn" data-msg="すごい！">すごい！</button>
+                                    <button class="qc-btn" data-msg="こわ！">こわ！</button>
+                                </div>
+                            </div>
+                            <div class="qc-category">
+                                <div class="qc-label">プレイ中</div>
+                                <div class="qc-items">
+                                    <button class="qc-btn" data-msg="ラッキー">ラッキー</button>
+                                    <button class="qc-btn" data-msg="しょうがない">しょうがない</button>
+                                    <button class="qc-btn" data-msg="ナイスブラフ！">ナイスブラフ！</button>
+                                    <button class="qc-btn" data-msg="どんまい">どんまい</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,6 +258,7 @@
                         <div id="bet-presets" class="hidden"></div>
                         <div id="bet-slider-area" class="hidden">
                             <input type="range" id="bet-slider" min="0" max="10000" step="50">
+                            <span id="slider-value-tip" class="slider-value-tip"></span>
                         </div>
                         <div id="action-buttons"></div>
                     </div>
@@ -283,6 +315,19 @@
                         <button id="btn-ranking-close" class="btn-small btn-danger">閉じる</button>
                     </div>
                     <div id="ranking-container"></div>
+                </div>
+            </div>
+
+            <!-- Session Summary Overlay -->
+            <div id="session-summary" class="hidden">
+                <div class="ss-inner">
+                    <h2 class="ss-title">セッションサマリー</h2>
+                    <div id="ss-ranking" class="ss-section"></div>
+                    <div id="ss-highlights" class="ss-section"></div>
+                    <div class="ss-actions">
+                        <button id="btn-ss-share" class="btn-small">共有</button>
+                        <button id="btn-ss-lobby" class="btn-primary" disabled>ロビーに戻る</button>
+                    </div>
                 </div>
             </div>
 

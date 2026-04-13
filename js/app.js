@@ -94,6 +94,29 @@ function persistHandHistory() {
     try { localStorage.setItem('poker10mix_hand_history', JSON.stringify(handHistory)); } catch (e) {}
 }
 
+// ==========================================
+// Player Notes (localStorage)
+// ==========================================
+const PLAYER_NOTES_KEY = 'poker10mix_player_notes';
+function loadPlayerNotes() {
+    try { return JSON.parse(localStorage.getItem(PLAYER_NOTES_KEY)) || {}; } catch (e) { return {}; }
+}
+function savePlayerNotes(notes) {
+    try { localStorage.setItem(PLAYER_NOTES_KEY, JSON.stringify(notes)); } catch (e) {}
+}
+function getPlayerNote(name) {
+    return loadPlayerNotes()[name] || '';
+}
+function setPlayerNote(name, text) {
+    const notes = loadPlayerNotes();
+    if (text.trim()) notes[name] = text.trim();
+    else delete notes[name];
+    savePlayerNotes(notes);
+}
+function hasPlayerNote(name) {
+    return !!loadPlayerNotes()[name];
+}
+
 // Save hand history on tab close/reload
 window.addEventListener('beforeunload', () => {
     saveCurrentHand();
@@ -146,6 +169,8 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('zoom_left', onZoomLeft);
     client.on('zoom_sitout', onZoomSitout);
     client.on('emote', onEmote);
+    client.on('reaction', onReaction);
+    client.on('big_hand', onBigHand);
     client.on('quiz_start', onQuizStart);
     client.on('quiz_correct', onQuizCorrect);
     client.on('quiz_end', onQuizEnd);
@@ -365,9 +390,13 @@ function renderRoomList(data) {
         // Current game
         const currentGame = r.playing && r.gameName ? r.gameName : '';
 
-        // Game tags
-        const mergedNames = (r.mergedGames || []).map(i => GAME_LIST[i]?.shortName || '').filter(Boolean);
-        const gameTags = mergedNames.map(n => `<span class="room-card-game-tag">${n}</span>`).join('');
+        // Game tags with color by type
+        const gameTags = (r.mergedGames || []).map(i => {
+            const g = GAME_LIST[i];
+            if (!g) return '';
+            const gType = getGameType(g.id);
+            return `<span class="room-card-game-tag tag-${gType}">${g.shortName}</span>`;
+        }).filter(Boolean).join('');
 
         // Avatar initial
         const initial = (r.hostName || '?').charAt(0).toUpperCase();
@@ -410,7 +439,8 @@ function setupRoomScreen() {
     const container = document.getElementById('room-game-checkboxes');
     GAME_LIST.forEach((g, i) => {
         const label = document.createElement('label');
-        label.className = 'game-checkbox-item';
+        const gType = getGameType(g.id);
+        label.className = `game-checkbox-item gcb-${gType}`;
         label.dataset.gameIndex = i;
         const cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -427,6 +457,16 @@ function setupRoomScreen() {
         const nameSpan = document.createElement('span');
         nameSpan.className = 'game-cb-name';
         nameSpan.textContent = g.name;
+
+        // Color badges: game type + betting type
+        const badgesSpan = document.createElement('span');
+        badgesSpan.className = 'game-cb-badges';
+        const typeBadge = GAME_TYPE_LABELS[gType];
+        const betBadge = BETTING_TYPE_LABELS[g.betting || 'limit'];
+        badgesSpan.innerHTML = `<span class="game-cb-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
+            + `<span class="game-cb-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
+        nameSpan.appendChild(badgesSpan);
+
         const selectorsSpan = document.createElement('span');
         selectorsSpan.className = 'game-cb-selectors';
         label.appendChild(cb);
@@ -570,6 +610,9 @@ function setupGameScreen() {
                     chatLog.classList.remove('hidden');
                     chatBar.classList.remove('hidden');
                     chatLog.scrollTop = chatLog.scrollHeight;
+                    // Clear unread badge
+                    chatUnreadCount = 0;
+                    updateChatBadge();
                 } else if (mode === 'both') {
                     gameLog.classList.remove('hidden');
                     chatLog.classList.add('hidden');
@@ -626,6 +669,8 @@ function setupGameScreen() {
         const betInput = document.getElementById('bet-amount-input');
         if (betInput) betInput.value = total;
         updateRaiseBtnText(total);
+        const tip = document.getElementById('slider-value-tip');
+        if (tip) tip.textContent = Number(total).toLocaleString();
     });
 
     document.addEventListener('input', (e) => {
@@ -664,6 +709,44 @@ function setupGameScreen() {
         ui.selectedCards.clear();
         document.getElementById('draw-action-bar').classList.add('hidden');
         ui.pendingDraw = false;
+    });
+
+    // Keyboard shortcuts for slider / action bar
+    document.addEventListener('keydown', (e) => {
+        // Skip if typing in an input field
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        const actionBar = document.getElementById('action-bar');
+        if (actionBar.classList.contains('hidden')) return;
+
+        const slider = document.getElementById('bet-slider');
+        const sliderArea = document.getElementById('bet-slider-area');
+        const hasSlider = sliderArea && sliderArea.classList.contains('visible');
+
+        if (hasSlider && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+            e.preventDefault();
+            const step = parseInt(slider.step) || 50;
+            let val = parseInt(slider.value);
+            if (e.key === 'ArrowLeft') val = Math.max(parseInt(slider.min), val - step);
+            else val = Math.min(parseInt(slider.max), val + step);
+            slider.value = val;
+            slider.dispatchEvent(new Event('input'));
+        } else if (hasSlider && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            e.preventDefault();
+            const presetBtns = [...document.querySelectorAll('#bet-presets .btn-preset')];
+            if (presetBtns.length === 0) return;
+            const activeIdx = presetBtns.findIndex(b => b.classList.contains('active'));
+            let nextIdx;
+            if (e.key === 'ArrowUp') {
+                nextIdx = activeIdx < 0 ? presetBtns.length - 1 : Math.max(0, activeIdx - 1);
+            } else {
+                nextIdx = activeIdx < 0 ? 0 : Math.min(presetBtns.length - 1, activeIdx + 1);
+            }
+            presetBtns[nextIdx].click();
+        } else if (e.key === 'Enter' && hasSlider) {
+            e.preventDefault();
+            const raiseBtn = document.getElementById('btn-raise-main');
+            if (raiseBtn) raiseBtn.click();
+        }
     });
 
     // Stats button
@@ -757,10 +840,19 @@ function onHandStart() {
     currentHandGameName = currentState ? currentState.gameName : '';
     currentHandGameType = currentState ? currentState.gameType : '';
     clearPreAction();
+    // Reset chip animation state
+    prevPot = 0;
+    prevBets = {};
+    // Reset card animation counters
+    ui._prevCCCount = 0;
+    ui._prevMyCardCount = 0;
+    ui._prevFolded = {};
 }
 
 function onHandResult(data) {
     lastHandResult = data;
+    detectWinAnimation(data);
+    showReactionBar();
 }
 
 function onGameState(state) {
@@ -835,6 +927,9 @@ function onGameState(state) {
         }
         if (players.length > 0) showdownPlayers = players;
     }
+    // Chip animations before render (detect bet changes)
+    detectBetAnimations(state);
+
     ui.renderFromServer(state);
 
     // Show folded-state buttons when player is folded and not acting
@@ -954,15 +1049,32 @@ function renderHandHistory(containerId) {
         container.innerHTML = '<p style="color:var(--text-dim);padding:8px;">まだ履歴がありません</p>';
         return;
     }
-    // Compact list of starting hands
+    // Compact list of starting hands with win/loss badges
+    const myName = client.name;
     let html = '<div class="hh-list">';
     for (let i = handHistory.length - 1; i >= 0; i--) {
         const h = handHistory[i];
         const cards = h.startCards || h.myCardObjs || [];
-        html += `<div class="hh-row" data-hh-idx="${i}">`;
+        // Determine win/loss from handResult
+        let diff = 0, hasResult = false;
+        if (h.handResult && h.handResult.players) {
+            const me = h.handResult.players.find(p => p.name === myName);
+            if (me) { diff = me.chips - me.startChips; hasResult = true; }
+        }
+        const rowCls = hasResult ? (diff > 0 ? ' hh-row-win' : diff < 0 ? ' hh-row-loss' : '') : '';
+        html += `<div class="hh-row${rowCls}" data-hh-idx="${i}">`;
         html += `<span class="hh-num">#${i + 1}</span>`;
         html += `<span class="hh-game-label">${h.gameName || ''}</span>`;
         html += `<span class="hh-start-cards">${renderMiniCards(cards)}</span>`;
+        if (hasResult) {
+            if (diff > 0) {
+                html += `<span class="hh-chip-diff hh-diff-plus">+${diff.toLocaleString()}</span>`;
+            } else if (diff < 0) {
+                html += `<span class="hh-chip-diff hh-diff-minus">${diff.toLocaleString()}</span>`;
+            } else {
+                html += `<span class="hh-chip-diff hh-diff-zero">\u00b10</span>`;
+            }
+        }
         html += `<span class="hh-time-label">${h.time || ''}</span>`;
         html += `</div>`;
     }
@@ -1446,6 +1558,7 @@ function showActionButtons(actions, turnData) {
     btnDiv.innerHTML = '';
     presetsDiv.classList.add('hidden');
     presetsDiv.innerHTML = '';
+    document.getElementById('bet-slider-area').classList.remove('visible');
 
     currentTurnBB = turnData.bigBlind || 0;
     const isStud = !currentTurnBB;
@@ -1650,11 +1763,16 @@ function setupSlider(min, max, currentBet) {
     // bet-amount-input is created dynamically in the raise row
     const input = document.getElementById('bet-amount-input');
     if (input) input.value = min + sliderOffset;
+    // Update slider tooltip and show slider
+    const tip = document.getElementById('slider-value-tip');
+    if (tip) tip.textContent = Number(min + sliderOffset).toLocaleString();
+    document.getElementById('bet-slider-area').classList.add('visible');
 }
 
 function sendActionAndHide(action) {
     client.sendAction(action);
     document.getElementById('action-bar').classList.add('hidden');
+    document.getElementById('bet-slider-area').classList.remove('visible');
     stopTurnTimer();
 }
 
@@ -1785,10 +1903,6 @@ function onGameOver(data) {
     saveCurrentHand();
 
     const ranking = data.ranking || [];
-    const rankingText = ranking.map((p, i) => {
-        const sign = p.totalWin >= 0 ? '+' : '';
-        return `${i + 1}位 ${p.name}  ${sign}${p.totalWin}`;
-    }).join('\n');
 
     ui.addLog('ゲーム終了！ Total Win ランキング：', 'important');
     ranking.forEach((p, i) => {
@@ -1798,13 +1912,102 @@ function onGameOver(data) {
 
     if (isInZoom) return;
 
-    setTimeout(() => {
-        const msg = `ゲーム終了！\n\n【Total Win ランキング】\n${rankingText}\n\nロビーに戻りますか？`;
-        if (confirm(msg)) {
-            client.leaveRoom();
-            showScreen('lobby');
+    // Show session summary overlay instead of confirm dialog
+    setTimeout(() => showSessionSummary(ranking), 1500);
+}
+
+function showSessionSummary(ranking) {
+    const overlay = document.getElementById('session-summary');
+    if (!overlay) return;
+    overlay.classList.remove('hidden');
+
+    const myName = client.name;
+
+    // === Ranking section ===
+    const rankContainer = document.getElementById('ss-ranking');
+    let rankHtml = '';
+    const medals = ['🥇', '🥈', '🥉'];
+    ranking.forEach((p, i) => {
+        const rowCls = i < 3 ? `ss-rank-${i + 1}` : 'ss-rank-other';
+        const pos = i < 3 ? medals[i] : `${i + 1}`;
+        const isMe = p.name === myName;
+        const diff = p.totalWin;
+        let diffCls, diffStr;
+        if (diff > 0) { diffCls = 'ss-rank-plus'; diffStr = `+${diff.toLocaleString()}`; }
+        else if (diff < 0) { diffCls = 'ss-rank-minus'; diffStr = diff.toLocaleString(); }
+        else { diffCls = 'ss-rank-zero'; diffStr = '±0'; }
+
+        rankHtml += `<div class="ss-rank-row ${rowCls}">`;
+        rankHtml += `<span class="ss-rank-pos">${pos}</span>`;
+        rankHtml += `<span class="ss-rank-name${isMe ? ' ss-rank-me' : ''}">${p.name}${isMe ? ' (自分)' : ''}</span>`;
+        rankHtml += `<span class="ss-rank-diff ${diffCls}">${diffStr}</span>`;
+        rankHtml += `</div>`;
+    });
+    rankContainer.innerHTML = rankHtml;
+
+    // === Highlights section ===
+    const hlContainer = document.getElementById('ss-highlights');
+    const highlights = generateHighlights(ranking);
+    let hlHtml = '<div class="ss-highlight-list">';
+    for (const hl of highlights) {
+        hlHtml += `<div class="ss-highlight">`;
+        hlHtml += `<span class="ss-hl-icon">${hl.icon}</span>`;
+        hlHtml += `<div class="ss-hl-body"><div class="ss-hl-title">${hl.title}</div><div class="ss-hl-name">${hl.name}</div></div>`;
+        hlHtml += `</div>`;
+    }
+    hlHtml += '</div>';
+    hlContainer.innerHTML = hlHtml;
+
+    // === Actions ===
+    const lobbyBtn = document.getElementById('btn-ss-lobby');
+    lobbyBtn.disabled = true;
+    // Enable after 3 seconds
+    setTimeout(() => { lobbyBtn.disabled = false; }, 3000);
+
+    lobbyBtn.onclick = () => {
+        overlay.classList.add('hidden');
+        client.leaveRoom();
+        showScreen('lobby');
+    };
+
+    const shareBtn = document.getElementById('btn-ss-share');
+    shareBtn.onclick = () => {
+        const lines = ['【セッションサマリー】'];
+        ranking.forEach((p, i) => {
+            const sign = p.totalWin >= 0 ? '+' : '';
+            lines.push(`${i + 1}位 ${p.name}: ${sign}${p.totalWin}`);
+        });
+        highlights.forEach(hl => {
+            lines.push(`${hl.icon} ${hl.title}: ${hl.name}`);
+        });
+        const text = lines.join('\n');
+        if (navigator.share) {
+            navigator.share({ text }).catch(() => {});
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                shareBtn.textContent = 'コピー済み!';
+                setTimeout(() => { shareBtn.textContent = '共有'; }, 2000);
+            });
         }
-    }, 2000);
+    };
+}
+
+function generateHighlights(ranking) {
+    const highlights = [];
+    if (ranking.length === 0) return highlights;
+
+    // Biggest winner
+    const bigWinner = ranking.reduce((a, b) => a.totalWin > b.totalWin ? a : b);
+    if (bigWinner.totalWin > 0) {
+        highlights.push({ icon: '👑', title: '最大勝者', name: `${bigWinner.name} (+${bigWinner.totalWin.toLocaleString()})` });
+    }
+
+    // Total hands played
+    if (handHistory.length > 0) {
+        highlights.push({ icon: '🃏', title: '総ハンド数', name: `${handHistory.length}ハンド` });
+    }
+
+    return highlights;
 }
 
 // ==========================================
@@ -2071,8 +2274,9 @@ function renderStats(data) {
     let html = '';
     for (const [seatId, c] of Object.entries(data.stats)) {
         const pName = (currentState && currentState.players[seatId]) ? currentState.players[seatId].name : 'Player ' + seatId;
-        const isMeClass = parseInt(seatId) === data.mySeat ? ' style="color:var(--gold)"' : '';
-        html += renderStatsBlock(pName, c, isMeClass);
+        const isMeSeat = parseInt(seatId) === data.mySeat;
+        const isMeClass = isMeSeat ? ' style="color:var(--gold)"' : '';
+        html += renderStatsBlock(pName, c, isMeClass, isMeSeat);
     }
     container.innerHTML = html;
 }
@@ -2090,7 +2294,7 @@ function renderStatsFromStorage() {
     // Show my stats
     const myStats = saved[client.name];
     if (myStats && myStats.hands > 0) {
-        html += renderPlayerStatsWithTabs(client.name, myStats, ' style="color:var(--gold)"');
+        html += renderPlayerStatsWithTabs(client.name, myStats, ' style="color:var(--gold)"', true);
     } else {
         html += '<p style="color:var(--text-dim);padding:16px;">まだスタッツがありません。ゲームをプレイすると記録されます。</p>';
     }
@@ -2117,8 +2321,9 @@ function renderStatsSearchResult(playerName) {
         html += `<p style="color:var(--text-dim);padding:16px;">"${playerName}" に一致するプレイヤーが見つかりません</p>`;
     } else {
         for (const [name, c] of matches) {
-            const isMe = name === client.name ? ' style="color:var(--gold)"' : '';
-            html += renderPlayerStatsWithTabs(name, c, isMe);
+            const isMeFlag = name === client.name;
+            const isMeStyle = isMeFlag ? ' style="color:var(--gold)"' : '';
+            html += renderPlayerStatsWithTabs(name, c, isMeStyle, isMeFlag);
         }
     }
 
@@ -2158,31 +2363,17 @@ function renderRanking() {
 
     let html = '';
 
-    // Win Rate ranking (all players, top 50)
-    html += '<h3 class="ranking-section-title">Win Rate ランキング（上位50名）</h3>';
-    const wrEntries = entries
-        .map(([name, c]) => ({ name, winRate: parseFloat(c.winRate) || 0, hands: c.hands }))
-        .sort((a, b) => b.winRate - a.winRate)
-        .slice(0, 50);
-
-    html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>Win Rate</th><th>ハンド数</th></tr></thead><tbody>';
-    wrEntries.forEach((e, i) => {
-        const isMe = e.name === client.name ? ' class="ranking-me"' : '';
-        html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.winRate}/100h</td><td>${e.hands.toLocaleString()}</td></tr>`;
-    });
-    html += '</tbody></table>';
-
     // Hands played ranking (all players, top 50)
-    html += '<h3 class="ranking-section-title" style="margin-top:16px;">ハンド数ランキング（上位50名）</h3>';
+    html += '<h3 class="ranking-section-title">ハンド数ランキング（上位50名）</h3>';
     const handEntries = entries
-        .map(([name, c]) => ({ name, hands: c.hands, winRate: c.winRate }))
+        .map(([name, c]) => ({ name, hands: c.hands }))
         .sort((a, b) => b.hands - a.hands)
         .slice(0, 50);
 
-    html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>ハンド数</th><th>Win Rate</th></tr></thead><tbody>';
+    html += '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>ハンド数</th></tr></thead><tbody>';
     handEntries.forEach((e, i) => {
         const isMe = e.name === client.name ? ' class="ranking-me"' : '';
-        html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.hands.toLocaleString()}</td><td>${e.winRate}/100h</td></tr>`;
+        html += `<tr${isMe}><td>${i + 1}</td><td>${e.name}</td><td>${e.hands.toLocaleString()}</td></tr>`;
     });
     html += '</tbody></table>';
 
@@ -2197,7 +2388,8 @@ function showPlayerStats(playerName) {
     if (!stats || !stats.hands) {
         container.innerHTML = `<h3 style="color:var(--gold)">${playerName}</h3><p style="color:var(--text-dim);padding:16px;">データなし</p>`;
     } else {
-        container.innerHTML = renderPlayerStatsWithTabs(playerName, stats, ' style="color:var(--gold)"');
+        const isMeFlag = playerName === client.name;
+        container.innerHTML = renderPlayerStatsWithTabs(playerName, stats, ' style="color:var(--gold)"', isMeFlag);
         container.querySelectorAll('.stats-tab').forEach(tab => {
             tab.addEventListener('click', (e) => handleStatsTabClick(e.target));
         });
@@ -2260,7 +2452,7 @@ const GAME_NAMES = {
     stud8: 'Stud8', nlhe: 'NLHE', plo: 'PLO', sd: 'SD', badugi: 'Badugi'
 };
 
-function renderPlayerStatsWithTabs(pName, c, extraAttr) {
+function renderPlayerStatsWithTabs(pName, c, extraAttr, isMe) {
     let html = `<div class="stats-player-panel">`;
     html += `<h3${extraAttr || ''}>${pName} (${c.hands}ハンド)</h3>`;
     if (!c.hands || c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p></div>'; return html; }
@@ -2273,7 +2465,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     html += `</div>`;
 
     // Total tab
-    html += `<div class="stats-tab-content" data-tab="total">${renderStatsTable(c)}</div>`;
+    html += `<div class="stats-tab-content" data-tab="total">${renderStatsTable(c, isMe)}</div>`;
 
     // Game tab (with dropdown)
     html += `<div class="stats-tab-content hidden" data-tab="game">`;
@@ -2286,7 +2478,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
         html += `</select>`;
         for (const [gid, gs] of gameEntries) {
             html += `<div class="stats-dropdown-content" data-game="${gid}"${gid !== gameEntries[0][0] ? ' style="display:none"' : ''}>`;
-            html += renderStatsTable(gs);
+            html += renderStatsTable(gs, isMe);
             html += `</div>`;
         }
     } else {
@@ -2312,6 +2504,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     html += `<select class="graph-filter-room stats-dropdown"><option value="">全ルーム</option></select>`;
     html += `</div>`;
     html += `<div class="graph-checkboxes">`;
+    const privateKeys = new Set(['wsd', 'wr', 'sdWin', 'nsdWin', 'totalWin']);
     const graphStats = [
         { key: 'vpip', label: 'VPIP', color: '#4fc3f7', checked: true },
         { key: 'pfr', label: 'PFR', color: '#f0c040', checked: true },
@@ -2329,7 +2522,8 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
         { key: 'totalWin', label: 'Total Win', color: '#ff8a65', checked: false },
     ];
     for (const gs of graphStats) {
-        html += `<label class="graph-cb-label" style="color:${gs.color}"><input type="checkbox" class="graph-cb" data-key="${gs.key}" ${gs.checked ? 'checked' : ''}>${gs.label}</label>`;
+        if (!isMe && privateKeys.has(gs.key)) continue;
+        html += `<label class="graph-cb-label" style="color:${gs.color}"><input type="checkbox" class="graph-cb" data-key="${gs.key}" ${gs.checked && (isMe || !privateKeys.has(gs.key)) ? 'checked' : ''}>${gs.label}</label>`;
     }
     html += `</div>`;
     html += `<canvas class="stats-graph-canvas" width="560" height="280"></canvas>`;
@@ -2340,8 +2534,8 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr) {
     return html;
 }
 
-function renderStatsTable(c) {
-    return `<table class="stats-table"><tbody>
+function renderStatsTable(c, isMe) {
+    let html = `<table class="stats-table"><tbody>
         <tr><td class="stat-label">VPIP</td><td class="stat-value">${c.vpip}%</td>
         <td class="stat-label">PFR</td><td class="stat-value">${c.pfr}%</td></tr>
         <tr><td class="stat-label">3-Bet</td><td class="stat-value">${c.threeBet}%</td>
@@ -2351,17 +2545,18 @@ function renderStatsTable(c) {
         <tr><td class="stat-label">Agg%</td><td class="stat-value">${c.postflopAgg}%</td>
         <td class="stat-label">AF</td><td class="stat-value">${c.af}</td></tr>
         <tr><td class="stat-label">WTSD%</td><td class="stat-value">${c.wtsd}%</td>
-        <td class="stat-label">W$SD</td><td class="stat-value">${c.wsd}%</td></tr>
-        <tr><td class="stat-label">Win Rate</td><td class="stat-value">${c.winRate}/100h</td>
-        <td class="stat-label">SD Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin}</td></tr>
-        <tr><td class="stat-label">Non-SD Win</td><td class="stat-value">${typeof c.nonShowdownWin === 'number' ? c.nonShowdownWin.toLocaleString() : (c.nonShowdownWin || '-')}</td>
-        <td class="stat-label">Total Win</td><td class="stat-value">${typeof c.showdownWin === 'number' ? ((c.showdownWin || 0) + (c.nonShowdownWin || 0)).toLocaleString() : '-'}</td></tr>
+        <td class="stat-label">W$SD</td><td class="stat-value">${isMe ? c.wsd + '%' : '非公開'}</td></tr>
+        <tr><td class="stat-label">Win Rate</td><td class="stat-value">${isMe ? c.winRate + '/100h' : '非公開'}</td>
+        <td class="stat-label">SD Win</td><td class="stat-value">${isMe ? (typeof c.showdownWin === 'number' ? c.showdownWin.toLocaleString() : c.showdownWin) : '非公開'}</td></tr>
+        <tr><td class="stat-label">Non-SD Win</td><td class="stat-value">${isMe ? (typeof c.nonShowdownWin === 'number' ? c.nonShowdownWin.toLocaleString() : (c.nonShowdownWin || '-')) : '非公開'}</td>
+        <td class="stat-label">Total Win</td><td class="stat-value">${isMe ? (typeof c.showdownWin === 'number' ? ((c.showdownWin || 0) + (c.nonShowdownWin || 0)).toLocaleString() : '-') : '非公開'}</td></tr>
     </tbody></table>`;
+    return html;
 }
 
 // Legacy alias
-function renderStatsBlock(pName, c, extraAttr) {
-    return renderPlayerStatsWithTabs(pName, c, extraAttr);
+function renderStatsBlock(pName, c, extraAttr, isMe) {
+    return renderPlayerStatsWithTabs(pName, c, extraAttr, isMe);
 }
 
 // ==========================================
@@ -2597,27 +2792,83 @@ function setupChat() {
     hookChatInput('lobby-chat-input', 'btn-lobby-chat-send');
     hookChatInput('room-chat-input', 'btn-room-chat-send');
     hookChatInput('game-chat-input', 'btn-game-chat-send');
+
+    // Quick Chat palette
+    const qcBtn = document.getElementById('btn-quick-chat');
+    const qcPalette = document.getElementById('quick-chat-palette');
+    if (qcBtn && qcPalette) {
+        qcBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            qcPalette.classList.toggle('hidden');
+        });
+        qcPalette.querySelectorAll('.qc-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const msg = btn.dataset.msg;
+                if (msg) {
+                    client.sendChat(msg);
+                    showQuickChatFloat(msg);
+                }
+                qcPalette.classList.add('hidden');
+            });
+        });
+        // Close palette when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!qcPalette.contains(e.target) && e.target !== qcBtn) {
+                qcPalette.classList.add('hidden');
+            }
+        });
+    }
 }
 
 function appendChatMsg(logId, from, message) {
     const log = document.getElementById(logId);
     if (!log) return;
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const div = document.createElement('div');
     div.className = 'room-chat-msg';
-    div.innerHTML = `<span class="room-chat-name">${from}:</span> ${message}`;
+    div.innerHTML = `<span class="chat-ts">${ts}</span><span class="room-chat-name">${from}:</span> ${message}`;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
 }
+
+let chatUnreadCount = 0;
 
 function addChatEntry(text, cls) {
     const log = document.getElementById('chat-log');
     if (!log) return;
     const entry = document.createElement('div');
     entry.className = 'chat-entry' + (cls ? ` chat-${cls}` : '');
-    entry.textContent = text;
+    // Add timestamp
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    entry.innerHTML = `<span class="chat-ts">${ts}</span> ${text}`;
     log.appendChild(entry);
     log.scrollTop = log.scrollHeight;
     while (log.children.length > 200) log.removeChild(log.firstChild);
+    // Update unread badge if chat tab is not active
+    const chatTab = document.querySelector('.log-tab[data-tab="chat"]');
+    if (chatTab && !chatTab.classList.contains('active')) {
+        chatUnreadCount++;
+        updateChatBadge();
+    }
+}
+
+function updateChatBadge() {
+    const chatTab = document.querySelector('.log-tab[data-tab="chat"]');
+    if (!chatTab) return;
+    let badge = chatTab.querySelector('.chat-unread-badge');
+    if (chatUnreadCount > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'chat-unread-badge';
+            chatTab.appendChild(badge);
+        }
+        badge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
+    } else if (badge) {
+        badge.remove();
+    }
 }
 
 function onChat(data) {
@@ -2625,6 +2876,26 @@ function onChat(data) {
     ui.addLog(`[${data.from}] ${data.message}`, 'chat');
     appendChatMsg('room-chat-log', data.from, data.message);
     addChatEntry(`[${data.from}] ${data.message}`, 'msg');
+    // Show short messages as floating text on table (quick chat style)
+    if (data.message.length <= 15 && currentState) {
+        const seatIdx = currentState.players.findIndex(p => p.name === data.from);
+        if (seatIdx >= 0) {
+            const tableFelt = document.getElementById('table-felt');
+            const seatEl = document.getElementById(`seat-${seatIdx}`);
+            if (tableFelt && seatEl) {
+                const sc = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat');
+                const pm = { 'seat-bottom':[50,65],'seat-bottom-left':[20,60],'seat-top-left':[20,35],'seat-top':[50,25],'seat-top-right':[80,35],'seat-bottom-right':[80,60] };
+                const pos = pm[sc] || [50,50];
+                const el = document.createElement('div');
+                el.className = 'qc-float';
+                el.textContent = data.message;
+                el.style.left = pos[0] + '%';
+                el.style.top = pos[1] + '%';
+                tableFelt.appendChild(el);
+                setTimeout(() => el.remove(), 2600);
+            }
+        }
+    }
 }
 
 function onLobbyChat(data) {
@@ -2658,6 +2929,33 @@ function setupEmotes() {
         picker.classList.add('hidden');
     });
     picker.addEventListener('click', (e) => e.stopPropagation());
+}
+
+function showQuickChatFloat(msg) {
+    const tableFelt = document.getElementById('table-felt');
+    if (!tableFelt || !currentState) return;
+    const mySeat = currentState.mySeatIndex;
+    const seatEl = document.getElementById(`seat-${mySeat}`);
+    if (!seatEl) return;
+
+    const seatClass = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat');
+    const posMap = {
+        'seat-bottom': [50, 65],
+        'seat-bottom-left': [20, 60],
+        'seat-top-left': [20, 35],
+        'seat-top': [50, 25],
+        'seat-top-right': [80, 35],
+        'seat-bottom-right': [80, 60],
+    };
+    const pos = posMap[seatClass] || [50, 50];
+
+    const el = document.createElement('div');
+    el.className = 'qc-float';
+    el.textContent = msg;
+    el.style.left = pos[0] + '%';
+    el.style.top = pos[1] + '%';
+    tableFelt.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
 }
 
 function onEmote(data) {
@@ -2700,6 +2998,112 @@ function onEmote(data) {
 }
 
 // ==========================================
+// Showdown Reaction Bar
+// ==========================================
+let reactionCooldown = false;
+
+function showReactionBar() {
+    // Remove existing bar
+    const existing = document.getElementById('reaction-bar');
+    if (existing) existing.remove();
+
+    const bar = document.createElement('div');
+    bar.id = 'reaction-bar';
+    bar.className = 'reaction-bar';
+
+    const reactions = [
+        { emote: '🎉', label: 'ナイス' },
+        { emote: '😱', label: 'えぐい' },
+        { emote: '😭', label: '泣' },
+        { emote: '🤣', label: '笑' },
+        { emote: '👀', label: '注目' },
+    ];
+
+    for (const r of reactions) {
+        const btn = document.createElement('button');
+        btn.className = 'reaction-btn';
+        btn.innerHTML = `<span class="reaction-emoji">${r.emote}</span><span class="reaction-label">${r.label}</span>`;
+        btn.addEventListener('click', () => {
+            if (reactionCooldown) return;
+            reactionCooldown = true;
+            setTimeout(() => { reactionCooldown = false; }, 3000);
+            client.sendReaction(r.emote);
+            bar.remove();
+        });
+        bar.appendChild(btn);
+    }
+
+    document.getElementById('table-felt').appendChild(bar);
+
+    // Auto-hide after 4 seconds
+    setTimeout(() => { if (bar.parentNode) bar.remove(); }, 4000);
+}
+
+function onReaction(data) {
+    const tableFelt = document.getElementById('table-felt');
+    if (!tableFelt) return;
+
+    const el = document.createElement('div');
+    el.className = 'reaction-pop';
+    el.innerHTML = `<span class="reaction-pop-emoji">${data.emote}</span><span class="reaction-pop-name">${data.from}</span>`;
+
+    // Stagger multiple reactions
+    const existing = tableFelt.querySelectorAll('.reaction-pop');
+    const offsetX = existing.length * 40;
+    el.style.left = `calc(50% + ${offsetX - 40}px)`;
+
+    tableFelt.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+}
+
+// ==========================================
+// Lobby Big Hand Feed
+// ==========================================
+const bigHandFeed = [];
+
+function onBigHand(data) {
+    bigHandFeed.unshift(data);
+    if (bigHandFeed.length > 5) bigHandFeed.pop();
+    renderBigHandFeed();
+}
+
+function renderBigHandFeed() {
+    const container = document.getElementById('big-hand-feed');
+    if (!container) return;
+
+    if (bigHandFeed.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+
+    let html = '<div class="bhf-title">🔥 最近のビッグハンド</div>';
+    for (const h of bigHandFeed) {
+        const rankText = h.handRank ? ` (${h.handRank})` : '';
+        html += `<div class="bhf-item" data-room="${h.roomId}">`;
+        html += `<span class="bhf-room">[${h.roomId}]</span> `;
+        html += `<span class="bhf-game">${h.gameName}</span> `;
+        html += `<span class="bhf-winner">${h.winner}</span> が `;
+        html += `<span class="bhf-pot">${h.pot.toLocaleString()}</span> チップ獲得${rankText}`;
+        html += `</div>`;
+    }
+    container.innerHTML = html;
+
+    // Click to join room
+    container.querySelectorAll('.bhf-item').forEach(item => {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+            const roomId = item.dataset.room;
+            if (roomId && roomId !== 'ZOOM') {
+                client.joinRoom(roomId);
+            } else if (roomId === 'ZOOM') {
+                client.joinZoom();
+            }
+        });
+    });
+}
+
+// ==========================================
 // Hiragana Quiz
 // ==========================================
 let activeQuiz = null;
@@ -2727,6 +3131,174 @@ function onQuizEnd(data) {
     if (data.answer) {
         ui.addLog(`🧩 答え: ${data.answer}`, 'quiz-end');
         addChatEntry(`🧩 答え: ${data.answer}`, 'quiz-end');
+    }
+}
+
+// ==========================================
+// Chip Animation System
+// ==========================================
+let prevPot = 0;
+let prevBets = {}; // seatIdx -> lastBet amount
+
+function animateChipTowardsPot(seatIdx) {
+    const tableFelt = document.getElementById('table-felt');
+    if (!tableFelt) return;
+    const seatEl = document.getElementById(`seat-${seatIdx}`);
+    if (!seatEl) return;
+
+    const feltRect = tableFelt.getBoundingClientRect();
+    const seatRect = seatEl.getBoundingClientRect();
+
+    // Start position: center of seat relative to table-felt
+    const startX = (seatRect.left + seatRect.width / 2) - feltRect.left;
+    const startY = (seatRect.top + seatRect.height / 2) - feltRect.top;
+
+    // End position: pot display (center of table)
+    const potEl = document.getElementById('pot-display');
+    let endX = feltRect.width / 2, endY = feltRect.height * 0.32;
+    if (potEl) {
+        const potRect = potEl.getBoundingClientRect();
+        endX = (potRect.left + potRect.width / 2) - feltRect.left;
+        endY = (potRect.top + potRect.height / 2) - feltRect.top;
+    }
+
+    // Create 2-3 small flying chips for visual effect
+    const count = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+        const chip = document.createElement('div');
+        chip.className = 'chip-fly';
+        // Slight random offset for each chip
+        const offX = (Math.random() - 0.5) * 12;
+        const offY = (Math.random() - 0.5) * 12;
+        chip.style.left = (startX + offX) + 'px';
+        chip.style.top = (startY + offY) + 'px';
+        tableFelt.appendChild(chip);
+
+        // Trigger transition after paint
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                chip.style.left = endX + 'px';
+                chip.style.top = endY + 'px';
+                setTimeout(() => {
+                    chip.classList.add('chip-fly-done');
+                    setTimeout(() => chip.remove(), 150);
+                }, 450 + i * 50);
+            });
+        });
+    }
+}
+
+function animateChipToWinner(seatIdx, amount) {
+    const tableFelt = document.getElementById('table-felt');
+    if (!tableFelt) return;
+    const seatEl = document.getElementById(`seat-${seatIdx}`);
+    if (!seatEl) return;
+
+    const feltRect = tableFelt.getBoundingClientRect();
+    const seatRect = seatEl.getBoundingClientRect();
+
+    // Start: pot center
+    const potEl = document.getElementById('pot-display');
+    let startX = feltRect.width / 2, startY = feltRect.height * 0.32;
+    if (potEl) {
+        const potRect = potEl.getBoundingClientRect();
+        startX = (potRect.left + potRect.width / 2) - feltRect.left;
+        startY = (potRect.top + potRect.height / 2) - feltRect.top;
+    }
+
+    // End: winner seat center
+    const endX = (seatRect.left + seatRect.width / 2) - feltRect.left;
+    const endY = (seatRect.top + seatRect.height / 2) - feltRect.top;
+
+    // Create golden flying chips
+    const count = 3;
+    for (let i = 0; i < count; i++) {
+        const chip = document.createElement('div');
+        chip.className = 'chip-fly-win';
+        const offX = (Math.random() - 0.5) * 10;
+        const offY = (Math.random() - 0.5) * 10;
+        chip.style.left = (startX + offX) + 'px';
+        chip.style.top = (startY + offY) + 'px';
+        tableFelt.appendChild(chip);
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                chip.style.left = (endX + offX * 0.5) + 'px';
+                chip.style.top = (endY + offY * 0.5) + 'px';
+                setTimeout(() => {
+                    chip.classList.add('chip-fly-done');
+                    setTimeout(() => chip.remove(), 200);
+                }, 500 + i * 60);
+            });
+        });
+    }
+
+    // Show won amount popup on seat
+    const popup = document.createElement('div');
+    popup.className = 'seat-won-popup';
+    popup.textContent = `+${amount.toLocaleString()}`;
+    seatEl.appendChild(popup);
+    setTimeout(() => popup.remove(), 2600);
+
+    // Gold glow on winner seat
+    seatEl.classList.add('seat-winner');
+    setTimeout(() => seatEl.classList.remove('seat-winner'), 2500);
+}
+
+function animatePotCountUp(fromVal, toVal) {
+    const potAmountEl = document.querySelector('.pot-amount');
+    if (!potAmountEl) return;
+    potAmountEl.classList.add('pot-counting');
+    setTimeout(() => potAmountEl.classList.remove('pot-counting'), 400);
+
+    const duration = 350;
+    const startTime = performance.now();
+    const diff = toVal - fromVal;
+
+    function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(fromVal + diff * eased);
+        potAmountEl.textContent = current.toLocaleString();
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+// Detect bet changes and trigger animations
+function detectBetAnimations(state) {
+    if (!state || !state.players) return;
+    const newBets = {};
+    state.players.forEach((p, i) => {
+        newBets[i] = p.seatBet || 0;
+        const prevBet = prevBets[i] || 0;
+        if (newBets[i] > prevBet && newBets[i] > 0) {
+            animateChipTowardsPot(i);
+        }
+    });
+    prevBets = newBets;
+
+    // Pot count-up
+    if (state.pot > prevPot && prevPot > 0) {
+        animatePotCountUp(prevPot, state.pot);
+    }
+    prevPot = state.pot || 0;
+}
+
+// Detect winner from hand_result and trigger win animation
+function detectWinAnimation(handResult) {
+    if (!handResult || !handResult.players || !currentState) return;
+    for (const p of handResult.players) {
+        const diff = p.chips - p.startChips;
+        if (diff > 0) {
+            // Find seat index by name
+            const seatIdx = currentState.players.findIndex(sp => sp.name === p.name);
+            if (seatIdx >= 0) {
+                setTimeout(() => animateChipToWinner(seatIdx, diff), 300);
+            }
+        }
     }
 }
 
