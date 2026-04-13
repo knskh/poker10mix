@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=31">
+    <link rel="stylesheet" href="css/style.css?v=32">
 </head>
 <body>
     <div id="app">
@@ -173,6 +173,10 @@
             <div id="top-bar">
                 <div id="game-name"></div>
                 <div id="game-rotation"></div>
+                <div id="top-bar-icons">
+                    <button id="btn-open-chat" class="top-icon-btn" title="チャット">💬<span class="top-icon-badge hidden" id="top-chat-badge">0</span></button>
+                    <button id="btn-open-log" class="top-icon-btn" title="ログ">📋</button>
+                </div>
                 <div id="top-bar-menu-wrap">
                     <button id="btn-hamburger" class="btn-tiny" title="メニュー">☰</button>
                     <div id="top-bar-menu" class="hidden">
@@ -234,104 +238,90 @@
                 </div>
             </div>
 
-            <!-- Bottom area: panel + actions -->
-            <div id="bottom-area">
-                <div id="bottom-panel">
-                    <div class="panel-content">
-                        <!-- Chat View -->
-                        <div class="panel-view active" id="view-chat">
-                            <div id="chat-log"></div>
-                            <div class="chat-bar game-chat-bar">
-                                <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                                <button id="btn-game-chat-send" class="btn-small">送信</button>
-                                <button id="btn-quick-chat" class="btn-small btn-quick-chat" title="クイックチャット">💬</button>
-                            </div>
-                            <div id="quick-chat-palette" class="hidden">
-                                <div class="qc-category">
-                                    <div class="qc-label">挨拶</div>
-                                    <div class="qc-items">
-                                        <button class="qc-btn" data-msg="よろしく！">よろしく！</button>
-                                        <button class="qc-btn" data-msg="gg">gg</button>
-                                        <button class="qc-btn" data-msg="またね！">またね！</button>
-                                        <button class="qc-btn" data-msg="おつかれ！">おつかれ！</button>
-                                    </div>
-                                </div>
-                                <div class="qc-category">
-                                    <div class="qc-label">リアクション</div>
-                                    <div class="qc-items">
-                                        <button class="qc-btn" data-msg="ナイスハンド！">ナイスハンド！</button>
-                                        <button class="qc-btn" data-msg="えぐい…">えぐい…</button>
-                                        <button class="qc-btn" data-msg="すごい！">すごい！</button>
-                                        <button class="qc-btn" data-msg="こわ！">こわ！</button>
-                                    </div>
-                                </div>
-                                <div class="qc-category">
-                                    <div class="qc-label">プレイ中</div>
-                                    <div class="qc-items">
-                                        <button class="qc-btn" data-msg="ラッキー">ラッキー</button>
-                                        <button class="qc-btn" data-msg="しょうがない">しょうがない</button>
-                                        <button class="qc-btn" data-msg="ナイスブラフ！">ナイスブラフ！</button>
-                                        <button class="qc-btn" data-msg="どんまい">どんまい</button>
-                                    </div>
-                                </div>
-                            </div>
+            <!-- Action panel (bottom of screen) -->
+            <div id="action-panel">
+                <div id="pre-action-bar" class="hidden"></div>
+                <div id="action-bar" class="hidden">
+                    <div id="bet-presets" class="hidden"></div>
+                    <div id="bet-numpad" class="hidden">
+                        <div class="numpad-display">
+                            <span id="numpad-value">0</span>
+                            <button id="numpad-clear" class="numpad-key numpad-fn">C</button>
                         </div>
-                        <!-- Log View -->
-                        <div class="panel-view" id="view-log">
-                            <div id="game-log"></div>
-                        </div>
-                        <!-- History View -->
-                        <div class="panel-view" id="view-history">
-                            <div id="inline-hand-history" class="hand-history-list"></div>
+                        <div class="numpad-grid">
+                            <button class="numpad-key" data-val="1">1</button>
+                            <button class="numpad-key" data-val="2">2</button>
+                            <button class="numpad-key" data-val="3">3</button>
+                            <button class="numpad-key" data-val="4">4</button>
+                            <button class="numpad-key" data-val="5">5</button>
+                            <button class="numpad-key" data-val="6">6</button>
+                            <button class="numpad-key" data-val="7">7</button>
+                            <button class="numpad-key" data-val="8">8</button>
+                            <button class="numpad-key" data-val="9">9</button>
+                            <button class="numpad-key numpad-fn" id="numpad-back">←</button>
+                            <button class="numpad-key" data-val="0">0</button>
+                            <button class="numpad-key numpad-fn" id="numpad-confirm">OK</button>
                         </div>
                     </div>
+                    <div id="action-buttons"></div>
                 </div>
-                <div id="action-panel">
-                    <div id="pre-action-bar" class="hidden"></div>
-                    <div id="action-bar" class="hidden">
-                        <div id="bet-presets" class="hidden"></div>
-                        <div id="bet-numpad" class="hidden">
-                            <div class="numpad-display">
-                                <span id="numpad-value">0</span>
-                                <button id="numpad-clear" class="numpad-key numpad-fn">C</button>
-                            </div>
-                            <div class="numpad-grid">
-                                <button class="numpad-key" data-val="1">1</button>
-                                <button class="numpad-key" data-val="2">2</button>
-                                <button class="numpad-key" data-val="3">3</button>
-                                <button class="numpad-key" data-val="4">4</button>
-                                <button class="numpad-key" data-val="5">5</button>
-                                <button class="numpad-key" data-val="6">6</button>
-                                <button class="numpad-key" data-val="7">7</button>
-                                <button class="numpad-key" data-val="8">8</button>
-                                <button class="numpad-key" data-val="9">9</button>
-                                <button class="numpad-key numpad-fn" id="numpad-back">←</button>
-                                <button class="numpad-key" data-val="0">0</button>
-                                <button class="numpad-key numpad-fn" id="numpad-confirm">OK</button>
-                            </div>
-                        </div>
-                        <div id="action-buttons"></div>
-                    </div>
-                    <div id="draw-action-bar" class="hidden">
-                        <div class="draw-hint">交換するカードをクリックして選択</div>
-                        <button id="btn-draw" class="btn-action">ドロー</button>
-                        <button id="btn-stand-pat" class="btn-action">スタンドパット</button>
-                    </div>
+                <div id="draw-action-bar" class="hidden">
+                    <div class="draw-hint">交換するカードをクリックして選択</div>
+                    <button id="btn-draw" class="btn-action">ドロー</button>
+                    <button id="btn-stand-pat" class="btn-action">スタンドパット</button>
                 </div>
             </div>
 
-            <nav id="bottom-nav">
-                <button class="nav-item active" data-tab="chat">
-                    <span class="nav-icon">💬</span><span class="nav-label">チャット</span>
-                    <span class="nav-badge hidden" id="nav-chat-badge">0</span>
-                </button>
-                <button class="nav-item" data-tab="log">
-                    <span class="nav-icon">📋</span><span class="nav-label">ログ</span>
-                </button>
-                <button class="nav-item" data-tab="history">
-                    <span class="nav-icon">🕐</span><span class="nav-label">履歴</span>
-                </button>
-            </nav>
+            <!-- Overlay panels (chat / log) -->
+            <div id="overlay-panel-bg" class="hidden"></div>
+            <div id="overlay-panel" class="hidden">
+                <div id="overlay-panel-header">
+                    <span id="overlay-panel-title"></span>
+                    <button id="overlay-panel-close">✕</button>
+                </div>
+                <div id="overlay-panel-body">
+                    <div class="overlay-view" id="ov-chat">
+                        <div id="chat-log"></div>
+                        <div class="chat-bar game-chat-bar">
+                            <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                            <button id="btn-game-chat-send" class="btn-small">送信</button>
+                            <button id="btn-quick-chat" class="btn-small btn-quick-chat" title="クイックチャット">💬</button>
+                        </div>
+                        <div id="quick-chat-palette" class="hidden">
+                            <div class="qc-category">
+                                <div class="qc-label">挨拶</div>
+                                <div class="qc-items">
+                                    <button class="qc-btn" data-msg="よろしく！">よろしく！</button>
+                                    <button class="qc-btn" data-msg="gg">gg</button>
+                                    <button class="qc-btn" data-msg="またね！">またね！</button>
+                                    <button class="qc-btn" data-msg="おつかれ！">おつかれ！</button>
+                                </div>
+                            </div>
+                            <div class="qc-category">
+                                <div class="qc-label">リアクション</div>
+                                <div class="qc-items">
+                                    <button class="qc-btn" data-msg="ナイスハンド！">ナイスハンド！</button>
+                                    <button class="qc-btn" data-msg="えぐい…">えぐい…</button>
+                                    <button class="qc-btn" data-msg="すごい！">すごい！</button>
+                                    <button class="qc-btn" data-msg="こわ！">こわ！</button>
+                                </div>
+                            </div>
+                            <div class="qc-category">
+                                <div class="qc-label">プレイ中</div>
+                                <div class="qc-items">
+                                    <button class="qc-btn" data-msg="ラッキー">ラッキー</button>
+                                    <button class="qc-btn" data-msg="しょうがない">しょうがない</button>
+                                    <button class="qc-btn" data-msg="ナイスブラフ！">ナイスブラフ！</button>
+                                    <button class="qc-btn" data-msg="どんまい">どんまい</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overlay-view hidden" id="ov-log">
+                        <div id="game-log"></div>
+                    </div>
+                </div>
+            </div>
 
 
             <div id="zoom-waiting-overlay" class="hidden">
@@ -392,7 +382,7 @@
     <script src="js/evaluator.js"></script>
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
-    <script src="js/ui.js?v=31"></script>
-    <script src="js/app.js?v=31"></script>
+    <script src="js/ui.js?v=32"></script>
+    <script src="js/app.js?v=32"></script>
 </body>
 </html>
