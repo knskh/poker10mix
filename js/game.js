@@ -100,8 +100,10 @@ class GameState {
         this.roundBets = 0;
         this.gameOver = false;
         this.isShowdown = false;
+        this.isFirstRound = false;
         this.fastFold = false;
         this.fastFoldActive = false;
+        this.zoomMode = false; // random game each hand
 
         // Callbacks
         this.onUpdate = null;
@@ -115,6 +117,7 @@ class GameState {
         this.onPlayerAction = null;
         this.onShowdown = null;
         this.onHandEnd = null;
+        this.onPlayerFold = null;
 
         // Filtered games
         this.filteredGames = GAME_LIST;
@@ -197,11 +200,20 @@ class GameState {
         this.handsInCurrentGame++;
         this.nextDealer();
 
-        // Check game rotation (every orbit = playerCount hands)
-        if (this.handsInCurrentGame >= this.playerCount) {
-            this.handsInCurrentGame = 0;
-            this.currentGameIndex = (this.currentGameIndex + 1) % this.filteredGames.length;
-            this.log(`ゲームチェンジ → ${this.gameConfig.name}`, 'important');
+        if (this.zoomMode) {
+            // Random game each hand
+            const prevIndex = this.currentGameIndex;
+            this.currentGameIndex = Math.floor(Math.random() * this.filteredGames.length);
+            if (this.currentGameIndex !== prevIndex) {
+                this.log(`ゲームチェンジ → ${this.gameConfig.name}`, 'important');
+            }
+        } else {
+            // Check game rotation (every orbit = playerCount hands)
+            if (this.handsInCurrentGame >= this.playerCount) {
+                this.handsInCurrentGame = 0;
+                this.currentGameIndex = (this.currentGameIndex + 1) % this.filteredGames.length;
+                this.log(`ゲームチェンジ → ${this.gameConfig.name}`, 'important');
+            }
         }
 
         // Check if game is over (only 1 player with chips)
@@ -254,7 +266,7 @@ class GameState {
         }
         this.update();
 
-        // Preflop betting
+        // Preflop betting (heads-up: SB/BTN first, BB last)
         const preflopStart = this.getNextActivePlayer(this.getBigBlindSeat());
         if (await this.bettingRound(preflopStart, true)) return;
 
@@ -401,6 +413,9 @@ class GameState {
         const gc = this.gameConfig;
         let best = -1;
         let bestValue = null;
+        let bestHighestSuit = -1;
+
+        const suitOrder = { c: 0, d: 1, h: 2, s: 3 };
 
         for (const p of this.players) {
             if (p.folded || p.allIn) continue;
@@ -408,20 +423,50 @@ class GameState {
             if (upHand.length === 0) continue;
 
             let value;
+            let highestSuit = -1;
+
             if (gc.lowOnly) {
                 // Razz: lowest visible hand acts first
                 value = upHand.map(c => c.rank === 14 ? 1 : c.rank).sort((a, b) => a - b);
-                if (!bestValue || compareArrays(value, bestValue) < 0) {
+                
+                let maxCard = upHand[0];
+                for (const c of upHand) {
+                    const r1 = maxCard.rank === 14 ? 1 : maxCard.rank;
+                    const r2 = c.rank === 14 ? 1 : c.rank;
+                    if (r2 > r1 || (r2 === r1 && suitOrder[c.suit] > suitOrder[maxCard.suit])) {
+                        maxCard = c;
+                    }
+                }
+                highestSuit = suitOrder[maxCard.suit];
+
+                let cmp = bestValue ? compareArrays(value, bestValue) : 0;
+                if (!bestValue || cmp < 0 || (cmp === 0 && highestSuit < bestHighestSuit)) {
                     best = p.id;
                     bestValue = value;
+                    bestHighestSuit = highestSuit;
                 }
             } else {
                 // Stud: highest visible hand acts first
-                const hand = bestHighHand(upHand.length >= 5 ? upHand : upHand);
+                const padded = [...upHand];
+                let dummy = -1;
+                while (padded.length < 5) padded.push({ rank: dummy--, suit: 'c' });
+                
+                const hand = bestHighHand(padded);
                 value = hand ? hand.value : [0];
-                if (!bestValue || compareArrays(value, bestValue) > 0) {
+
+                let maxCard = upHand[0];
+                for (const c of upHand) {
+                    if (c.rank > maxCard.rank || (c.rank === maxCard.rank && suitOrder[c.suit] > suitOrder[maxCard.suit])) {
+                        maxCard = c;
+                    }
+                }
+                highestSuit = suitOrder[maxCard.suit];
+
+                let cmp = bestValue ? compareArrays(value, bestValue) : 0;
+                if (!bestValue || cmp > 0 || (cmp === 0 && highestSuit > bestHighestSuit)) {
                     best = p.id;
                     bestValue = value;
+                    bestHighestSuit = highestSuit;
                 }
             }
         }
@@ -434,6 +479,7 @@ class GameState {
 
     async playDrawHand() {
         const gc = this.gameConfig;
+        this.drawSnapshots = []; // track all players' hands per draw round
 
         await this.postBlinds();
 
@@ -443,9 +489,11 @@ class GameState {
                 p.hand = this.deck.deal(gc.handSize);
             }
         }
+        // Snapshot: initial deal
+        this.drawSnapshots.push(this._captureDrawSnapshot());
         this.update();
 
-        // Pre-draw betting
+        // Pre-draw betting (heads-up: SB/BTN first, BB last)
         const firstActor = this.getNextActivePlayer(this.getBigBlindSeat());
         if (await this.bettingRound(firstActor, true, gc.smallBet)) return;
 
@@ -456,6 +504,8 @@ class GameState {
             // Draw phase
             this.log(`--- ${d + 1}回目のドロー ---`, 'action');
             await this.drawPhase();
+            // Snapshot: after draw
+            this.drawSnapshots.push(this._captureDrawSnapshot());
             this.update();
 
             // Post-draw betting
@@ -479,6 +529,13 @@ class GameState {
             this.update();
             await this.delay(300);
         }
+    }
+
+    _captureDrawSnapshot() {
+        return this.players.map(p => ({
+            id: p.id, name: p.name, folded: p.folded,
+            hand: (p.hand || []).map(c => ({ rank: c.rank, suit: c.suit })),
+        }));
     }
 
     executeDiscard(player, discardIndices) {
@@ -531,10 +588,20 @@ class GameState {
     }
 
     getSmallBlindSeat() {
+        // Heads-up: dealer is SB
+        const activePlayers = this.players.filter(p => !p.folded && p.chips > 0);
+        if (activePlayers.length === 2) {
+            return this.dealerSeat;
+        }
         return this.getNextActivePlayer(this.dealerSeat);
     }
 
     getBigBlindSeat() {
+        // Heads-up: non-dealer is BB
+        const activePlayers = this.players.filter(p => !p.folded && p.chips > 0);
+        if (activePlayers.length === 2) {
+            return this.getNextActivePlayer(this.dealerSeat);
+        }
         return this.getNextActivePlayer(this.getSmallBlindSeat());
     }
 
@@ -551,6 +618,7 @@ class GameState {
 
     // Returns true if hand is over (only 1 player left)
     async bettingRound(startIdx, isPreflop, limitBetSize) {
+        this.isFirstRound = !!isPreflop;
         if (startIdx < 0) return this.checkHandOver();
 
         const gc = this.gameConfig;
@@ -588,11 +656,18 @@ class GameState {
                 if (canRaise && player.chips > callAmount) {
                     if (gc.betting === 'limit') {
                         const size = limitBetSize || gc.smallBet;
-                        const raiseTotal = this.currentBet + size;
+                        let raiseTotal = this.currentBet + size;
+                        
+                        // For stud 3rd street, the first raise is a "Complete" to the small bet
+                        if (this.isFirstRound && gc.type === 'stud' && raiseCount === 0) {
+                            raiseTotal = size;
+                        }
+
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', amount: Math.min(size, player.chips) });
                         } else {
-                            actions.push({ type: 'raise', amount: Math.min(raiseTotal - player.currentBet, player.chips) });
+                            const amt = Math.min(raiseTotal - player.currentBet, player.chips);
+                            actions.push({ type: 'raise', amount: amt, total: player.currentBet + amt });
                         }
                     } else if (gc.betting === 'no-limit') {
                         const minRaiseSize = Math.max(this.minRaise, this.currentBet * 2 - player.currentBet);
@@ -600,9 +675,9 @@ class GameState {
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', min: this.minRaise, max: maxBet });
                         } else {
-                            actions.push({ type: 'raise', min: Math.min(minRaiseSize, maxBet), max: maxBet });
+                            actions.push({ type: 'raise', min: Math.min(minRaiseSize, maxBet), max: maxBet, currentBet: player.currentBet });
                         }
-                        actions.push({ type: 'allin', amount: player.chips });
+                        actions.push({ type: 'allin', amount: player.chips, total: player.currentBet + player.chips });
                     } else if (gc.betting === 'pot-limit') {
                         const potAfterCall = this.pot + callAmount;
                         const maxRaiseAmt = potAfterCall + callAmount;
@@ -610,7 +685,7 @@ class GameState {
                         if (callAmount <= 0) {
                             actions.push({ type: 'bet', min: this.minRaise, max: maxBet });
                         } else {
-                            actions.push({ type: 'raise', min: Math.min(this.currentBet + this.minRaise - player.currentBet, maxBet), max: maxBet });
+                            actions.push({ type: 'raise', min: Math.min(this.currentBet + this.minRaise - player.currentBet, maxBet), max: maxBet, currentBet: player.currentBet });
                         }
                     }
                 }
@@ -684,6 +759,7 @@ class GameState {
                 if (player.isHuman && this.fastFold) {
                     this.fastFoldActive = true;
                 }
+                if (this.onPlayerFold) this.onPlayerFold(player);
                 break;
 
             case 'check':

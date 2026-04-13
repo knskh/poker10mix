@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 - ハンドリプレイ</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+
+/* TABLE */
+#table {
+    position: absolute; top: 46%; left: 50%; transform: translate(-50%,-56%);
+    width: 680px; height: min(360px, calc(100vh - 220px));
+    background: radial-gradient(ellipse at 50% 50%, #1a5c3a, #0e3522 70%, #081f14);
+    border-radius: 50%; border: 4px solid #2a6b4a;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,0,0,0.6);
+}
+#table-logo {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 120px; height: 120px; z-index: 1; opacity: 0.12; pointer-events: none;
+}
+
+/* Info panel */
+#info-panel {
+    position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 14px; padding: 6px 20px 8px; z-index: 10;
+    text-align: center; white-space: nowrap; opacity: 0; transition: opacity 0.5s; min-width: 160px;
+}
+#table-banner { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.9); margin-bottom: 3px; }
+#table-banner .badge { background: #1565c0; color: #fff; font-size: 9px; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+#pot { display: flex; align-items: baseline; justify-content: center; gap: 5px; }
+#pot-label { font-size: 10px; color: rgba(255,215,0,0.6); }
+#pot-amount { font-size: 18px; font-weight: 700; color: #ffd700; }
+
+/* Board */
+#board {
+    position: absolute; top: 55%; left: 50%; transform: translate(-50%,-50%);
+    display: flex; gap: 6px; z-index: 10;
+}
+.board-card {
+    width: 42px; height: 58px; border-radius: 5px; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+    opacity: 0; transform: scale(0.3) rotateY(180deg);
+    transition: opacity 0.4s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.board-card.show { opacity: 1; transform: scale(1) rotateY(0); }
+.board-card .rank { font-size: 15px; line-height: 1; }
+.board-card .suit { font-size: 13px; line-height: 1; }
+.board-card.red { color: #dc2626; }
+.board-card.black { color: #1a1a1a; }
+
+/* Draw info */
+#draw-info {
+    position: absolute; top: 52%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 10; text-align: center; opacity: 0; transition: opacity 0.4s;
+    font-size: 14px; font-weight: 700; color: #67e8f9;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(103,232,249,0.2);
+    border-radius: 10px; padding: 6px 20px;
+}
+#draw-info.show { opacity: 1; }
+
+/* Seats */
+.seat {
+    position: absolute; width: 105px; text-align: center;
+    opacity: 0; transform: scale(0.8); transition: opacity 0.5s, transform 0.5s; z-index: 15;
+}
+.seat.show { opacity: 1; transform: scale(1); }
+.seat.folded { opacity: 0.3; transition: opacity 0.4s; }
+.seat-box {
+    background: rgba(15,20,35,0.9); border-radius: 12px; padding: 5px 8px;
+    border: 2px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: border-color 0.4s, box-shadow 0.4s;
+}
+.seat.active .seat-box { border-color: #38bdf8; box-shadow: 0 0 16px rgba(56,189,248,0.4); }
+.seat.winner .seat-box { border-color: #4ade80; box-shadow: 0 0 20px rgba(74,222,128,0.4); }
+.seat-name { font-size: 11px; font-weight: 700; color: #e0e0e0; }
+.seat-info { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 1px; }
+.seat-pos { font-size: 8px; font-weight: 700; color: #fff; padding: 1px 5px; border-radius: 3px; display: inline-block; }
+.seat-chips { font-size: 11px; font-weight: 700; color: #ffd700; }
+.seat-bet { font-size: 10px; font-weight: 700; color: #7dd3fc; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    opacity: 0; height: 0; overflow: hidden; transition: opacity 0.3s, height 0.2s; }
+.seat-bet.show { opacity: 1; height: 14px; }
+.seat-bet .chip-sm { width: 8px; height: 8px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #7dd3fc, #0284c7);
+    border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
+.seat-cards { display: flex; gap: 3px; justify-content: center; margin-top: 3px; flex-wrap: wrap; }
+.seat-card {
+    width: 24px; height: 34px; border-radius: 3px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 9px; line-height: 1; transition: transform 0.4s, opacity 0.3s;
+}
+.seat-card.facedown { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
+.seat-card.faceup { background: #fff; }
+.seat-card.faceup.red { color: #dc2626; }
+.seat-card.faceup.black { color: #1a1a1a; }
+.seat-card.downcard { background: linear-gradient(135deg, #1a2a50, #0d1830); border: 1px dashed #5588cc; }
+.seat-card.downcard.red { color: #f87171; }
+.seat-card.downcard.black { color: #94a3b8; }
+.seat-card.downcard span { opacity: 0.85; }
+.seat-card.hidden-card { opacity: 0; transform: scale(0.3); }
+.seat-card.discarding { opacity: 0; transform: translateY(-15px) scale(0.5); transition: all 0.3s; }
+.seat-card.drawing { opacity: 0; transform: translateY(15px) scale(0.5); }
+.seat-card.drawn { opacity: 1; transform: translateY(0) scale(1); transition: all 0.3s; }
+
+/* Action label */
+.seat-action {
+    font-size: 10px; font-weight: 700; margin-top: 3px; padding: 2px 8px; border-radius: 4px;
+    opacity: 0; transform: translateY(5px); transition: opacity 0.3s, transform 0.3s; display: inline-block;
+}
+.seat-action.show { opacity: 1; transform: translateY(0); }
+.act-fold { color: #ef4444; background: rgba(239,68,68,0.15); }
+.act-check { color: #a3e635; background: rgba(163,230,53,0.12); }
+.act-call { color: #4ade80; background: rgba(74,222,128,0.15); }
+.act-raise { color: #fbbf24; background: rgba(251,191,36,0.15); }
+.act-bet { color: #38bdf8; background: rgba(56,189,248,0.15); }
+.act-allin { color: #f472b6; background: rgba(244,114,182,0.15); border: 1px solid rgba(244,114,182,0.3); }
+.act-draw { color: #c084fc; background: rgba(192,132,252,0.15); }
+.act-stand { color: #67e8f9; background: rgba(103,232,249,0.12); }
+
+/* Seat positions */
+.s0 { bottom: -24px; left: 50%; transform: translateX(-50%); }
+.s0.show { transform: translateX(-50%) scale(1); }
+.s1 { bottom: 30px; left: 2px; }
+.s2 { top: 30px; left: 2px; }
+.s3 { top: -24px; left: 50%; transform: translateX(-50%); }
+.s3.show { transform: translateX(-50%) scale(1); }
+.s4 { top: 30px; right: 2px; }
+.s5 { bottom: 30px; right: 2px; }
+
+@keyframes winPulse { 0%,100%{box-shadow:0 0 20px rgba(74,222,128,0.4)} 50%{box-shadow:0 0 40px rgba(74,222,128,0.7)} }
+.seat.winner .seat-box { animation: winPulse 1s ease-in-out 3; }
+
+/* Result overlay */
+#result-overlay {
+    position: absolute; top: 60%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 20; text-align: center; opacity: 0; transition: opacity 0.5s;
+}
+#result-overlay.show { opacity: 1; }
+.result-hand { font-size: 13px; color: #67e8f9; font-weight: 600;
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(103,232,249,0.3);
+    border-radius: 10px; padding: 5px 18px; margin-bottom: 5px; }
+.result-winner { font-size: 16px; font-weight: 800; color: #4ade80; text-shadow: 0 0 20px rgba(74,222,128,0.5); }
+
+/* Action log */
+#action-log {
+    position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+    width: 660px; max-height: 95px; overflow: hidden;
+    background: rgba(10,14,20,0.92); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 6px 10px; z-index: 30; font-size: 10px;
+}
+#log-entries { display: flex; gap: 4px; overflow: hidden; }
+.log-street {
+    flex: 1; min-width: 0; background: rgba(255,255,255,0.03);
+    border-radius: 6px; padding: 3px 6px;
+    opacity: 0; transform: translateY(8px); transition: opacity 0.3s, transform 0.3s;
+}
+.log-street.show { opacity: 1; transform: translateY(0); }
+.log-street-name { font-size: 9px; font-weight: 800; letter-spacing: 0.5px; padding: 1px 6px; border-radius: 3px; margin-bottom: 3px; display: inline-block; }
+.street-preflop .log-street-name, .street-predraw .log-street-name, .street-3rd .log-street-name { color: #fff; background: rgba(100,100,100,0.4); }
+.street-flop .log-street-name, .street-draw1 .log-street-name, .street-4th .log-street-name { color: #67e8f9; background: rgba(56,189,248,0.15); }
+.street-turn .log-street-name, .street-draw2 .log-street-name, .street-5th .log-street-name { color: #fbbf24; background: rgba(251,191,36,0.12); }
+.street-river .log-street-name, .street-draw3 .log-street-name, .street-6th .log-street-name { color: #f472b6; background: rgba(244,114,182,0.12); }
+.street-showdown .log-street-name, .street-7th .log-street-name { color: #4ade80; background: rgba(74,222,128,0.12); }
+.log-action { padding: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity 0.25s; }
+.log-action.show { opacity: 1; }
+.log-action .la-name { font-weight: 700; color: #ccc; }
+.log-action .la-act { font-weight: 600; }
+.la-fold { color: #ef4444; } .la-check { color: #a3e635; } .la-call { color: #4ade80; }
+.la-raise, .la-bet { color: #fbbf24; } .la-allin { color: #f472b6; }
+.la-blind { color: #78909c; } .la-win { color: #4ade80; font-weight: 800; }
+.la-draw { color: #c084fc; } .la-stand { color: #67e8f9; } .la-deal { color: #fbbf24; }
+
+/* Title bar */
+#title { position: absolute; top: 10px; left: 16px; z-index: 30; display: flex; align-items: center; gap: 8px; }
+#title img { height: 32px; filter: drop-shadow(0 0 8px rgba(255,215,0,0.4)); }
+#title .sub { font-size: 10px; color: rgba(255,215,0,0.5); letter-spacing: 1px; }
+
+/* Controls */
+#controls {
+    position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 30;
+    display: flex; gap: 6px; align-items: center;
+    background: rgba(10,14,20,0.85); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 30px; padding: 4px 12px;
+}
+.ctrl-btn { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; user-select: none; }
+.ctrl-btn:hover { background: rgba(255,255,255,0.18); }
+.ctrl-btn.play { background: rgba(56,189,248,0.2); border-color: rgba(56,189,248,0.4); width: 36px; height: 36px; font-size: 15px; }
+.ctrl-btn.disabled { opacity: 0.3; pointer-events: none; }
+#step-label { font-size: 10px; color: #888; min-width: 60px; text-align: center; letter-spacing: 0.5px; }
+
+/* Progress bar */
+#progress-wrap {
+    width: 140px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; cursor: pointer; position: relative;
+}
+#progress-fill { height: 100%; background: #38bdf8; border-radius: 3px; transition: width 0.15s; }
+
+/* Share bar */
+#share-bar {
+    position: absolute; top: 10px; right: 16px; z-index: 30; display: flex; align-items: center; gap: 6px;
+}
+#btn-share { padding: 5px 14px; border-radius: 8px; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3);
+    color: #67e8f9; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+#btn-share:hover { background: rgba(56,189,248,0.3); }
+#share-toast { font-size: 10px; color: #4ade80; opacity: 0; transition: opacity 0.3s; }
+
+/* Error / loading */
+#loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0e14;
+    display: flex; align-items: center; justify-content: center; z-index: 200; }
+#loading-screen .msg { text-align: center; }
+#loading-screen h2 { color: #67e8f9; margin-bottom: 8px; }
+#loading-screen p { color: #888; font-size: 13px; }
+#loading-screen.hidden { display: none; }
+.error-msg { color: #ef4444; }
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+    <div class="msg">
+        <h2 id="loading-title">リプレイを読み込み中...</h2>
+        <p id="loading-sub"></p>
+    </div>
+</div>
+
+<div id="title"><img src="logos/logo.png" alt="mix-1"><div class="sub">ハンドリプレイ</div></div>
+
+<div id="share-bar">
+    <button id="btn-share">🔗 URLをコピー</button>
+    <span id="share-toast"></span>
+</div>
+
+<div id="table">
+    <img id="table-logo" src="logos/logo.png" alt="">
+    <div id="info-panel">
+        <div id="table-banner"></div>
+        <div id="pot"><span id="pot-label">Pot</span><span id="pot-amount">0</span></div>
+    </div>
+    <div id="board"></div>
+    <div id="draw-info"></div>
+    <div class="seat s0" id="seat-0"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s1" id="seat-1"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s2" id="seat-2"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s3" id="seat-3"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s4" id="seat-4"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div class="seat s5" id="seat-5"><div class="seat-box"><div class="seat-name"></div><div class="seat-info"><span class="seat-pos"></span><span class="seat-chips"></span></div><div class="seat-bet"><span class="chip-sm"></span><span class="sbet-val"></span></div><div class="seat-cards"></div><div class="seat-action"></div></div></div>
+    <div id="result-overlay"><div class="result-hand" id="result-hand"></div><div class="result-winner" id="result-winner"></div></div>
+</div>
+
+<div id="action-log"><div id="log-entries"></div></div>
+
+<div id="controls">
+    <div class="ctrl-btn" id="btn-start" title="最初に戻る">⏮</div>
+    <div class="ctrl-btn" id="btn-prev" title="1ステップ戻る">◀</div>
+    <div class="ctrl-btn play" id="btn-play" title="自動再生/一時停止">▶</div>
+    <div class="ctrl-btn" id="btn-next" title="1ステップ進む">▶</div>
+    <div class="ctrl-btn" id="btn-end" title="最後まで進む">⏭</div>
+    <div id="progress-wrap"><div id="progress-fill"></div></div>
+    <span id="step-label">0 / 0</span>
+    <div class="ctrl-btn" id="btn-speed" title="速度変更">1x</div>
+</div>
+
+<script>
+// ==================== COMPRESSION ====================
+async function compressData(str) {
+    const blob = new Blob([new TextEncoder().encode(str)]);
+    const stream = blob.stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buf = await new Response(stream).arrayBuffer();
+    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function decompressData(b64) {
+    const padded = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(padded);
+    const buf = Uint8Array.from(bin, c => c.charCodeAt(0));
+    const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Response(stream).text();
+}
+
+// ==================== DATA CONVERSION ====================
+const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
+const SUIT_COLOR = { s: 'black', h: 'red', d: 'red', c: 'black' };
+const POS_COLORS = { BTN:'#e65100', SB:'#37474f', BB:'#37474f', CO:'#6a1b9a', HJ:'#1565c0', EP:'#2e7d32',
+    S1:'#e65100', S2:'#1565c0', S3:'#2e7d32', S4:'#6a1b9a', S5:'#37474f', S6:'#37474f' };
+
+function cardObj(c) {
+    return { r: c.r, s: SUIT_SYM[c.s] || c.s, c: SUIT_COLOR[c.s] || 'black' };
+}
+
+// Convert handHistory entry (from app.js) → HANDS timeline format
+function convertHandData(data) {
+    const hr = data;
+    const gameType = hr.t;
+    const gameName = hr.g;
+
+    // Build badge info from game name
+    const badges = [];
+    if (gameName.includes('NL') || gameName.includes('ノーリミット')) badges.push({t:'No Limit',c:'blue'});
+    else if (gameName.includes('PL') || gameName.includes('ポットリミット')) badges.push({t:'Pot Limit',c:'blue'});
+    else if (gameName.includes('FL') || gameName.includes('フィクスド') || gameName.includes('リミット')) badges.push({t:'Fixed Limit',c:'blue'});
+    if (gameType === 'stud') badges.push({t:'Stud',c:'purple'});
+    else if (gameType === 'draw') badges.push({t:'Draw',c:'purple'});
+
+    const bannerHTML = gameName;
+
+    // Players
+    const players = hr.p.map(p => ({
+        name: p.n, pos: p.o, posColor: POS_COLORS[p.o] || '#37474f',
+        chips: p.s,
+        cards: (gameType === 'stud' ? p.w : p.h).map(cardObj),
+        endChips: p.c,
+        folded: !!p.f,
+        upCards: (p.u || []).map(cardObj),
+        downCards: (p.w || []).map(cardObj),
+        allCards: p.h.map(cardObj),
+    }));
+
+    // Community cards
+    const board = (hr.c || []).map(cardObj);
+
+    // Build timeline from logs
+    const timeline = buildTimeline(hr, players, board, gameType);
+
+    return {
+        game: gameName, badges, bannerHTML, players, board, timeline, gameType
+    };
+}
+
+function buildTimeline(hr, players, board, gameType) {
+    const logs = hr.l || [];
+    const timeline = [];
+
+    // Parse logs into structured events
+    const ROUND_MARKERS = {
+        'フロップ': { name: 'Flop', cls: 'street-flop' },
+        'ターン': { name: 'Turn', cls: 'street-turn' },
+        'リバー': { name: 'River', cls: 'street-river' },
+        '3rd': { name: '3rd Street', cls: 'street-3rd' },
+        '4th': { name: '4th Street', cls: 'street-4th' },
+        '5th': { name: '5th Street', cls: 'street-5th' },
+        '6th': { name: '6th Street', cls: 'street-6th' },
+        '7th': { name: '7th Street', cls: 'street-7th' },
+        '1回目のドロー': { name: '1st Draw', cls: 'street-draw1' },
+        '2回目のドロー': { name: '2nd Draw', cls: 'street-draw2' },
+        '3回目のドロー': { name: '3rd Draw', cls: 'street-draw3' },
+    };
+
+    // Determine initial round
+    if (gameType === 'stud') {
+        // Stud: studDeal first
+        const studCards = players.map(p => {
+            if (p.downCards.length >= 2 && p.upCards.length >= 1) {
+                return [
+                    { ...p.downCards[0], up: false },
+                    { ...p.downCards[1], up: false },
+                    { ...p.upCards[0], up: true },
+                ];
+            }
+            return p.allCards.slice(0, 3).map((c, i) => ({ ...c, up: i === 2 }));
+        });
+        timeline.push({ type: 'round', name: '3rd Street', cls: 'street-3rd' });
+        timeline.push({ type: 'studDeal', cards: studCards });
+    } else if (gameType === 'draw') {
+        timeline.push({ type: 'deal' });
+        timeline.push({ type: 'round', name: 'Pre-Draw', cls: 'street-predraw' });
+    } else {
+        timeline.push({ type: 'deal' });
+        timeline.push({ type: 'round', name: 'Preflop', cls: 'street-preflop' });
+    }
+
+    let boardCount = 0;
+    let studStreet = 3; // current stud street for card tracking
+    let drawRound = 0;
+    const drawSnaps = hr.ds || [];
+
+    for (const log of logs) {
+        // Check for round markers
+        let isRound = false;
+        for (const [marker, info] of Object.entries(ROUND_MARKERS)) {
+            if (log.includes(marker)) {
+                // Insert collect before new round
+                timeline.push({ type: 'collect' });
+
+                timeline.push({ type: 'round', name: info.name, cls: info.cls });
+
+                // Board cards for community games
+                if (info.name === 'Flop') {
+                    timeline.push({ type: 'board', count: 3 }); boardCount = 3;
+                } else if (info.name === 'Turn') {
+                    timeline.push({ type: 'board', count: 4 }); boardCount = 4;
+                } else if (info.name === 'River') {
+                    timeline.push({ type: 'board', count: 5 }); boardCount = 5;
+                }
+
+                // Stud card adds
+                if (info.name.includes('Street') && gameType === 'stud') {
+                    studStreet++;
+                    const isDown = studStreet === 7;
+                    const upIdx = studStreet - 3; // 4th=1, 5th=2, 6th=3, 7th=4
+                    const studAddCards = players.map(p => {
+                        if (p.folded) return null;
+                        if (isDown && p.downCards.length > 2) {
+                            return { ...p.downCards[2], up: false };
+                        } else if (!isDown && p.upCards.length > upIdx - 1) {
+                            return { ...p.upCards[upIdx], up: true };
+                        }
+                        return null;
+                    });
+                    timeline.push({ type: 'studCard', cards: studAddCards });
+                }
+
+                // Draw info
+                if (info.name.includes('Draw')) {
+                    drawRound++;
+                    timeline.push({ type: 'drawInfo', text: info.name });
+                    // Add draw events from snapshots
+                    if (drawSnaps.length > drawRound) {
+                        const preSnap = drawSnaps[drawRound - 1];
+                        const postSnap = drawSnaps[drawRound];
+                        if (preSnap && postSnap) {
+                            for (let pi = 0; pi < players.length; pi++) {
+                                const pre = preSnap.find(s => s.name === players[pi].name);
+                                const post = postSnap.find(s => s.name === players[pi].name);
+                                if (!pre || pre.folded || !post) continue;
+                                const preHand = pre.hand || [];
+                                const postHand = post.hand || [];
+                                // Count discards
+                                const discardCount = preHand.length - postHand.filter(c =>
+                                    preHand.some(pc => pc.r === c.r && pc.s === c.s)
+                                ).length;
+                                const discardedCards = preHand.filter(c =>
+                                    !postHand.some(pc => pc.r === c.r && pc.s === c.s)
+                                ).map(cardObj);
+                                const newCards = postHand.filter(c =>
+                                    !preHand.some(pc => pc.r === c.r && pc.s === c.s)
+                                ).map(cardObj);
+                                let label;
+                                if (discardCount === 0) {
+                                    label = 'スタンドパット';
+                                } else {
+                                    const discStr = discardedCards.map(c => c.r + c.s).join(' ');
+                                    const newStr = newCards.map(c => c.r + c.s).join(' ');
+                                    label = `${discardCount}枚交換: ${discStr} → ${newStr}`;
+                                }
+                                timeline.push({ type: 'draw', seat: pi, discard: discardCount, label, newCards });
+                            }
+                        }
+                    }
+                    timeline.push({ type: 'hideDrawInfo' });
+                }
+
+                isRound = true;
+                break;
+            }
+        }
+        if (isRound) continue;
+
+        // Parse action logs
+        const actionMatch = parseAction(log, players);
+        if (actionMatch) {
+            timeline.push(actionMatch);
+        }
+    }
+
+    // Final collect + showdown
+    timeline.push({ type: 'collect' });
+    timeline.push({ type: 'round', name: 'Showdown', cls: 'street-showdown' });
+
+    // Find non-folded players for showdown
+    const showdownSeats = players.map((p, i) => p.folded ? -1 : i).filter(i => i >= 0);
+    timeline.push({ type: 'showdown', seats: showdownSeats });
+
+    // Find winner(s)
+    const winners = players.map((p, i) => ({ i, diff: p.endChips - p.chips }))
+        .filter(w => w.diff > 0);
+    if (winners.length > 0) {
+        const w = winners[0];
+        const totalWon = winners.reduce((a, w) => a + w.diff, 0) + players.reduce((a, p) => a + p.chips, 0) - players.reduce((a, p) => a + p.endChips, 0);
+        timeline.push({ type: 'result', winner: w.i, hand: '', pot: 0 });
+    }
+
+    return timeline;
+}
+
+function parseAction(log, players) {
+    // Find which player
+    let seat = -1;
+    for (let i = 0; i < players.length; i++) {
+        if (log.startsWith(players[i].name)) { seat = i; break; }
+    }
+    if (seat < 0) return null;
+
+    // Parse amount
+    const amountMatch = log.match(/(\d[\d,]*)/);
+    const amount = amountMatch ? parseInt(amountMatch[1].replace(/,/g, '')) : 0;
+
+    if (log.includes('フォールド')) return { type: 'action', seat, act: 'fold', cls: 'act-fold', amount: 0, label: 'フォールド' };
+    if (log.includes('チェック')) return { type: 'action', seat, act: 'check', cls: 'act-check', amount: 0, label: 'チェック' };
+    if (log.includes('オールイン')) return { type: 'action', seat, act: 'allin', cls: 'act-allin', amount, label: `オールイン ${amount.toLocaleString()}` };
+    if (log.includes('レイズ') || log.includes('コンプリート')) return { type: 'action', seat, act: 'raise', cls: 'act-raise', amount, label: log.substring(log.indexOf(players[seat].name) + players[seat].name.length).trim() };
+    if (log.includes('ベット')) return { type: 'action', seat, act: 'bet', cls: 'act-bet', amount, label: `ベット ${amount.toLocaleString()}` };
+    if (log.includes('コール')) return { type: 'action', seat, act: 'call', cls: 'act-call', amount, label: `コール${amount ? ' ' + amount.toLocaleString() : ''}` };
+    if (log.includes('SB') || log.includes('BB') || log.includes('アンティ') || log.includes('ブリングイン')) {
+        return { type: 'blind', seat, amount, label: log.substring(log.indexOf(players[seat].name) + players[seat].name.length).trim() };
+    }
+    if (log.includes('獲得')) return null; // Skip - handled by result
+
+    return null;
+}
+
+// ==================== ENGINE ====================
+let HAND = null;
+let step = 0, maxStep = 0, playing = false, speed = 1, pot = 0;
+let bets = [], chips = [], boardShown = 0, timeoutId = null, currentStreetEl = null;
+// Snapshot history for step-back
+let snapshots = [];
+
+const $ = id => document.getElementById(id);
+// Dynamic getters — these elements get replaced by snapshot restore
+function $log() { return $('log-entries'); }
+function $board() { return $('board'); }
+function $potAmt() { return $('pot-amount'); }
+function $infoPanel() { return $('info-panel'); }
+function $banner() { return $('table-banner'); }
+function $drawInfo() { return $('draw-info'); }
+const fmt = n => n.toLocaleString();
+
+function makeCard(c) {
+    const d = document.createElement('div');
+    d.className = `board-card ${c.c}`;
+    d.innerHTML = `<span class="rank">${c.r}</span><span class="suit">${c.s}</span>`;
+    return d;
+}
+
+// ---- Snapshot system for step-back ----
+function captureSnapshot() {
+    return {
+        step,
+        pot,
+        bets: [...bets],
+        chips: [...chips],
+        boardShown,
+        tableHTML: $('table').innerHTML,
+        logHTML: $log().innerHTML,
+        drawInfoClass: $drawInfo().className,
+        drawInfoText: $drawInfo().textContent,
+    };
+}
+
+function restoreSnapshot(snap) {
+    step = snap.step;
+    pot = snap.pot;
+    bets = [...snap.bets];
+    chips = [...snap.chips];
+    boardShown = snap.boardShown;
+    $('table').innerHTML = snap.tableHTML;
+    $log().innerHTML = snap.logHTML;
+    $drawInfo().className = snap.drawInfoClass;
+    $drawInfo().textContent = snap.drawInfoText;
+    $potAmt().textContent = fmt(pot);
+    currentStreetEl = $log().querySelector('.log-street:last-child');
+    updateProgress();
+}
+
+// ---- Table setup ----
+function setupSeats() {
+    for (let i = 0; i < 6; i++) {
+        const el = $(`seat-${i}`);
+        if (i >= HAND.players.length) { el.style.display = 'none'; continue; }
+        el.style.display = '';
+        const p = HAND.players[i];
+        el.querySelector('.seat-name').textContent = p.name;
+        el.querySelector('.seat-pos').textContent = p.pos;
+        el.querySelector('.seat-pos').style.background = p.posColor;
+        el.querySelector('.seat-chips').textContent = fmt(p.chips);
+        el.querySelector('.seat-cards').innerHTML = '';
+        el.querySelector('.seat-action').className = 'seat-action';
+        el.querySelector('.seat-bet').classList.remove('show');
+    }
+    chips = HAND.players.map(p => p.chips);
+    bets = HAND.players.map(() => 0);
+}
+
+function dealCards() {
+    HAND.players.forEach((p, i) => {
+        const cont = $(`seat-${i}`).querySelector('.seat-cards');
+        cont.innerHTML = '';
+        p.cards.forEach(c => {
+            const el = document.createElement('div');
+            el.className = `seat-card faceup ${c.c}`;
+            el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+            cont.appendChild(el);
+        });
+    });
+}
+
+function studDealCards(cardsPerSeat) {
+    cardsPerSeat.forEach((seatCards, i) => {
+        if (!seatCards || i >= HAND.players.length) return;
+        const cont = $(`seat-${i}`).querySelector('.seat-cards');
+        cont.innerHTML = '';
+        seatCards.forEach(c => {
+            const el = document.createElement('div');
+            const cardCls = c.up ? 'faceup' : 'downcard';
+            el.className = `seat-card ${cardCls} ${c.c}`;
+            el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+            cont.appendChild(el);
+        });
+    });
+}
+
+function studAddCard(cardsPerSeat) {
+    cardsPerSeat.forEach((c, i) => {
+        if (!c || i >= HAND.players.length) return;
+        const cont = $(`seat-${i}`).querySelector('.seat-cards');
+        const el = document.createElement('div');
+        const cardCls = c.up ? 'faceup' : 'downcard';
+        el.className = `seat-card ${cardCls} ${c.c}`;
+        el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+        cont.appendChild(el);
+    });
+}
+
+function drawCardsInstant(seat, discardCount, newCards) {
+    if (discardCount === 0) return;
+    const cont = $(`seat-${seat}`).querySelector('.seat-cards');
+    const cards = cont.querySelectorAll('.seat-card');
+    const startIdx = cards.length - discardCount;
+    for (let i = cards.length - 1; i >= startIdx; i--) {
+        cont.removeChild(cards[i]);
+    }
+    newCards.forEach(c => {
+        const el = document.createElement('div');
+        el.className = `seat-card faceup ${c.c}`;
+        el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+        cont.appendChild(el);
+    });
+}
+
+function showAction(seat, act, cls) {
+    document.querySelectorAll('.seat.active').forEach(s => s.classList.remove('active'));
+    const seatEl = $(`seat-${seat}`);
+    seatEl.classList.add('active');
+    const actionEl = seatEl.querySelector('.seat-action');
+    actionEl.className = `seat-action ${cls}`;
+    actionEl.textContent = act.toUpperCase();
+    actionEl.classList.add('show');
+    if (act === 'fold') { seatEl.classList.add('folded'); seatEl.classList.remove('active'); }
+}
+
+function setBet(seat, amount) {
+    if (amount <= 0) return;
+    bets[seat] += amount; chips[seat] -= amount;
+    $(`seat-${seat}`).querySelector('.seat-chips').textContent = fmt(chips[seat]);
+    const sbetEl = $(`seat-${seat}`).querySelector('.seat-bet');
+    sbetEl.querySelector('.sbet-val').textContent = fmt(bets[seat]);
+    sbetEl.classList.add('show');
+}
+
+function collectBets() {
+    pot += bets.reduce((a, b) => a + b, 0);
+    $potAmt().textContent = fmt(pot);
+    for (let i = 0; i < HAND.players.length; i++) {
+        $(`seat-${i}`).querySelector('.seat-bet').classList.remove('show');
+        bets[i] = 0;
+    }
+    for (let i = 0; i < HAND.players.length; i++) {
+        $(`seat-${i}`).querySelector('.seat-action').classList.remove('show');
+    }
+    document.querySelectorAll('.seat.active').forEach(s => s.classList.remove('active'));
+}
+
+function showBoard(count) {
+    const cards = $board().querySelectorAll('.board-card');
+    for (let i = boardShown; i < count; i++) { cards[i].classList.add('show'); }
+    boardShown = count;
+}
+
+function showdownFn() {
+    HAND.players.forEach((p, seat) => {
+        const seatEl = $(`seat-${seat}`);
+        if (seatEl.classList.contains('folded')) { seatEl.style.opacity = '0.55'; }
+        seatEl.querySelectorAll('.seat-card.downcard').forEach(card => {
+            card.className = card.className.replace('downcard', 'faceup');
+        });
+    });
+}
+
+function showResult(winner, handName) {
+    const seatEl = $(`seat-${winner}`);
+    seatEl.classList.remove('active');
+    seatEl.classList.add('winner');
+    const wonAmount = HAND.players[winner].endChips - HAND.players[winner].chips;
+    $('result-hand').textContent = handName;
+    $('result-winner').textContent = `${HAND.players[winner].name} won ${fmt(pot > 0 ? pot : wonAmount)}`;
+    $('result-overlay').classList.add('show');
+    chips[winner] += pot;
+    $(`seat-${winner}`).querySelector('.seat-chips').textContent = fmt(HAND.players[winner].endChips);
+    addResultLog(`${HAND.players[winner].name} won ${fmt(pot > 0 ? pot : wonAmount)}`);
+    $potAmt().textContent = '0';
+}
+
+// Log functions
+const actClsMap = {fold:'la-fold',check:'la-check',call:'la-call',raise:'la-raise',bet:'la-bet',allin:'la-allin',draw:'la-draw',stand:'la-stand'};
+function addRoundLog(name, cls) {
+    const col = document.createElement('div');
+    col.className = `log-street ${cls} show`;
+    col.innerHTML = `<div class="log-street-name">${name}</div>`;
+    $log().appendChild(col);
+    currentStreetEl = col;
+}
+function addActionLog(seat, actType, label) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action show';
+    const cls = actClsMap[actType] || 'la-blind';
+    div.innerHTML = `<span class="la-name">${HAND.players[seat].name}</span> <span class="la-act ${cls}">${label}</span>`;
+    currentStreetEl.appendChild(div);
+}
+function addBlindLog(seat, label) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action show';
+    div.innerHTML = `<span class="la-name">${HAND.players[seat].name}</span> <span class="la-act la-blind">${label}</span>`;
+    currentStreetEl.appendChild(div);
+}
+function addStudCardLog(cardsPerSeat) {
+    if (!currentStreetEl) return;
+    cardsPerSeat.forEach((c, i) => {
+        if (!c || i >= HAND.players.length) return;
+        const div = document.createElement('div');
+        div.className = 'log-action show';
+        const upDown = c.up ? 'アップ' : 'ダウン';
+        const cardStr = c.r + c.s;
+        div.innerHTML = `<span class="la-name">${HAND.players[i].name}</span> <span class="la-act la-deal">${cardStr} (${upDown})</span>`;
+        currentStreetEl.appendChild(div);
+    });
+}
+function addDrawLog(seat, label) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action show';
+    const cls = label.includes('スタンド') ? 'la-stand' : 'la-draw';
+    div.innerHTML = `<span class="la-name">${HAND.players[seat].name}</span> <span class="la-act ${cls}">${label}</span>`;
+    currentStreetEl.appendChild(div);
+}
+function addResultLog(text) {
+    if (!currentStreetEl) return;
+    const div = document.createElement('div');
+    div.className = 'log-action show';
+    div.innerHTML = `<span class="la-act la-win">${text}</span>`;
+    currentStreetEl.appendChild(div);
+}
+
+// ---- Step execution (instant, no animation delays) ----
+function executeStep(idx) {
+    const ev = HAND.timeline[idx];
+    if (!ev) return;
+
+    switch (ev.type) {
+        case 'deal':
+            $banner().innerHTML = HAND.bannerHTML;
+            $infoPanel().style.opacity = '1';
+            if (HAND.board.length > 0) {
+                $board().innerHTML = '';
+                HAND.board.forEach(c => $board().appendChild(makeCard(c)));
+            }
+            setupSeats();
+            document.querySelectorAll('.seat').forEach((s, i) => {
+                if (i < HAND.players.length) s.classList.add('show');
+            });
+            dealCards();
+            break;
+        case 'round':
+            addRoundLog(ev.name, ev.cls);
+            break;
+        case 'blind':
+            setBet(ev.seat, ev.amount);
+            addBlindLog(ev.seat, ev.label);
+            break;
+        case 'action':
+            showAction(ev.seat, ev.act, ev.cls);
+            setBet(ev.seat, ev.amount);
+            addActionLog(ev.seat, ev.act, ev.label);
+            break;
+        case 'collect':
+            collectBets();
+            break;
+        case 'board':
+            showBoard(ev.count);
+            break;
+        case 'drawInfo':
+            $drawInfo().textContent = ev.text;
+            $drawInfo().classList.add('show');
+            break;
+        case 'hideDrawInfo':
+            $drawInfo().classList.remove('show');
+            break;
+        case 'draw':
+            drawCardsInstant(ev.seat, ev.discard, ev.newCards);
+            const drawEl = $(`seat-${ev.seat}`).querySelector('.seat-action');
+            drawEl.className = `seat-action ${ev.discard === 0 ? 'act-stand' : 'act-draw'}`;
+            drawEl.textContent = ev.discard === 0 ? 'STAND' : `DRAW ${ev.discard}`;
+            drawEl.classList.add('show');
+            addDrawLog(ev.seat, ev.label);
+            break;
+        case 'studDeal':
+            $banner().innerHTML = HAND.bannerHTML;
+            $infoPanel().style.opacity = '1';
+            setupSeats();
+            document.querySelectorAll('.seat').forEach((s, i) => {
+                if (i < HAND.players.length) s.classList.add('show');
+            });
+            studDealCards(ev.cards);
+            break;
+        case 'studCard':
+            studAddCard(ev.cards);
+            addStudCardLog(ev.cards);
+            break;
+        case 'showdown':
+            showdownFn();
+            break;
+        case 'result':
+            showResult(ev.winner, ev.hand);
+            break;
+    }
+}
+
+// ---- Reset ----
+function resetAll() {
+    step = 0; pot = 0; boardShown = 0; currentStreetEl = null;
+    $board().innerHTML = ''; $potAmt().textContent = '0';
+    $infoPanel().style.opacity = '0'; $log().innerHTML = '';
+    $drawInfo().classList.remove('show'); $drawInfo().textContent = '';
+    $('result-overlay').classList.remove('show');
+    for (let i = 0; i < 6; i++) {
+        const s = $(`seat-${i}`);
+        s.classList.remove('show','folded','active','winner');
+        s.style.opacity = '';
+        s.querySelector('.seat-cards').innerHTML = '';
+        s.querySelector('.seat-action').className = 'seat-action';
+        s.querySelector('.seat-bet').classList.remove('show');
+    }
+    snapshots = [captureSnapshot()];
+    updateProgress();
+}
+
+// ---- Navigation ----
+function updateProgress() {
+    const total = HAND ? HAND.timeline.length : 0;
+    $('step-label').textContent = `${step} / ${total}`;
+    const pct = total > 0 ? (step / total) * 100 : 0;
+    $('progress-fill').style.width = pct + '%';
+    $('btn-prev').classList.toggle('disabled', step <= 0);
+    $('btn-start').classList.toggle('disabled', step <= 0);
+    $('btn-next').classList.toggle('disabled', step >= total);
+    $('btn-end').classList.toggle('disabled', step >= total);
+}
+
+function stepForward() {
+    if (!HAND || step >= HAND.timeline.length) return;
+    snapshots.push(captureSnapshot());
+    executeStep(step);
+    step++;
+    updateProgress();
+}
+
+function stepBack() {
+    if (snapshots.length <= 1) return;
+    snapshots.pop();
+    const snap = snapshots[snapshots.length - 1];
+    restoreSnapshot(snap);
+}
+
+function goToStart() {
+    pausePlay();
+    resetAll();
+}
+
+function goToEnd() {
+    pausePlay();
+    while (step < HAND.timeline.length) {
+        snapshots.push(captureSnapshot());
+        executeStep(step);
+        step++;
+    }
+    updateProgress();
+}
+
+// ---- Auto-play ----
+function getDelay(base) { return base / speed; }
+
+function autoStep() {
+    if (!playing || !HAND || step >= HAND.timeline.length) {
+        pausePlay();
+        return;
+    }
+    stepForward();
+    const ev = HAND.timeline[step - 1];
+    let delay = 700;
+    if (ev) {
+        switch (ev.type) {
+            case 'deal': case 'studDeal': delay = 1200; break;
+            case 'round': delay = 400; break;
+            case 'blind': delay = 300; break;
+            case 'action': delay = ev.act === 'fold' ? 500 : 750; break;
+            case 'collect': delay = 500; break;
+            case 'board': delay = ev.count === 3 ? 1000 : 700; break;
+            case 'draw': delay = 800; break;
+            case 'showdown': delay = 1300; break;
+            case 'result': delay = 3000; break;
+        }
+    }
+    timeoutId = setTimeout(autoStep, getDelay(delay));
+}
+
+function togglePlay() {
+    if (playing) {
+        pausePlay();
+    } else {
+        if (step >= HAND.timeline.length) { resetAll(); }
+        playing = true;
+        $('btn-play').innerHTML = '⏸';
+        autoStep();
+    }
+}
+
+function pausePlay() {
+    playing = false;
+    clearTimeout(timeoutId);
+    $('btn-play').innerHTML = '▶';
+}
+
+// ---- Controls ----
+$('btn-play').addEventListener('click', togglePlay);
+$('btn-next').addEventListener('click', () => { pausePlay(); stepForward(); });
+$('btn-prev').addEventListener('click', () => { pausePlay(); stepBack(); });
+$('btn-start').addEventListener('click', goToStart);
+$('btn-end').addEventListener('click', goToEnd);
+
+// Progress bar click
+$('progress-wrap').addEventListener('click', (e) => {
+    if (!HAND) return;
+    pausePlay();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    const targetStep = Math.round(pct * HAND.timeline.length);
+
+    if (targetStep < step) {
+        // Go back: restore from start, replay to target
+        resetAll();
+    }
+    while (step < targetStep && step < HAND.timeline.length) {
+        snapshots.push(captureSnapshot());
+        executeStep(step);
+        step++;
+    }
+    updateProgress();
+});
+
+// Speed
+const speeds = [1, 1.5, 2, 3]; let speedIdx = 0;
+$('btn-speed').addEventListener('click', () => {
+    speedIdx = (speedIdx + 1) % speeds.length; speed = speeds[speedIdx];
+    $('btn-speed').textContent = speed + 'x';
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'ArrowRight' || e.key === 'l') { pausePlay(); stepForward(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'j') { pausePlay(); stepBack(); }
+    else if (e.key === 'Home') { goToStart(); }
+    else if (e.key === 'End') { goToEnd(); }
+});
+
+// ---- Share ----
+$('btn-share').addEventListener('click', async () => {
+    const url = window.location.href;
+    try {
+        await navigator.clipboard.writeText(url);
+        $('share-toast').textContent = 'コピーしました！';
+        $('share-toast').style.opacity = '1';
+        setTimeout(() => { $('share-toast').style.opacity = '0'; }, 2000);
+    } catch {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = url; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        $('share-toast').textContent = 'コピーしました！';
+        $('share-toast').style.opacity = '1';
+        setTimeout(() => { $('share-toast').style.opacity = '0'; }, 2000);
+    }
+});
+
+// ==================== INIT ====================
+async function init() {
+    const hash = window.location.hash.substring(1);
+    if (!hash) {
+        $('loading-title').textContent = 'リプレイデータがありません';
+        $('loading-title').classList.add('error-msg');
+        $('loading-sub').textContent = 'ゲーム内のハンド履歴から「共有」ボタンでリプレイURLを取得できます';
+        return;
+    }
+
+    try {
+        const json = await decompressData(hash);
+        const data = JSON.parse(json);
+        HAND = convertHandData(data);
+        maxStep = HAND.timeline.length;
+        $('loading-screen').classList.add('hidden');
+        resetAll();
+    } catch (e) {
+        console.error('Replay load error:', e);
+        $('loading-title').textContent = 'リプレイの読み込みに失敗しました';
+        $('loading-title').classList.add('error-msg');
+        $('loading-sub').textContent = e.message;
+    }
+}
+
+init();
+</script>
+</body>
+</html>

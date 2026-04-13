@@ -2,3 +2,4 @@ node_modules/
 .claude/
 *.jsonl
 test*.js
+accounts.json

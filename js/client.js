@@ -56,7 +56,7 @@ class PokerClient {
                 this.name = msg.name;
                 break;
             case 'room_list':
-                this.emit('room_list', msg.rooms);
+                this.emit('room_list', { rooms: msg.rooms, zoomCount: msg.zoomCount || 0 });
                 break;
             case 'room_joined':
                 this.roomId = msg.room.id;
@@ -70,13 +70,16 @@ class PokerClient {
                 this.emit('room_left');
                 break;
             case 'game_started':
-                this.emit('game_started');
+                this.emit('game_started', msg);
+                break;
+            case 'hand_start':
+                this.emit('hand_start');
                 break;
             case 'game_state':
                 this.emit('game_state', msg.state);
                 break;
             case 'your_turn':
-                this.emit('your_turn', { actions: msg.actions, timeLimit: msg.timeLimit });
+                this.emit('your_turn', msg);
                 break;
             case 'your_draw':
                 this.emit('your_draw', { hand: msg.hand, timeLimit: msg.timeLimit });
@@ -87,11 +90,47 @@ class PokerClient {
             case 'chat':
                 this.emit('chat', { from: msg.from, message: msg.message });
                 break;
+            case 'lobby_chat':
+                this.emit('lobby_chat', { from: msg.from, message: msg.message });
+                break;
             case 'game_over':
                 this.emit('game_over', msg);
                 break;
             case 'stats_data':
                 this.emit('stats_data', msg);
+                break;
+            case 'hand_result':
+                this.emit('hand_result', msg);
+                break;
+            case 'stats_update':
+                this.emit('stats_update', msg);
+                break;
+            case 'auth_result':
+                this.emit('auth_result', msg);
+                break;
+            case 'zoom_joined':
+                this.emit('zoom_joined');
+                break;
+            case 'zoom_waiting':
+                this.emit('zoom_waiting', msg);
+                break;
+            case 'zoom_left':
+                this.emit('zoom_left');
+                break;
+            case 'zoom_sitout':
+                this.emit('zoom_sitout');
+                break;
+            case 'emote':
+                this.emit('emote', { seat: msg.seat, emote: msg.emote, from: msg.from });
+                break;
+            case 'reaction':
+                this.emit('reaction', { emote: msg.emote, from: msg.from });
+                break;
+            case 'big_hand':
+                this.emit('big_hand', { roomId: msg.roomId, winner: msg.winner, pot: msg.pot, handRank: msg.handRank, gameName: msg.gameName });
+                break;
+            case 'auto_kicked':
+                this.emit('auto_kicked');
                 break;
             case 'error':
                 this.emit('error', msg.message);
@@ -101,6 +140,10 @@ class PokerClient {
 
     setName(name) { this.name = name; this.send({ type: 'set_name', name }); }
     createRoom() { this.send({ type: 'create_room' }); }
+    joinZoom() { this.send({ type: 'join_zoom' }); }
+    leaveZoom() { this.send({ type: 'leave_zoom' }); }
+    zoomSitout() { this.send({ type: 'zoom_sitout' }); }
+    zoomRejoin() { this.send({ type: 'zoom_rejoin' }); }
     joinRoom(roomId) { this.send({ type: 'join_room', roomId }); }
     leaveRoom() { this.send({ type: 'leave_room' }); }
     updateSettings(settings) { this.send({ type: 'update_settings', settings }); }
@@ -108,6 +151,10 @@ class PokerClient {
     sendAction(action) { this.send({ type: 'action', action }); }
     sendDraw(discards) { this.send({ type: 'draw', discards }); }
     sendChat(message) { this.send({ type: 'chat', message }); }
+    rejoinGame() { this.send({ type: 'rejoin_game' }); }
+    sendEmote(emote) { this.send({ type: 'emote', emote }); }
+    sendReaction(emote) { this.send({ type: 'reaction', emote }); }
+    rebuyChips(amount) { this.send({ type: 'rebuy_chips', amount }); }
     getStats() { this.send({ type: 'get_stats' }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
 }

@@ -9,10 +9,15 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["poker", "multiplayer", "websocket"],
+  "keywords": [
+    "poker",
+    "multiplayer",
+    "websocket"
+  ],
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "ws": "^8.20.0"
   }
 }

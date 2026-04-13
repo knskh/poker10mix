@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Change Animation Demos</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d1117; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+#tab-bar { display: flex; gap: 4px; padding: 10px; background: rgba(0,0,0,0.5); z-index: 200; flex-shrink: 0; }
+.tab-btn { flex: 1; padding: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #aaa; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.3s; }
+.tab-btn.active { background: rgba(56,189,248,0.15); border-color: rgba(56,189,248,0.4); color: #67e8f9; }
+
+#demo-area { flex: 1; position: relative; overflow: hidden; }
+.demo-panel { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+.demo-panel.active { opacity: 1; pointer-events: auto; }
+
+/* ============================================ */
+/* Reconstructed Logo (shared base)             */
+/* ============================================ */
+.gc-scene {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 42%, #1a2235 0%, #111827 35%, #0d1117 65%);
+    display: flex; align-items: center; justify-content: center;
+}
+.logo-container {
+    position: relative; width: 280px; height: 280px;
+}
+
+/* Center glow */
+.center-glow {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-52%);
+    width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(56,189,248,0.18) 0%, rgba(56,189,248,0.05) 40%, transparent 70%);
+}
+
+/* Neon rings */
+.neon-ring {
+    position: absolute; top: 50%; left: 50%;
+    border-radius: 50%;
+    border: 2.5px solid rgba(56,189,248,0.5);
+    box-shadow: 0 0 15px rgba(56,189,248,0.25), 0 0 40px rgba(56,189,248,0.08), inset 0 0 15px rgba(56,189,248,0.1);
+}
+.neon-ring.main {
+    width: 170px; height: 170px;
+    transform: translate(-50%,-52%);
+}
+.neon-ring.sub {
+    width: 190px; height: 160px;
+    transform: translate(-50%,-52%) rotateX(15deg) rotateZ(-25deg);
+    border-color: rgba(56,189,248,0.2);
+    box-shadow: 0 0 10px rgba(56,189,248,0.1);
+}
+.neon-ring.sub2 {
+    width: 200px; height: 150px;
+    transform: translate(-50%,-52%) rotateX(-20deg) rotateZ(20deg);
+    border-color: rgba(56,189,248,0.12);
+    box-shadow: 0 0 8px rgba(56,189,248,0.06);
+}
+
+/* mix-1 text */
+.logo-text {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-55%);
+    font-size: 48px; font-weight: 900; letter-spacing: -1px; z-index: 5;
+    background: linear-gradient(180deg, rgba(200,230,255,0.95) 0%, rgba(56,189,248,0.9) 50%, rgba(0,200,220,1) 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 12px rgba(56,189,248,0.4));
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Bubbles - glass sphere */
+.logo-bubble {
+    position: absolute; border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.28), rgba(200,230,255,0.08) 40%, rgba(56,189,248,0.03) 70%, transparent);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 0 12px rgba(56,189,248,0.1), inset 0 -4px 12px rgba(255,255,255,0.04);
+    z-index: 3;
+}
+.logo-bubble::before {
+    content: ''; position: absolute; top: 14%; left: 22%; width: 32%; height: 22%;
+    border-radius: 50%; background: rgba(255,255,255,0.22);
+    filter: blur(2px); transform: rotate(-25deg);
+}
+.logo-bubble::after {
+    content: ''; position: absolute; bottom: 18%; right: 18%; width: 15%; height: 10%;
+    border-radius: 50%; background: rgba(255,255,255,0.08);
+    filter: blur(1px);
+}
+
+/* Initial bubble positions (matching logo) */
+.bub-a { width: 70px; height: 70px; top: 8%; left: 8%; }        /* upper-left large */
+.bub-b { width: 48px; height: 48px; top: 22%; right: 4%; }      /* right medium */
+.bub-c { width: 30px; height: 30px; top: 5%; right: 22%; }      /* upper-right small */
+.bub-d { width: 58px; height: 58px; bottom: 10%; left: 20%; }   /* bottom-left large */
+.bub-e { width: 24px; height: 24px; bottom: 25%; right: 10%; }  /* right small */
+.bub-f { width: 18px; height: 18px; top: 42%; left: 2%; }       /* left tiny */
+
+/* Game info text */
+.gc-info {
+    position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
+    text-align: center; z-index: 10;
+}
+.gc-label { font-size: 11px; color: #67e8f9; letter-spacing: 4px; margin-bottom: 4px; opacity: 0.7; }
+.gc-name { font-size: 26px; font-weight: 900; color: #fff; text-shadow: 0 0 25px rgba(56,189,248,0.4); white-space: nowrap; }
+.gc-badges { margin-top: 8px; }
+.gc-badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin: 0 3px; }
+.gc-badge.blue { background: rgba(21,101,192,0.3); color: #67e8f9; border: 1px solid rgba(56,189,248,0.3); }
+.gc-badge.green { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+
+/* ============================================ */
+/* DEMO 1: Orbit - bubbles orbit the text       */
+/* ============================================ */
+#demo-1 .logo-bubble { animation: var(--orbit-anim); }
+#demo-1 .bub-a { --orbit-anim: orbit1A 8s ease-in-out infinite; }
+#demo-1 .bub-b { --orbit-anim: orbit1B 10s ease-in-out infinite; }
+#demo-1 .bub-c { --orbit-anim: orbit1C 7s ease-in-out infinite; }
+#demo-1 .bub-d { --orbit-anim: orbit1D 9s ease-in-out infinite; }
+#demo-1 .bub-e { --orbit-anim: orbit1E 11s ease-in-out infinite; }
+#demo-1 .bub-f { --orbit-anim: orbit1F 6s ease-in-out infinite; }
+
+@keyframes orbit1A {
+    0%   { top: 8%;  left: 8%;  }
+    25%  { top: 2%;  left: 50%; }
+    50%  { top: 20%; left: 82%; }
+    75%  { top: 65%; left: 55%; }
+    100% { top: 8%;  left: 8%;  }
+}
+@keyframes orbit1B {
+    0%   { top: 22%; right: 4%;  }
+    25%  { top: 60%; right: 0%;  }
+    50%  { top: 75%; right: 45%; }
+    75%  { top: 10%; right: 30%; }
+    100% { top: 22%; right: 4%;  }
+}
+@keyframes orbit1C {
+    0%   { top: 5%;  right: 22%; }
+    33%  { top: 35%; right: 80%; }
+    66%  { top: 70%; right: 30%; }
+    100% { top: 5%;  right: 22%; }
+}
+@keyframes orbit1D {
+    0%   { bottom: 10%; left: 20%; }
+    25%  { bottom: 5%;  left: 60%; }
+    50%  { bottom: 30%; left: 80%; }
+    75%  { bottom: 55%; left: 40%; }
+    100% { bottom: 10%; left: 20%; }
+}
+@keyframes orbit1E {
+    0%   { bottom: 25%; right: 10%; }
+    33%  { bottom: 60%; right: 30%; }
+    66%  { bottom: 10%; right: 60%; }
+    100% { bottom: 25%; right: 10%; }
+}
+@keyframes orbit1F {
+    0%   { top: 42%; left: 2%;  }
+    50%  { top: 15%; left: 45%; }
+    100% { top: 42%; left: 2%;  }
+}
+
+/* Ring glow pulse for demo 1 */
+#demo-1 .neon-ring.main { animation: ringPulse1 4s ease-in-out infinite; }
+@keyframes ringPulse1 {
+    0%,100% { box-shadow: 0 0 15px rgba(56,189,248,0.25), inset 0 0 15px rgba(56,189,248,0.1); }
+    50%     { box-shadow: 0 0 30px rgba(56,189,248,0.45), inset 0 0 25px rgba(56,189,248,0.2); }
+}
+
+/* ============================================ */
+/* DEMO 2: Breathe - bubbles pulse & float      */
+/* ============================================ */
+#demo-2 .logo-bubble { animation: var(--breathe-anim); }
+#demo-2 .bub-a { --breathe-anim: breatheA 6s ease-in-out infinite; }
+#demo-2 .bub-b { --breathe-anim: breatheB 7s ease-in-out infinite -1.5s; }
+#demo-2 .bub-c { --breathe-anim: breatheC 5s ease-in-out infinite -0.8s; }
+#demo-2 .bub-d { --breathe-anim: breatheD 8s ease-in-out infinite -2s; }
+#demo-2 .bub-e { --breathe-anim: breatheE 5.5s ease-in-out infinite -3s; }
+#demo-2 .bub-f { --breathe-anim: breatheF 4.5s ease-in-out infinite -1s; }
+
+@keyframes breatheA {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.8; }
+    30%     { transform: translate(12px,-8px) scale(1.15); opacity: 1; }
+    60%     { transform: translate(-6px,10px) scale(0.9); opacity: 0.6; }
+}
+@keyframes breatheB {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.75; }
+    40%     { transform: translate(-10px,14px) scale(1.2); opacity: 0.95; }
+    70%     { transform: translate(8px,-6px) scale(0.85); opacity: 0.55; }
+}
+@keyframes breatheC {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.7; }
+    50%     { transform: translate(-8px,6px) scale(1.35); opacity: 1; }
+}
+@keyframes breatheD {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.8; }
+    35%     { transform: translate(15px,-10px) scale(1.1); opacity: 0.95; }
+    65%     { transform: translate(-8px,5px) scale(0.88); opacity: 0.6; }
+}
+@keyframes breatheE {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.7; }
+    50%     { transform: translate(10px,8px) scale(1.3); opacity: 1; }
+}
+@keyframes breatheF {
+    0%,100% { transform: translate(0,0) scale(1); opacity: 0.65; }
+    40%     { transform: translate(6px,-10px) scale(1.4); opacity: 0.95; }
+    80%     { transform: translate(-4px,4px) scale(0.8); opacity: 0.5; }
+}
+
+/* Ring breathe for demo 2 */
+#demo-2 .neon-ring.main { animation: ringBreathe 5s ease-in-out infinite; }
+#demo-2 .neon-ring.sub  { animation: ringBreathe 6s ease-in-out infinite -1.5s; }
+@keyframes ringBreathe {
+    0%,100% { transform: translate(-50%,-52%) scale(1); border-color: rgba(56,189,248,0.5); }
+    50%     { transform: translate(-50%,-52%) scale(1.06); border-color: rgba(56,189,248,0.7); }
+}
+#demo-2 .center-glow { animation: glowBreathe 4s ease-in-out infinite; }
+@keyframes glowBreathe {
+    0%,100% { transform: translate(-50%,-52%) scale(1); opacity: 0.7; }
+    50%     { transform: translate(-50%,-52%) scale(1.2); opacity: 1; }
+}
+
+/* ============================================ */
+/* DEMO 3: Swirl - bubbles spiral around center */
+/* ============================================ */
+#demo-3 .bub-a { animation: swirl3A 10s cubic-bezier(0.4,0,0.6,1) infinite; }
+#demo-3 .bub-b { animation: swirl3B 12s cubic-bezier(0.4,0,0.6,1) infinite; }
+#demo-3 .bub-c { animation: swirl3C 8s  cubic-bezier(0.4,0,0.6,1) infinite; }
+#demo-3 .bub-d { animation: swirl3D 11s cubic-bezier(0.4,0,0.6,1) infinite; }
+#demo-3 .bub-e { animation: swirl3E 9s  cubic-bezier(0.4,0,0.6,1) infinite; }
+#demo-3 .bub-f { animation: swirl3F 7s  cubic-bezier(0.4,0,0.6,1) infinite; }
+
+/* Spiral paths: approach center then swing back out */
+@keyframes swirl3A {
+    0%   { top: 8%;  left: 8%;  transform: scale(1); opacity: 0.8; }
+    20%  { top: 25%; left: 30%; transform: scale(0.8); opacity: 0.9; }
+    40%  { top: 40%; left: 42%; transform: scale(0.5); opacity: 1; }
+    50%  { top: 42%; left: 48%; transform: scale(0.4); opacity: 0.6; }
+    65%  { top: 30%; left: 70%; transform: scale(0.7); opacity: 0.9; }
+    80%  { top: 10%; left: 55%; transform: scale(1.1); opacity: 0.85; }
+    100% { top: 8%;  left: 8%;  transform: scale(1); opacity: 0.8; }
+}
+@keyframes swirl3B {
+    0%   { top: 22%; right: 4%;  transform: scale(1); }
+    25%  { top: 38%; right: 25%; transform: scale(0.6); }
+    45%  { top: 43%; right: 42%; transform: scale(0.35); }
+    60%  { top: 55%; right: 55%; transform: scale(0.7); }
+    80%  { top: 65%; right: 20%; transform: scale(1.1); }
+    100% { top: 22%; right: 4%;  transform: scale(1); }
+}
+@keyframes swirl3C {
+    0%   { top: 5%;  right: 22%; transform: scale(1); }
+    30%  { top: 30%; right: 35%; transform: scale(0.5); }
+    50%  { top: 42%; right: 45%; transform: scale(0.3); }
+    70%  { top: 20%; right: 60%; transform: scale(0.8); }
+    100% { top: 5%;  right: 22%; transform: scale(1); }
+}
+@keyframes swirl3D {
+    0%   { bottom: 10%; left: 20%; transform: scale(1); }
+    20%  { bottom: 25%; left: 35%; transform: scale(0.7); }
+    45%  { bottom: 38%; left: 44%; transform: scale(0.4); }
+    60%  { bottom: 35%; left: 55%; transform: scale(0.6); }
+    80%  { bottom: 15%; left: 65%; transform: scale(1.05); }
+    100% { bottom: 10%; left: 20%; transform: scale(1); }
+}
+@keyframes swirl3E {
+    0%   { bottom: 25%; right: 10%; transform: scale(1); }
+    35%  { bottom: 38%; right: 30%; transform: scale(0.5); }
+    50%  { bottom: 42%; right: 44%; transform: scale(0.3); }
+    75%  { bottom: 50%; right: 60%; transform: scale(0.9); }
+    100% { bottom: 25%; right: 10%; transform: scale(1); }
+}
+@keyframes swirl3F {
+    0%   { top: 42%; left: 2%;  transform: scale(1); }
+    40%  { top: 43%; left: 38%; transform: scale(0.4); }
+    60%  { top: 55%; left: 60%; transform: scale(0.8); }
+    100% { top: 42%; left: 2%;  transform: scale(1); }
+}
+
+/* Rotating rings for demo 3 */
+#demo-3 .neon-ring.main { animation: ringRotate3 6s linear infinite; }
+#demo-3 .neon-ring.sub  { animation: ringRotate3 8s linear infinite reverse; }
+#demo-3 .neon-ring.sub2 { animation: ringRotate3 10s linear infinite; }
+@keyframes ringRotate3 {
+    0%   { transform: translate(-50%,-52%) rotateZ(0deg); }
+    100% { transform: translate(-50%,-52%) rotateZ(360deg); }
+}
+#demo-3 .center-glow { animation: glowSwirl 3s ease-in-out infinite; }
+@keyframes glowSwirl {
+    0%,100% { opacity: 0.6; filter: hue-rotate(0deg); }
+    50%     { opacity: 1; filter: hue-rotate(20deg); }
+}
+</style>
+</head>
+<body>
+<div id="tab-bar">
+    <button class="tab-btn active" data-demo="1">案1: オービット</button>
+    <button class="tab-btn" data-demo="2">案2: ブリーズ</button>
+    <button class="tab-btn" data-demo="3">案3: スワール</button>
+</div>
+<div id="demo-area">
+
+<!-- DEMO 1 -->
+<div class="demo-panel active" id="demo-1">
+<div class="gc-scene">
+    <div class="logo-container">
+        <div class="center-glow"></div>
+        <div class="neon-ring main"></div>
+        <div class="neon-ring sub"></div>
+        <div class="neon-ring sub2"></div>
+        <div class="logo-text">mix-1</div>
+        <div class="logo-bubble bub-a"></div>
+        <div class="logo-bubble bub-b"></div>
+        <div class="logo-bubble bub-c"></div>
+        <div class="logo-bubble bub-d"></div>
+        <div class="logo-bubble bub-e"></div>
+        <div class="logo-bubble bub-f"></div>
+    </div>
+    <div class="gc-info">
+        <div class="gc-label">GAME CHANGE</div>
+        <div class="gc-name">7-Card Stud</div>
+        <div class="gc-badges"><span class="gc-badge blue">Fixed Limit</span><span class="gc-badge green">Hi-Lo</span></div>
+    </div>
+</div>
+</div>
+
+<!-- DEMO 2 -->
+<div class="demo-panel" id="demo-2">
+<div class="gc-scene">
+    <div class="logo-container">
+        <div class="center-glow"></div>
+        <div class="neon-ring main"></div>
+        <div class="neon-ring sub"></div>
+        <div class="neon-ring sub2"></div>
+        <div class="logo-text">mix-1</div>
+        <div class="logo-bubble bub-a"></div>
+        <div class="logo-bubble bub-b"></div>
+        <div class="logo-bubble bub-c"></div>
+        <div class="logo-bubble bub-d"></div>
+        <div class="logo-bubble bub-e"></div>
+        <div class="logo-bubble bub-f"></div>
+    </div>
+    <div class="gc-info">
+        <div class="gc-label">GAME CHANGE</div>
+        <div class="gc-name">2-7 Triple Draw</div>
+        <div class="gc-badges"><span class="gc-badge blue">Fixed Limit</span><span class="gc-badge green">Lowball</span></div>
+    </div>
+</div>
+</div>
+
+<!-- DEMO 3 -->
+<div class="demo-panel" id="demo-3">
+<div class="gc-scene">
+    <div class="logo-container">
+        <div class="center-glow"></div>
+        <div class="neon-ring main"></div>
+        <div class="neon-ring sub"></div>
+        <div class="neon-ring sub2"></div>
+        <div class="logo-text">mix-1</div>
+        <div class="logo-bubble bub-a"></div>
+        <div class="logo-bubble bub-b"></div>
+        <div class="logo-bubble bub-c"></div>
+        <div class="logo-bubble bub-d"></div>
+        <div class="logo-bubble bub-e"></div>
+        <div class="logo-bubble bub-f"></div>
+    </div>
+    <div class="gc-info">
+        <div class="gc-label">GAME CHANGE</div>
+        <div class="gc-name">Texas Hold'em</div>
+        <div class="gc-badges"><span class="gc-badge blue">No Limit</span><span class="gc-badge green">6-Max</span></div>
+    </div>
+</div>
+</div>
+
+</div>
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.demo-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('demo-' + btn.dataset.demo).classList.add('active');
+    });
+});
+</script>
+</body>
+</html>

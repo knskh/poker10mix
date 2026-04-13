@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 - 全ハンド履歴</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sans',sans-serif; }
+
+/* Header */
+.page-header {
+    text-align: center; padding: 20px 16px 10px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+}
+.page-header img { height: 40px; filter: drop-shadow(0 0 8px rgba(255,215,0,0.4)); }
+.page-header h1 { font-size: 14px; color: rgba(255,215,0,0.6); letter-spacing: 2px; font-weight: 400; }
+
+/* Hand section */
+.hand-section {
+    max-width: 900px; margin: 10px auto 30px; padding: 0 16px;
+}
+.hand-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(15,20,35,0.9); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px 14px 0 0; padding: 12px 20px;
+}
+.hand-header-left h2 { font-size: 18px; color: #fff; margin-bottom: 2px; }
+.hand-header-left h2 .badge { background: #1565c0; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+.hand-header-left h2 .badge.purple { background: #7c3aed; }
+.hand-header-left .sub { font-size: 11px; color: #888; }
+.hand-header-right { text-align: right; }
+.hand-header-right .pot-lbl { font-size: 9px; color: rgba(255,215,0,0.5); letter-spacing: 1px; }
+.hand-header-right .pot-val { font-size: 22px; font-weight: 800; color: #ffd700; }
+
+/* Table mini */
+.hand-table-wrap {
+    background: rgba(15,20,35,0.5); border-left: 1px solid rgba(255,255,255,0.1);
+    border-right: 1px solid rgba(255,255,255,0.1); padding: 16px;
+    display: flex; justify-content: center;
+}
+.mini-table {
+    position: relative; width: 500px; height: 260px;
+    background: radial-gradient(ellipse at 50% 50%, #1a5c3a, #0e3522 70%, #081f14);
+    border-radius: 50%; border: 3px solid #2a6b4a;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+}
+.mini-table .tbl-logo {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 70px; opacity: 0.12; pointer-events: none;
+}
+.mini-table .tbl-banner {
+    position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 12px; padding: 4px 14px; text-align: center; white-space: nowrap; z-index: 5;
+}
+.mini-table .tbl-pot { font-size: 14px; font-weight: 700; color: #ffd700; margin-top: 2px; }
+/* Board cards */
+.mini-board {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    display: flex; gap: 4px; z-index: 5;
+}
+.mini-card {
+    width: 32px; height: 44px; border-radius: 4px; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.mini-card .rank { font-size: 12px; line-height: 1; }
+.mini-card .suit { font-size: 10px; line-height: 1; }
+.mini-card.red { color: #dc2626; }
+.mini-card.black { color: #1a1a1a; }
+.mini-card.facedown { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
+/* Draw info */
+.mini-draw-info {
+    position: absolute; top: 48%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 12px; font-weight: 700; color: #67e8f9; z-index: 5;
+    background: rgba(0,0,0,0.4); border-radius: 8px; padding: 3px 14px;
+}
+/* Seat */
+.mini-seat {
+    position: absolute; text-align: center; width: 80px; z-index: 6;
+}
+.mini-seat.folded { opacity: 0.3; }
+.mini-seat.winner .ms-box { border-color: #4ade80; box-shadow: 0 0 12px rgba(74,222,128,0.3); }
+.ms-box {
+    background: rgba(15,20,35,0.9); border-radius: 10px; padding: 4px 6px;
+    border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+}
+.ms-name { font-size: 9px; font-weight: 700; color: #ddd; }
+.ms-info { display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 1px; }
+.ms-pos { font-size: 7px; font-weight: 700; color: #fff; padding: 1px 4px; border-radius: 3px; }
+.ms-chips { font-size: 9px; font-weight: 700; color: #ffd700; }
+.ms-cards { display: flex; gap: 2px; justify-content: center; margin-top: 2px; flex-wrap: wrap; }
+.ms-card {
+    width: 18px; height: 24px; border-radius: 2px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-weight: 700; font-size: 7px; line-height: 1;
+}
+.ms-card.faceup { background: #fff; }
+.ms-card.faceup.red { color: #dc2626; }
+.ms-card.faceup.black { color: #1a1a1a; }
+.ms-card.facedown { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
+.ms-action {
+    font-size: 8px; font-weight: 700; margin-top: 2px; padding: 1px 5px; border-radius: 3px; display: inline-block;
+}
+.ms-result { font-size: 8px; font-weight: 700; color: #4ade80; margin-top: 2px; }
+/* Seat positions */
+.msp-0 { bottom: -20px; left: 50%; transform: translateX(-50%); }
+.msp-1 { bottom: 15px; left: -5px; }
+.msp-2 { top: 15px; left: -5px; }
+.msp-3 { top: -22px; left: 50%; transform: translateX(-50%); }
+.msp-4 { top: 15px; right: -5px; }
+
+/* Action log */
+.hand-log {
+    background: rgba(15,20,35,0.9); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0 0 14px 14px; padding: 12px 16px;
+}
+.log-streets { display: flex; gap: 6px; overflow-x: auto; }
+.log-col {
+    flex: 1; min-width: 100px; background: rgba(255,255,255,0.03);
+    border-radius: 6px; padding: 6px 8px;
+}
+.log-col-name {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.5px; padding: 2px 8px;
+    border-radius: 3px; margin-bottom: 4px; display: inline-block;
+}
+.lcn-default { color: #fff; background: rgba(100,100,100,0.4); }
+.lcn-blue { color: #67e8f9; background: rgba(56,189,248,0.15); }
+.lcn-yellow { color: #fbbf24; background: rgba(251,191,36,0.12); }
+.lcn-pink { color: #f472b6; background: rgba(244,114,182,0.12); }
+.lcn-green { color: #4ade80; background: rgba(74,222,128,0.12); }
+.log-line { font-size: 10px; padding: 1px 0; white-space: nowrap; }
+.log-line .ln { font-weight: 700; color: #ccc; }
+.log-line .la { font-weight: 600; }
+.la-f { color: #ef4444; } .la-ck { color: #a3e635; } .la-c { color: #4ade80; }
+.la-r { color: #fbbf24; } .la-b { color: #fbbf24; } .la-ai { color: #f472b6; }
+.la-bl { color: #78909c; } .la-w { color: #4ade80; font-weight: 800; } .la-dl { color: #fbbf24; }
+.la-d { color: #c084fc; } .la-sp { color: #67e8f9; }
+
+/* Result banner */
+.hand-result {
+    text-align: center; padding: 8px; margin-top: -1px;
+    background: rgba(74,222,128,0.06); border-left: 1px solid rgba(74,222,128,0.15);
+    border-right: 1px solid rgba(74,222,128,0.15);
+}
+.hand-result .hr-hand { font-size: 13px; color: #67e8f9; font-weight: 600; }
+.hand-result .hr-winner { font-size: 16px; color: #4ade80; font-weight: 800; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+    <img src="logos/logo.png" alt="mix-1">
+    <h1>全ハンド履歴デモ</h1>
+</div>
+
+<script>
+// ===== DATA =====
+const HANDS = [
+{
+    title: "Texas Hold'em", badge: "NL", badgeCls: "",
+    pot: 12300, result: { winner: "Tanaka", hand: "ツーペア A-A-K-K", amount: 12300 },
+    board: [{r:'A',s:'♥',c:'red'},{r:'K',s:'♠',c:'black'},{r:'9',s:'♦',c:'red'},{r:'7',s:'♣',c:'black'},{r:'3',s:'♥',c:'red'}],
+    drawInfo: null,
+    players: [
+        { name:'Tanaka', pos:'BTN', posColor:'#e65100', chips:16300, cards:[{r:'A',s:'♦',c:'red'},{r:'K',s:'♣',c:'black'}], winner:true },
+        { name:'Mike', pos:'SB', posColor:'#37474f', chips:4300, cards:[{r:'Q',s:'♠',c:'black'},{r:'Q',s:'♣',c:'black'}], show:true },
+        { name:'Suzuki', pos:'BB', posColor:'#37474f', chips:9900, cards:null, folded:true },
+        { name:'Yamada', pos:'CO', posColor:'#6a1b9a', chips:10000, cards:null, folded:true },
+        { name:'Sato', pos:'HJ', posColor:'#1565c0', chips:9200, cards:null, folded:true },
+    ],
+    streets: [
+        { name:'Preflop', cls:'lcn-default', actions:[
+            {n:'Mike',a:'SB 50',c:'la-bl'},{n:'Suzuki',a:'BB 100',c:'la-bl'},
+            {n:'Sato',a:'コール 100',c:'la-c'},{n:'Yamada',a:'フォールド',c:'la-f'},
+            {n:'Tanaka',a:'レイズ 300',c:'la-r'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'フォールド',c:'la-f'},{n:'Sato',a:'コール',c:'la-c'},
+        ]},
+        { name:'Flop', cls:'lcn-blue', actions:[
+            {n:'Mike',a:'チェック',c:'la-ck'},{n:'Sato',a:'ベット 500',c:'la-b'},
+            {n:'Tanaka',a:'レイズ 1,200',c:'la-r'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Sato',a:'フォールド',c:'la-f'},
+        ]},
+        { name:'Turn', cls:'lcn-yellow', actions:[
+            {n:'Mike',a:'チェック',c:'la-ck'},{n:'Tanaka',a:'ベット 1,700',c:'la-b'},
+            {n:'Mike',a:'コール',c:'la-c'},
+        ]},
+        { name:'River', cls:'lcn-pink', actions:[
+            {n:'Mike',a:'チェック',c:'la-ck'},{n:'Tanaka',a:'ベット 2,500',c:'la-b'},
+            {n:'Mike',a:'コール',c:'la-c'},
+        ]},
+        { name:'Result', cls:'lcn-green', actions:[
+            {n:'Tanaka',a:'won 12,300',c:'la-w'},
+        ]},
+    ]
+},
+{
+    title: "2-7 Triple Draw", badge: "FL", badgeCls: "purple",
+    pot: 2100, result: { winner: "Tanaka", hand: "8-5-4-3-2 (ナンバーワン)", amount: 2100 },
+    board: [],
+    drawInfo: "ドローゲーム（コミュニティカードなし）",
+    players: [
+        { name:'Tanaka', pos:'BTN', posColor:'#e65100', chips:11100,
+          cards:[{r:'2',s:'♣',c:'black'},{r:'3',s:'♦',c:'red'},{r:'4',s:'♥',c:'red'},{r:'5',s:'♠',c:'black'},{r:'8',s:'♦',c:'red'}], winner:true },
+        { name:'Mike', pos:'SB', posColor:'#37474f', chips:9300,
+          cards:[{r:'3',s:'♥',c:'red'},{r:'4',s:'♠',c:'black'},{r:'5',s:'♣',c:'black'},{r:'6',s:'♣',c:'black'},{r:'9',s:'♦',c:'red'}], show:true },
+        { name:'Suzuki', pos:'BB', posColor:'#37474f', chips:9700, cards:null, folded:true },
+        { name:'Yamada', pos:'CO', posColor:'#6a1b9a', chips:9800, cards:null, folded:true },
+    ],
+    streets: [
+        { name:'Pre-Draw', cls:'lcn-default', actions:[
+            {n:'Mike',a:'SB 50',c:'la-bl'},{n:'Suzuki',a:'BB 100',c:'la-bl'},
+            {n:'Yamada',a:'コール',c:'la-c'},{n:'Tanaka',a:'レイズ 200',c:'la-r'},
+            {n:'Mike',a:'コール',c:'la-c'},{n:'Suzuki',a:'コール',c:'la-c'},{n:'Yamada',a:'コール',c:'la-c'},
+        ]},
+        { name:'1st Draw', cls:'lcn-blue', actions:[
+            {n:'Mike',a:'1枚交換',c:'la-d'},{n:'Suzuki',a:'2枚交換',c:'la-d'},
+            {n:'Yamada',a:'2枚交換',c:'la-d'},{n:'Tanaka',a:'1枚交換',c:'la-d'},
+            {n:'Suzuki',a:'ベット 100',c:'la-b'},{n:'Yamada',a:'フォールド',c:'la-f'},
+            {n:'Tanaka',a:'コール',c:'la-c'},{n:'Mike',a:'コール',c:'la-c'},
+        ]},
+        { name:'2nd Draw', cls:'lcn-yellow', actions:[
+            {n:'Mike',a:'スタンドパット',c:'la-sp'},{n:'Suzuki',a:'1枚交換',c:'la-d'},
+            {n:'Tanaka',a:'スタンドパット',c:'la-sp'},
+            {n:'Tanaka',a:'ベット 200',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'フォールド',c:'la-f'},
+        ]},
+        { name:'3rd Draw', cls:'lcn-pink', actions:[
+            {n:'Mike',a:'スタンドパット',c:'la-sp'},{n:'Tanaka',a:'スタンドパット',c:'la-sp'},
+            {n:'Tanaka',a:'ベット 200',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+        ]},
+        { name:'Result', cls:'lcn-green', actions:[
+            {n:'Tanaka',a:'won 2,100',c:'la-w'},
+        ]},
+    ]
+},
+{
+    title: "7-Card Stud", badge: "FL", badgeCls: "",
+    pot: 3900, result: { winner: "Tanaka", hand: "A-K-Q-J-10♠ ロイヤルフラッシュ", amount: 3900 },
+    board: [],
+    drawInfo: "スタッドゲーム（コミュニティカードなし）",
+    players: [
+        { name:'Tanaka', pos:'S1', posColor:'#e65100', chips:12700,
+          cards:[{r:'A',s:'♠',c:'black',down:true},{r:'10',s:'♠',c:'black',down:true},{r:'K',s:'♠',c:'black'},{r:'Q',s:'♦',c:'red'},{r:'J',s:'♠',c:'black'},{r:'9',s:'♥',c:'red'},{r:'A',s:'♥',c:'red',down:true}], winner:true },
+        { name:'Mike', pos:'S2', posColor:'#1565c0', chips:8475,
+          cards:[{r:'J',s:'♥',c:'red',down:true},{r:'3',s:'♣',c:'black',down:true},{r:'J',s:'♦',c:'red'},{r:'5',s:'♠',c:'black'},{r:'9',s:'♠',c:'black'},{r:'K',s:'♥',c:'red'},{r:'2',s:'♦',c:'red',down:true}], show:true },
+        { name:'Suzuki', pos:'S3', posColor:'#2e7d32', chips:9400, cards:null, folded:true },
+        { name:'Yamada', pos:'S4', posColor:'#6a1b9a', chips:9925, cards:null, folded:true },
+    ],
+    streets: [
+        { name:'3rd St.', cls:'lcn-default', actions:[
+            {n:'全員',a:'アンティ 25',c:'la-bl'},{n:'Yamada',a:'ブリングイン 50',c:'la-bl'},
+            {n:'Tanaka',a:'コンプリート 200',c:'la-r'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},{n:'Yamada',a:'フォールド',c:'la-f'},
+        ]},
+        { name:'4th St.', cls:'lcn-blue', actions:[
+            {n:'Tanaka',a:'Q♦ (アップ)',c:'la-dl'},{n:'Mike',a:'5♠ (アップ)',c:'la-dl'},{n:'Suzuki',a:'6♣ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 200',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},
+        ]},
+        { name:'5th St.', cls:'lcn-yellow', actions:[
+            {n:'Tanaka',a:'J♠ (アップ)',c:'la-dl'},{n:'Mike',a:'9♠ (アップ)',c:'la-dl'},{n:'Suzuki',a:'2♥ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'フォールド',c:'la-f'},
+        ]},
+        { name:'6th St.', cls:'lcn-pink', actions:[
+            {n:'Tanaka',a:'9♥ (アップ)',c:'la-dl'},{n:'Mike',a:'K♥ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+        ]},
+        { name:'7th St.', cls:'lcn-green', actions:[
+            {n:'Tanaka',a:'A♥ (ダウン)',c:'la-dl'},{n:'Mike',a:'2♦ (ダウン)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Tanaka',a:'won 3,900',c:'la-w'},
+        ]},
+    ]
+},
+// --- Razz ---
+{
+    title: "Razz", badge: "FL", badgeCls: "",
+    pot: 3500, result: { winner: "Mike", hand: "2-3-5-6-7 (ナンバーツー)", amount: 3500 },
+    board: [],
+    drawInfo: "Razz（A-5ローボール・スタッド）",
+    players: [
+        { name:'Tanaka', pos:'S1', posColor:'#e65100', chips:8250,
+          cards:[{r:'A',s:'♣',c:'black',down:true},{r:'3',s:'♦',c:'red',down:true},{r:'4',s:'♠',c:'black'},{r:'2',s:'♦',c:'red'},{r:'5',s:'♣',c:'black'},{r:'9',s:'♥',c:'red'},{r:'8',s:'♣',c:'black',down:true}], show:true },
+        { name:'Mike', pos:'S2', posColor:'#1565c0', chips:13250,
+          cards:[{r:'2',s:'♠',c:'black',down:true},{r:'5',s:'♥',c:'red',down:true},{r:'7',s:'♣',c:'black'},{r:'6',s:'♣',c:'black'},{r:'8',s:'♥',c:'red'},{r:'4',s:'♦',c:'red'},{r:'3',s:'♣',c:'black',down:true}], winner:true },
+        { name:'Suzuki', pos:'S3', posColor:'#2e7d32', chips:9200, cards:null, folded:true },
+        { name:'Yamada', pos:'S4', posColor:'#6a1b9a', chips:9800, cards:null, folded:true },
+    ],
+    streets: [
+        { name:'3rd St.', cls:'lcn-default', actions:[
+            {n:'全員',a:'アンティ 25',c:'la-bl'},{n:'Yamada',a:'ブリングイン 50',c:'la-bl'},
+            {n:'Tanaka',a:'コンプリート 200',c:'la-r'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},{n:'Yamada',a:'フォールド',c:'la-f'},
+        ]},
+        { name:'4th St.', cls:'lcn-blue', actions:[
+            {n:'Tanaka',a:'2♦ (アップ)',c:'la-dl'},{n:'Mike',a:'6♣ (アップ)',c:'la-dl'},{n:'Suzuki',a:'8♠ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 200',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},
+        ]},
+        { name:'5th St.', cls:'lcn-yellow', actions:[
+            {n:'Tanaka',a:'5♣ (アップ)',c:'la-dl'},{n:'Mike',a:'8♥ (アップ)',c:'la-dl'},{n:'Suzuki',a:'J♣ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'フォールド',c:'la-f'},
+        ]},
+        { name:'6th St.', cls:'lcn-pink', actions:[
+            {n:'Tanaka',a:'9♥ (アップ)',c:'la-dl'},{n:'Mike',a:'4♦ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+        ]},
+        { name:'7th St.', cls:'lcn-green', actions:[
+            {n:'Tanaka',a:'8♣ (ダウン)',c:'la-dl'},{n:'Mike',a:'3♣ (ダウン)',c:'la-dl'},
+            {n:'Tanaka',a:'チェック',c:'la-ck'},{n:'Mike',a:'ベット 400',c:'la-b'},
+            {n:'Tanaka',a:'コール',c:'la-c'},
+            {n:'Mike',a:'won 3,500',c:'la-w'},
+        ]},
+    ]
+},
+// --- 7-Card Stud Hi-Lo ---
+{
+    title: "7-Card Stud Hi-Lo", badge: "FL", badgeCls: "",
+    pot: 4800, result: { winner: "Tanaka", hand: "Hi: A-5ストレート / Lo: 6-5-4-3-A", amount: 4800 },
+    board: [],
+    drawInfo: "スタッド Hi-Lo（ハイとローでポット分割）",
+    players: [
+        { name:'Tanaka', pos:'S1', posColor:'#e65100', chips:14800,
+          cards:[{r:'A',s:'♥',c:'red',down:true},{r:'2',s:'♣',c:'black',down:true},{r:'4',s:'♦',c:'red'},{r:'3',s:'♥',c:'red'},{r:'5',s:'♠',c:'black'},{r:'6',s:'♦',c:'red'},{r:'8',s:'♣',c:'black',down:true}], winner:true },
+        { name:'Mike', pos:'S2', posColor:'#1565c0', chips:8400,
+          cards:[{r:'K',s:'♠',c:'black',down:true},{r:'K',s:'♦',c:'red',down:true},{r:'10',s:'♥',c:'red'},{r:'J',s:'♣',c:'black'},{r:'Q',s:'♣',c:'black'},{r:'9',s:'♠',c:'black'},{r:'7',s:'♦',c:'red',down:true}], show:true },
+        { name:'Suzuki', pos:'S3', posColor:'#2e7d32', chips:8400,
+          cards:[{r:'3',s:'♠',c:'black',down:true},{r:'5',s:'♦',c:'red',down:true},{r:'6',s:'♣',c:'black'},{r:'7',s:'♥',c:'red'},{r:'8',s:'♦',c:'red'},{r:'2',s:'♥',c:'red'},{r:'4',s:'♣',c:'black',down:true}], show:true },
+        { name:'Yamada', pos:'S4', posColor:'#6a1b9a', chips:9800, cards:null, folded:true },
+    ],
+    streets: [
+        { name:'3rd St.', cls:'lcn-default', actions:[
+            {n:'全員',a:'アンティ 25',c:'la-bl'},{n:'Tanaka',a:'ブリングイン 50',c:'la-bl'},
+            {n:'Mike',a:'コンプリート 200',c:'la-r'},{n:'Suzuki',a:'コール',c:'la-c'},
+            {n:'Yamada',a:'フォールド',c:'la-f'},{n:'Tanaka',a:'コール',c:'la-c'},
+        ]},
+        { name:'4th St.', cls:'lcn-blue', actions:[
+            {n:'Tanaka',a:'3♥ (アップ)',c:'la-dl'},{n:'Mike',a:'J♣ (アップ)',c:'la-dl'},{n:'Suzuki',a:'7♥ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 200',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},
+        ]},
+        { name:'5th St.', cls:'lcn-yellow', actions:[
+            {n:'Tanaka',a:'5♠ (アップ)',c:'la-dl'},{n:'Mike',a:'Q♣ (アップ)',c:'la-dl'},{n:'Suzuki',a:'8♦ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},
+        ]},
+        { name:'6th St.', cls:'lcn-pink', actions:[
+            {n:'Tanaka',a:'6♦ (アップ)',c:'la-dl'},{n:'Mike',a:'9♠ (アップ)',c:'la-dl'},{n:'Suzuki',a:'2♥ (アップ)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},
+        ]},
+        { name:'7th St.', cls:'lcn-green', actions:[
+            {n:'Tanaka',a:'8♣ (ダウン)',c:'la-dl'},{n:'Mike',a:'7♦ (ダウン)',c:'la-dl'},{n:'Suzuki',a:'4♣ (ダウン)',c:'la-dl'},
+            {n:'Tanaka',a:'ベット 400',c:'la-b'},{n:'Mike',a:'コール',c:'la-c'},
+            {n:'Suzuki',a:'コール',c:'la-c'},
+            {n:'Tanaka',a:'won 4,800',c:'la-w'},
+        ]},
+    ]
+},
+];
+
+// ===== RENDER =====
+function cardHTML(c, small=false) {
+    if (!c) return '';
+    const cls = small ? 'ms-card' : 'mini-card';
+    if (c.down) return `<div class="${cls} facedown"></div>`;
+    return `<div class="${cls} faceup ${c.c}"><span class="rank">${c.r}</span><span class="suit">${c.s}</span></div>`;
+}
+
+function renderHand(h, idx) {
+    const seatPositions = h.players.length === 5
+        ? ['msp-0','msp-1','msp-2','msp-3','msp-4']
+        : ['msp-0','msp-1','msp-2','msp-3'];
+
+    // Board or draw info
+    let boardHTML = '';
+    if (h.board.length > 0) {
+        boardHTML = `<div class="mini-board">${h.board.map(c => cardHTML(c)).join('')}</div>`;
+    } else if (h.drawInfo) {
+        boardHTML = `<div class="mini-draw-info">${h.drawInfo}</div>`;
+    }
+
+    // Seats
+    let seatsHTML = '';
+    h.players.forEach((p, i) => {
+        let cardsHTML = '';
+        if (p.cards) {
+            cardsHTML = p.cards.map(c => cardHTML(c, true)).join('');
+        } else {
+            cardsHTML = '<div class="ms-card facedown"></div><div class="ms-card facedown"></div>';
+        }
+        const folded = p.folded ? 'folded' : '';
+        const winner = p.winner ? 'winner' : '';
+        const resultHTML = p.winner ? `<div class="ms-result">+${h.result.amount.toLocaleString()}</div>` : '';
+        seatsHTML += `
+        <div class="mini-seat ${seatPositions[i]} ${folded} ${winner}">
+            <div class="ms-box">
+                <div class="ms-name">${p.name}</div>
+                <div class="ms-info"><span class="ms-pos" style="background:${p.posColor}">${p.pos}</span><span class="ms-chips">${p.chips.toLocaleString()}</span></div>
+                <div class="ms-cards">${cardsHTML}</div>
+                ${resultHTML}
+            </div>
+        </div>`;
+    });
+
+    // Streets log
+    let streetsHTML = h.streets.map(s => {
+        const acts = s.actions.map(a => `<div class="log-line"><span class="ln">${a.n}</span> <span class="la ${a.c}">${a.a}</span></div>`).join('');
+        return `<div class="log-col"><div class="log-col-name ${s.cls}">${s.name}</div>${acts}</div>`;
+    }).join('');
+
+    return `
+    <div class="hand-section">
+        <div class="hand-header">
+            <div class="hand-header-left">
+                <h2>${h.title} <span class="badge ${h.badgeCls}">${h.badge}</span></h2>
+                <div class="sub">Hand ${idx+1} / ${HANDS.length}</div>
+            </div>
+            <div class="hand-header-right">
+                <div class="pot-lbl">TOTAL POT</div>
+                <div class="pot-val">${h.pot.toLocaleString()}</div>
+            </div>
+        </div>
+        <div class="hand-table-wrap">
+            <div class="mini-table">
+                <img class="tbl-logo" src="logos/logo.png" alt="">
+                <div class="tbl-banner">${h.title} <span class="badge" style="background:#1565c0;color:#fff;font-size:8px;padding:1px 5px;border-radius:3px;margin-left:3px">${h.badge}</span><div class="tbl-pot">Pot ${h.pot.toLocaleString()}</div></div>
+                ${boardHTML}
+                ${seatsHTML}
+            </div>
+        </div>
+        <div class="hand-result">
+            <div class="hr-hand">${h.result.hand}</div>
+            <div class="hr-winner">${h.result.winner} won ${h.result.amount.toLocaleString()}</div>
+        </div>
+        <div class="hand-log">
+            <div class="log-streets">${streetsHTML}</div>
+        </div>
+    </div>`;
+}
+
+document.body.innerHTML += HANDS.map((h,i) => renderHand(h,i)).join('');
+</script>
+</body>
+</html>
