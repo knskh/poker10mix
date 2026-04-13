@@ -1088,7 +1088,7 @@ function renderRoom(room) {
 // Game Screen
 // ==========================================
 function setupGameScreen() {
-    // Overlay panel (chat/log) is handled in setupOverlayPanel()
+    // Side panel (chat/log) is handled in setupSidePanel()
 
     // Sound toggle button
     const soundBtn = document.getElementById('btn-sound-toggle');
@@ -3591,14 +3591,14 @@ function addChatEntry(text, cls) {
     log.scrollTop = log.scrollHeight;
     while (log.children.length > 200) log.removeChild(log.firstChild);
     // Update unread badge if chat panel is not open
-    if (activeOverlayPanel !== 'chat') {
+    if (activeSidePanel !== 'chat') {
         chatUnreadCount++;
         updateChatBadge();
     }
 }
 
 function updateChatBadge() {
-    const badge = document.getElementById('top-chat-badge');
+    const badge = document.getElementById('pill-chat-badge');
     if (badge) {
         if (chatUnreadCount > 0) {
             badge.classList.remove('hidden');
@@ -4069,33 +4069,38 @@ function setupActionRipple() {
 }
 
 // ==========================================
-// Overlay Panel (chat / log) — top-bar icon buttons
+// Side Panel (chat / log) — pills on mobile, side-by-side on PC
 // ==========================================
-let activeOverlayPanel = null; // 'chat' | 'log' | null
+let activeSidePanel = null; // 'chat' | 'log' | null
 
-function openOverlayPanel(panel) {
-    if (activeOverlayPanel === panel) {
-        closeOverlayPanel();
+function isSidePanelPC() {
+    return window.innerWidth >= 768;
+}
+
+function openSidePanel(panel) {
+    const ap = document.getElementById('action-panel');
+    const sp = document.getElementById('side-panel');
+
+    // On mobile: toggle same panel = close
+    if (!isSidePanelPC() && activeSidePanel === panel) {
+        closeSidePanel();
         return;
     }
-    activeOverlayPanel = panel;
-    const bg = document.getElementById('overlay-panel-bg');
-    const overlay = document.getElementById('overlay-panel');
-    const title = document.getElementById('overlay-panel-title');
-    bg.classList.remove('hidden');
-    overlay.classList.remove('hidden');
+
+    activeSidePanel = panel;
+    sp.classList.remove('hidden');
+    ap.classList.add('sp-open');
 
     // Switch views
-    document.querySelectorAll('.overlay-view').forEach(v => v.classList.add('hidden'));
-    const target = document.getElementById('ov-' + panel);
+    document.querySelectorAll('.sp-view').forEach(v => v.classList.add('hidden'));
+    const target = document.getElementById('sp-' + panel);
     if (target) target.classList.remove('hidden');
 
-    // Title
-    title.textContent = panel === 'chat' ? 'チャット' : 'ログ';
+    // Highlight tab
+    document.querySelectorAll('.sp-tab').forEach(t => t.classList.toggle('active', t.dataset.sp === panel));
 
-    // Highlight active icon
-    document.getElementById('btn-open-chat').classList.toggle('panel-open', panel === 'chat');
-    document.getElementById('btn-open-log').classList.toggle('panel-open', panel === 'log');
+    // Highlight pill
+    document.querySelectorAll('.side-pill').forEach(p => p.classList.toggle('active', p.dataset.panel === panel));
 
     // Panel-specific actions
     if (panel === 'chat') {
@@ -4109,21 +4114,53 @@ function openOverlayPanel(panel) {
     }
 }
 
-function closeOverlayPanel() {
-    activeOverlayPanel = null;
-    document.getElementById('overlay-panel-bg').classList.add('hidden');
-    document.getElementById('overlay-panel').classList.add('hidden');
-    document.getElementById('btn-open-chat').classList.remove('panel-open');
-    document.getElementById('btn-open-log').classList.remove('panel-open');
+function closeSidePanel() {
+    activeSidePanel = null;
+    const ap = document.getElementById('action-panel');
+    const sp = document.getElementById('side-panel');
+    if (!isSidePanelPC()) {
+        sp.classList.add('hidden');
+    }
+    ap.classList.remove('sp-open');
+    document.querySelectorAll('.side-pill').forEach(p => p.classList.remove('active'));
 }
 
-function setupOverlayPanel() {
-    document.getElementById('btn-open-chat').addEventListener('click', () => openOverlayPanel('chat'));
-    document.getElementById('btn-open-log').addEventListener('click', () => openOverlayPanel('log'));
-    document.getElementById('overlay-panel-close').addEventListener('click', closeOverlayPanel);
-    document.getElementById('overlay-panel-bg').addEventListener('click', closeOverlayPanel);
+function setupSidePanel() {
+    // Pill buttons (mobile)
+    document.querySelectorAll('.side-pill').forEach(pill => {
+        pill.addEventListener('click', () => openSidePanel(pill.dataset.panel));
+    });
+
+    // Tab buttons inside panel header
+    document.querySelectorAll('.sp-tab').forEach(tab => {
+        tab.addEventListener('click', () => openSidePanel(tab.dataset.sp));
+    });
+
+    // Close button (mobile only, hidden on PC via CSS)
+    document.getElementById('side-panel-close').addEventListener('click', closeSidePanel);
+
+    // On PC: auto-open chat by default
+    if (isSidePanelPC()) {
+        openSidePanel('chat');
+    }
+
+    // Handle resize: PC↔mobile transition
+    window.addEventListener('resize', () => {
+        if (isSidePanelPC()) {
+            // Always show side panel on PC
+            document.getElementById('side-panel').classList.remove('hidden');
+            document.getElementById('action-panel').classList.remove('sp-open');
+            if (!activeSidePanel) openSidePanel('chat');
+        } else {
+            // On mobile, if no active panel, hide it
+            if (!activeSidePanel) {
+                document.getElementById('side-panel').classList.add('hidden');
+                document.getElementById('action-panel').classList.remove('sp-open');
+            }
+        }
+    });
 }
 
 // Init
 setupActionRipple();
-setupOverlayPanel();
+setupSidePanel();
