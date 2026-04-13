@@ -1297,17 +1297,40 @@ body {
     color: #4ade80 !important;
 }
 
-/* Pre-action checkboxes */
-#pre-action-bar {
-    display: flex; gap: 8px; padding: 4px 10px; flex-wrap: wrap;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+/* Pre-action overlay on player seat */
+#pre-action-overlay {
+    position: absolute;
+    display: flex; gap: 6px;
+    z-index: 200;
+    pointer-events: auto;
+    transform: translateX(-50%);
 }
-.pre-action-opt {
-    display: flex; align-items: center; gap: 4px; cursor: pointer;
-    font-size: 11px; color: #aaa; user-select: none;
+#pre-action-overlay.hidden { display: none; }
+.pre-action-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    background: rgba(15,20,30,0.85);
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    user-select: none;
+    backdrop-filter: blur(6px);
 }
-.pre-action-opt input { accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
-.pre-action-opt input:checked + span { color: var(--gold); font-weight: 600; }
+.pre-action-btn:hover {
+    background: rgba(30,40,60,0.9);
+    border-color: rgba(255,255,255,0.35);
+    color: #fff;
+}
+.pre-action-btn.active {
+    background: rgba(0,229,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow: 0 0 8px rgba(0,229,255,0.3);
+}
 
 /* Emote toggle button (in top bar) */
 #emote-toggle {
@@ -2320,20 +2343,13 @@ body {
 .hh-chip-diff.hh-diff-zero { color: #666; }
 
 /* ==========================================
-   UX Enhancement: Pre-action Bar Visual
+   UX Enhancement: Pre-action Overlay (mobile)
    ========================================== */
-#pre-action-bar {
-    background: rgba(0,229,255,0.03);
-}
-.pre-action-opt input:checked + span {
-    color: var(--gold); font-weight: 600;
-    text-shadow: 0 0 6px rgba(0,229,255,0.3);
-}
-.pre-action-opt {
-    padding: 3px 8px; border-radius: 6px; transition: background 0.15s;
-}
-.pre-action-opt:has(input:checked) {
-    background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.15);
+@media (max-width: 600px) {
+    .pre-action-btn {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
 }
 
 /* Bet presets larger pill style */

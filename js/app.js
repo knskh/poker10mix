@@ -503,6 +503,9 @@ function onRoomJoined(room) {
         document.getElementById('zoom-sitout-overlay').classList.add('hidden');
         document.getElementById('btn-back-room').classList.remove('hidden');
         document.getElementById('btn-zoom-exit').classList.add('hidden');
+        // Reset action bar state so showFoldedButtons can work after reconnection
+        document.getElementById('action-bar').classList.add('hidden');
+        document.getElementById('draw-action-bar').classList.add('hidden');
         document.getElementById('game-log').innerHTML = '';
         currentHandLogs = [];
     } else {
@@ -880,6 +883,9 @@ function onGameStarted(data) {
     showScreen('game');
     document.getElementById('zoom-waiting-overlay').classList.add('hidden');
     document.getElementById('zoom-sitout-overlay').classList.add('hidden');
+    // Reset action bar so folded/sitout buttons can display correctly
+    document.getElementById('action-bar').classList.add('hidden');
+    document.getElementById('draw-action-bar').classList.add('hidden');
     lastGameId = null; // Reset so first game doesn't trigger overlay
 
     // Save previous hand to history
