@@ -162,6 +162,7 @@ class PokerClient {
     sendDraw(discards, roomId) { this.send({ type: 'draw', discards, roomId: roomId || this.roomId }); }
     sendChat(message, roomId) { this.send({ type: 'chat', message, roomId: roomId || this.roomId }); }
     rejoinGame(roomId) { this.send({ type: 'rejoin_game', roomId: roomId || this.roomId }); }
+    sitoutRequest(roomId) { this.send({ type: 'sitout_request', roomId: roomId || this.roomId }); }
     sendEmote(emote, roomId) { this.send({ type: 'emote', emote, roomId: roomId || this.roomId }); }
     sendReaction(emote, roomId) { this.send({ type: 'reaction', emote, roomId: roomId || this.roomId }); }
     rebuyChips(amount, roomId) { this.send({ type: 'rebuy_chips', amount, roomId: roomId || this.roomId }); }
