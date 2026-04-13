@@ -1597,6 +1597,21 @@ body {
 .focus-mode .quick-chat-float {
     display: none !important;
 }
+/* Focus mode: kill all animations & transitions for performance */
+.focus-mode *,
+.focus-mode *::before,
+.focus-mode *::after {
+    animation: none !important;
+    transition: none !important;
+}
+/* Hide purely decorative overlays */
+.focus-mode #game-change-overlay,
+.focus-mode #turn-flash,
+.focus-mode .chip-fly,
+.focus-mode .chip-fly-win,
+.focus-mode .seat-won-popup {
+    display: none !important;
+}
 
 /* Draw Action Bar */
 #draw-action-bar {

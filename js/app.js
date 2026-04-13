@@ -1932,6 +1932,7 @@ document.addEventListener('click', (e) => {
 });
 
 function triggerTurnFlash() {
+    if (focusMode) return;
     const flash = document.getElementById('turn-flash');
     if (!flash) return;
     flash.classList.remove('flash-active');
@@ -2364,8 +2365,8 @@ function setupNumpad() {
 }
 
 function sendActionAndHide(action) {
-    // Fold card animation
-    if (action.type === 'fold') {
+    // Fold card animation (skip in focus mode)
+    if (action.type === 'fold' && !focusMode) {
         document.querySelectorAll('#player-cards .card').forEach((card, i) => {
             card.style.animationDelay = (i * 0.1) + 's';
             card.classList.add('fold-anim');
@@ -2386,7 +2387,7 @@ function startTurnTimer(seconds) {
         const elapsed = (Date.now() - turnTimerStart) / 1000;
         const remaining = Math.max(0, Math.ceil(turnTimeLimit - elapsed));
         if (remaining <= 0) stopTurnTimer();
-    }, 200);
+    }, focusMode ? 1000 : 200);
 }
 
 function stopTurnTimer() {
@@ -3811,6 +3812,7 @@ let prevPot = 0;
 let prevBets = {}; // seatIdx -> lastBet amount
 
 function animateChipTowardsPot(seatIdx) {
+    if (focusMode) return;
     const tableFelt = document.getElementById('table-felt');
     if (!tableFelt) return;
     const seatEl = document.getElementById(`seat-${seatIdx}`);
@@ -3859,6 +3861,7 @@ function animateChipTowardsPot(seatIdx) {
 }
 
 function animateChipToWinner(seatIdx, amount) {
+    if (focusMode) return;
     const tableFelt = document.getElementById('table-felt');
     if (!tableFelt) return;
     const seatEl = document.getElementById(`seat-${seatIdx}`);
@@ -3916,6 +3919,7 @@ function animateChipToWinner(seatIdx, amount) {
 }
 
 function animatePotCountUp(fromVal, toVal) {
+    if (focusMode) { const el = document.querySelector('.pot-amount'); if (el) el.textContent = toVal.toLocaleString(); return; }
     const potAmountEl = document.querySelector('.pot-amount');
     if (!potAmountEl) return;
     potAmountEl.classList.add('pot-counting');
@@ -3978,6 +3982,7 @@ function detectWinAnimation(handResult) {
 let gameChangeTimer = null;
 
 function showGameChangeOverlay(state) {
+    if (focusMode) return;
     const overlay = document.getElementById('game-change-overlay');
     if (!overlay) return;
 
