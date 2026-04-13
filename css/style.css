@@ -1240,7 +1240,16 @@ body {
 .bet-raise-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Bet presets row */
-#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 4px; }
+#bet-presets { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: nowrap; margin-bottom: 4px; overflow: visible; align-items: center; position: relative; }
+.preset-wrapper {
+    position: relative; flex: 1; min-width: 0; display: flex;
+}
+.preset-wrapper.editing { animation: preset-shake 0.3s ease-in-out infinite; }
+@keyframes preset-shake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-1.5deg); }
+    75% { transform: rotate(1.5deg); }
+}
 .btn-preset {
     padding: 7px 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px;
     background: rgba(255,255,255,0.09); color: #ddd; cursor: pointer; font-weight: 600;
@@ -1249,6 +1258,48 @@ body {
 }
 .btn-preset:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4); }
 .btn-preset.active { background: rgba(0,229,255,0.2); color: var(--gold); border-color: var(--gold); }
+
+/* [+] add preset button */
+.btn-preset-add {
+    flex: 0 0 32px !important; min-width: 32px; max-width: 32px;
+    border-style: dashed; border-color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.04); color: #999; font-size: 16px; font-weight: 400;
+    line-height: 1;
+}
+.btn-preset-add:hover { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.5); }
+
+/* Delete x on preset (edit mode) */
+.preset-delete-x {
+    position: absolute; top: -5px; right: -3px; width: 16px; height: 16px;
+    background: #c62828; color: #fff; border-radius: 50%; font-size: 11px; line-height: 16px;
+    text-align: center; cursor: pointer; z-index: 2; font-weight: bold;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.preset-delete-x:hover { background: #e53935; transform: scale(1.15); }
+
+/* Preset popover */
+.preset-popover {
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+    padding: 8px; display: flex; gap: 6px; align-items: center; z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    white-space: nowrap;
+}
+.popover-input {
+    width: 56px; padding: 5px 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 5px; color: #fff; font-size: 13px; text-align: center; outline: none; font-family: inherit;
+}
+.popover-input:focus { border-color: var(--accent); }
+.popover-input::-webkit-outer-spin-button,
+.popover-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.popover-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.popover-unit { color: #aaa; font-size: 12px; font-weight: 600; }
+.popover-add-btn {
+    padding: 5px 10px; background: #2e7d32; color: #fff; border: none; border-radius: 5px;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+}
+.popover-add-btn:hover { background: #388e3c; }
+
 /* All-in preset: distinct purple */
 .btn-preset-allin {
     background: rgba(106,27,154,0.35); border-color: rgba(156,39,176,0.5);
@@ -1644,6 +1695,12 @@ body {
 }
 .hh-detail-title { font-size: 14px; font-weight: bold; color: var(--accent); }
 .hh-detail-time { font-size: 11px; color: var(--text-dim); }
+.btn-hh-share {
+    padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3);
+    background: rgba(56,189,248,0.1); color: #67e8f9; font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: background 0.2s;
+}
+.btn-hh-share:hover { background: rgba(56,189,248,0.25); }
 
 /* Player summary table */
 .hh-player-table {

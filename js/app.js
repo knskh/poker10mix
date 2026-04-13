@@ -1178,6 +1178,14 @@ function renderHandHistory(containerId) {
             detail.dataset.activeIdx = String(idx);
             detail.classList.remove('hidden');
             detail.innerHTML = renderHandDetail(handHistory[idx], idx);
+            // Attach share button handler
+            const shareBtn = detail.querySelector('.btn-hh-share');
+            if (shareBtn) {
+                shareBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    generateReplayURL(parseInt(shareBtn.dataset.hhIdx));
+                });
+            }
         });
     });
 }
@@ -1198,10 +1206,13 @@ function renderHandDetail(h, idx) {
     const hr = h.handResult;
     const myName = client.name;
 
-    // Header: game name + time
+    // Header: game name + time + share button
     let html = `<div class="hh-detail-header">`;
     html += `<span class="hh-detail-title">#${idx + 1} ${h.gameName || ''}</span>`;
     html += `<span class="hh-detail-time">${h.time || ''}</span>`;
+    if (hr) {
+        html += `<button class="btn-hh-share" data-hh-idx="${idx}" title="リプレイURLをコピー">🔗 共有</button>`;
+    }
     html += `</div>`;
 
     // === Player summary table (position, name, result, cards) ===
@@ -1483,6 +1494,63 @@ function renderVisualCardsWithType(cardObjs) {
         const cls = c.faceDown ? 'hh-visual-card hh-vc-down' : 'hh-visual-card';
         return `<span class="${cls}" style="color:${col}">${r}<span class="hh-vc-suit">${sym}</span></span>`;
     }).join('');
+}
+
+// ---- Replay URL generation ----
+async function compressForURL(str) {
+    const blob = new Blob([new TextEncoder().encode(str)]);
+    const stream = blob.stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buf = await new Response(stream).arrayBuffer();
+    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function generateReplayURL(idx) {
+    const h = handHistory[idx];
+    if (!h || !h.handResult) return;
+    const hr = h.handResult;
+    // Compact data format for URL
+    const data = {
+        g: hr.gameName,
+        t: hr.gameType,
+        c: hr.communityCards,
+        d: hr.dealerSeat,
+        p: hr.players.map(p => ({
+            n: p.name, o: p.position, f: p.folded ? 1 : 0,
+            c: p.chips, s: p.startChips,
+            h: p.cards, u: p.upCards, w: p.downCards,
+        })),
+        l: h.logs,
+        ds: hr.drawSnapshots,
+    };
+    try {
+        const compressed = await compressForURL(JSON.stringify(data));
+        const url = window.location.origin + '/replay.html#' + compressed;
+        await navigator.clipboard.writeText(url);
+        showToast('リプレイURLをコピーしました');
+    } catch (e) {
+        // Fallback: textarea copy
+        const compressed = await compressForURL(JSON.stringify(data));
+        const url = window.location.origin + '/replay.html#' + compressed;
+        const ta = document.createElement('textarea');
+        ta.value = url; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('リプレイURLをコピーしました');
+    }
+}
+
+function showToast(msg) {
+    let toast = document.getElementById('hh-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'hh-toast';
+        toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(74,222,128,0.9);color:#000;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:9999;opacity:0;transition:opacity 0.3s;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    setTimeout(() => { toast.style.opacity = '0'; }, 2500);
 }
 
 function getActionClass(log) {
@@ -1801,34 +1869,98 @@ function showActionButtons(actions, turnData) {
     }
 }
 
+// --- Custom Preset Management ---
+const CUSTOM_PRESETS_KEY = 'customPresets';
+const MAX_CUSTOM_PRESETS = 5;
+let presetEditMode = false;
+let lastPresetContext = null; // track current context for re-render
+
+function getPresetContext(isFirstRound, tableBet, bb) {
+    if (isFirstRound && tableBet <= bb) return 'preflop_open';
+    if (isFirstRound && tableBet > bb) return 'preflop_raise';
+    return 'postflop';
+}
+
+function getDefaultUnit(context) {
+    if (context === 'preflop_open') return 'bb';
+    if (context === 'preflop_raise') return 'x';
+    return '%';
+}
+
+function loadCustomPresets() {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_PRESETS_KEY)) || {}; } catch { return {}; }
+}
+
+function saveCustomPresets(data) {
+    localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(data));
+}
+
+function addCustomPreset(context, label, value, unit) {
+    const data = loadCustomPresets();
+    if (!data[context]) data[context] = [];
+    if (data[context].length >= MAX_CUSTOM_PRESETS) return false;
+    data[context].push({ label, value, unit });
+    saveCustomPresets(data);
+    return true;
+}
+
+function removeCustomPreset(context, index) {
+    const data = loadCustomPresets();
+    if (!data[context]) return;
+    data[context].splice(index, 1);
+    if (data[context].length === 0) delete data[context];
+    saveCustomPresets(data);
+}
+
+function resolvePresetTotal(p, bb, pot, tableBet) {
+    if (p.unit === 'bb') return Math.round(bb * p.value);
+    if (p.unit === 'x') return Math.round(tableBet * p.value);
+    if (p.unit === '%') return Math.round(pot * p.value) + tableBet;
+    return p.value;
+}
+
+// Saved render params for re-render after add/delete
+let _lastPresetParams = null;
+
 function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction) {
+    _lastPresetParams = { turnData, sliderAction, sliderMin, sliderMax, allInAction };
     const presetsDiv = document.getElementById('bet-presets');
     presetsDiv.innerHTML = '';
-    const presets = [];
     const bb = (turnData && turnData.bigBlind) || 100;
     const pot = (turnData && turnData.pot) || 0;
     const isFirstRound = turnData && turnData.isFirstRound;
     const tableBet = (turnData && turnData.currentBet) || 0;
 
+    const context = sliderAction ? getPresetContext(isFirstRound, tableBet, bb) : null;
+    lastPresetContext = context;
+
     if (sliderAction) {
-        // Preflop unopened: BB-based buttons
-        if (isFirstRound && tableBet <= bb) {
-            [2, 2.5, 3, 3.5, 4].forEach(mult => {
-                const targetTotal = Math.round(bb * mult);
-                presets.push({ label: `${mult}bb`, targetTotal });
-            });
-        } else if (isFirstRound && tableBet > bb) {
-            // Preflop facing raise: multipliers of current bet
-            [2, 2.5, 3, 4].forEach(mult => {
-                const targetTotal = Math.round(tableBet * mult);
-                presets.push({ label: `${mult}x`, targetTotal });
-            });
-        } else if (!isFirstRound) {
-            // Postflop: pot percentages
-            [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
-                const targetTotal = Math.round(pot * pct) + tableBet;
-                presets.push({ label, targetTotal });
-            });
+        const customData = loadCustomPresets();
+        const hasCustom = customData[context] && customData[context].length > 0;
+        let presets = [];
+
+        if (hasCustom) {
+            // Use custom presets
+            presets = customData[context].map((p, idx) => ({
+                label: p.label,
+                targetTotal: resolvePresetTotal(p, bb, pot, tableBet),
+                customIndex: idx
+            }));
+        } else {
+            // Default presets
+            if (context === 'preflop_open') {
+                [2, 2.5, 3, 3.5, 4].forEach(mult => {
+                    presets.push({ label: `${mult}bb`, targetTotal: Math.round(bb * mult) });
+                });
+            } else if (context === 'preflop_raise') {
+                [2, 2.5, 3, 4].forEach(mult => {
+                    presets.push({ label: `${mult}x`, targetTotal: Math.round(tableBet * mult) });
+                });
+            } else {
+                [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
+                    presets.push({ label, targetTotal: Math.round(pot * pct) + tableBet });
+                });
+            }
         }
 
         // Filter out presets outside slider range
@@ -1838,10 +1970,14 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
         });
 
         for (const p of filtered) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'preset-wrapper' + (presetEditMode && p.customIndex !== undefined ? ' editing' : '');
+
             const btn = document.createElement('button');
             btn.className = 'btn-preset';
             btn.textContent = p.label;
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                if (presetEditMode) return; // don't trigger bet in edit mode
                 const outOfPocket = p.targetTotal - sliderOffset;
                 const slider = document.getElementById('bet-slider');
                 if (slider) slider.value = outOfPocket;
@@ -1851,7 +1987,47 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
                 presetsDiv.querySelectorAll('.btn-preset:not(.btn-preset-allin)').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
-            presetsDiv.appendChild(btn);
+
+            // Long-press to enter edit mode
+            let pressTimer = null;
+            btn.addEventListener('pointerdown', () => {
+                pressTimer = setTimeout(() => {
+                    presetEditMode = !presetEditMode;
+                    reRenderPresets();
+                }, 500);
+            });
+            btn.addEventListener('pointerup', () => clearTimeout(pressTimer));
+            btn.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+            wrapper.appendChild(btn);
+
+            // Delete button (edit mode only, custom presets only)
+            if (presetEditMode && p.customIndex !== undefined) {
+                const del = document.createElement('span');
+                del.className = 'preset-delete-x';
+                del.textContent = '\u00d7';
+                del.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removeCustomPreset(context, p.customIndex);
+                    reRenderPresets();
+                });
+                wrapper.appendChild(del);
+            }
+
+            presetsDiv.appendChild(wrapper);
+        }
+
+        // [+] add button (only if custom presets < max)
+        const currentCount = (hasCustom ? customData[context].length : 0);
+        if (currentCount < MAX_CUSTOM_PRESETS) {
+            const addBtn = document.createElement('button');
+            addBtn.className = 'btn-preset btn-preset-add';
+            addBtn.textContent = '+';
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showPresetPopover(context, addBtn);
+            });
+            presetsDiv.appendChild(addBtn);
         }
     }
 
@@ -1877,6 +2053,60 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
     if (presetsDiv.children.length > 0) {
         presetsDiv.classList.remove('hidden');
     }
+}
+
+function reRenderPresets() {
+    if (!_lastPresetParams) return;
+    const { turnData, sliderAction, sliderMin, sliderMax, allInAction } = _lastPresetParams;
+    renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction);
+}
+
+function showPresetPopover(context, anchorBtn) {
+    // Remove existing popover
+    const existing = document.querySelector('.preset-popover');
+    if (existing) existing.remove();
+
+    const unit = getDefaultUnit(context);
+    const unitLabel = unit === 'bb' ? 'BB' : unit === 'x' ? 'x' : '%';
+    const placeholder = unit === 'bb' ? '2.5' : unit === 'x' ? '3' : '75';
+
+    const pop = document.createElement('div');
+    pop.className = 'preset-popover';
+    pop.innerHTML = `
+        <input type="number" class="popover-input" placeholder="${placeholder}" inputmode="decimal" step="any">
+        <span class="popover-unit">${unitLabel}</span>
+        <button class="popover-add-btn">追加</button>
+    `;
+    pop.addEventListener('click', e => e.stopPropagation());
+
+    const presetsDiv = document.getElementById('bet-presets');
+    presetsDiv.appendChild(pop);
+
+    const inp = pop.querySelector('.popover-input');
+    inp.focus();
+
+    const doAdd = () => {
+        const val = parseFloat(inp.value);
+        if (!val || val <= 0) return;
+        const realValue = unit === '%' ? val / 100 : val;
+        const label = unit === '%' ? (val === 100 ? 'Pot' : `${val}%`) : `${val}${unit}`;
+        addCustomPreset(context, label, realValue, unit);
+        pop.remove();
+        presetEditMode = false;
+        reRenderPresets();
+    };
+
+    pop.querySelector('.popover-add-btn').addEventListener('click', doAdd);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
+
+    // Close on outside click
+    const closeHandler = (e) => {
+        if (!pop.contains(e.target)) {
+            pop.remove();
+            document.removeEventListener('pointerdown', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('pointerdown', closeHandler), 0);
 }
 
 let sliderOffset = 0; // currentBet to add for total display
