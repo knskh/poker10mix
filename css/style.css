@@ -1202,11 +1202,72 @@ body {
 }
 
 /* === Action Bar === */
-/* === Bottom Area: panel + actions === */
+/* === Bottom Area: side-panel + actions === */
 /* Action panel (fixed to bottom) */
 #action-panel {
-    flex-shrink: 0; display: flex; flex-direction: column;
-    justify-content: center; overflow: hidden;
+    flex-shrink: 0; display: flex; flex-direction: row;
+    overflow: hidden;
+}
+
+/* Side pill buttons (mobile only) */
+#side-pills {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 6px 0 6px 4px; justify-content: center; flex-shrink: 0;
+}
+.side-pill {
+    width: 28px; height: 36px; border-radius: 6px 0 0 6px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-right: none; color: #94a3b8; font-size: 13px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    position: relative; transition: background 0.15s, color 0.15s;
+}
+.side-pill:active { background: rgba(255,255,255,0.12); }
+.side-pill.active { background: rgba(0,191,255,0.15); color: #00bfff; border-color: rgba(0,191,255,0.25); }
+.side-pill-badge {
+    position: absolute; top: -4px; right: -2px;
+    background: #ef5350; color: #fff; font-size: 7px; font-weight: 800;
+    min-width: 13px; height: 13px; line-height: 13px;
+    border-radius: 7px; text-align: center; padding: 0 2px;
+}
+.side-pill-badge.hidden { display: none; }
+
+/* Side panel (chat / log) */
+#side-panel {
+    display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+}
+#side-panel.hidden { display: none; }
+#side-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 8px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#side-panel-tabs { display: flex; gap: 2px; }
+.sp-tab {
+    padding: 3px 10px; font-size: 11px; font-weight: 700; border: none;
+    border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.sp-tab.active { background: rgba(0,191,255,0.12); color: #00bfff; }
+.sp-tab:active { background: rgba(255,255,255,0.08); }
+#side-panel-close {
+    width: 24px; height: 24px; border-radius: 5px;
+    border: none; background: rgba(255,255,255,0.06);
+    color: #888; font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+#side-panel-close:active { background: rgba(255,255,255,0.12); }
+#side-panel-body {
+    flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0;
+}
+.sp-view {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
+}
+.sp-view.hidden { display: none; }
+
+/* Action column (right side) */
+#action-col {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; overflow: hidden; min-width: 0;
 }
 
 #action-bar {
@@ -2523,68 +2584,26 @@ body {
 }
 
 /* ==========================================
-   案3: Bottom Navigation Bar (mobile)
+   Side Panel: Mobile vs PC layout
    ========================================== */
-/* Top bar icon buttons (chat, log) */
 #top-bar-icons {
-    display: flex; gap: 4px; margin-left: auto; margin-right: 6px;
+    display: none; margin-left: auto; margin-right: 6px;
 }
-.top-icon-btn {
-    position: relative;
-    width: 32px; height: 32px; border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.04);
-    font-size: 15px; cursor: pointer; display: flex;
-    align-items: center; justify-content: center;
-    transition: background 0.15s;
-}
-.top-icon-btn:active { background: rgba(255,255,255,0.1); }
-.top-icon-btn.panel-open { background: rgba(0,191,255,0.15); border-color: rgba(0,191,255,0.3); }
-.top-icon-badge {
-    position: absolute; top: -3px; right: -3px;
-    background: #ef5350; color: #fff;
-    font-size: 7px; font-weight: 800;
-    min-width: 14px; height: 14px; line-height: 14px;
-    border-radius: 7px; text-align: center; padding: 0 3px;
-}
-.top-icon-badge.hidden { display: none; }
 
-/* Overlay panel */
-#overlay-panel-bg {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 60;
+/* --- Mobile (default): pills visible, side-panel replaces action-col --- */
+/* When side-panel is open on mobile, hide action-col */
+#action-panel.sp-open #action-col { display: none; }
+#action-panel.sp-open #side-panel { flex: 1; }
+
+/* --- PC (≥768px): side-by-side layout --- */
+@media (min-width: 768px) {
+    #side-pills { display: none; }
+    #side-panel {
+        display: flex !important; /* always visible on PC */
+        flex: 1; border-right: 1px solid rgba(255,255,255,0.08);
+        max-width: 50%;
+    }
+    #side-panel-close { display: none; }
+    #action-col { flex: 1; }
+    #action-panel.sp-open #action-col { display: flex; } /* never hide on PC */
 }
-#overlay-panel-bg.hidden { display: none; }
-#overlay-panel {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    height: 50%; max-height: 360px;
-    background: #111318; border-top: 2px solid rgba(0,191,255,0.2);
-    border-radius: 14px 14px 0 0;
-    z-index: 61; display: flex; flex-direction: column;
-    transform: translateY(0);
-    transition: transform 0.25s ease;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
-}
-#overlay-panel.hidden { transform: translateY(100%); pointer-events: none; }
-#overlay-panel-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 14px; flex-shrink: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-#overlay-panel-title {
-    font-size: 13px; font-weight: 700; color: var(--accent);
-}
-#overlay-panel-close {
-    width: 28px; height: 28px; border-radius: 6px;
-    border: none; background: rgba(255,255,255,0.06);
-    color: #888; font-size: 14px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-}
-#overlay-panel-close:active { background: rgba(255,255,255,0.12); }
-#overlay-panel-body {
-    flex: 1; overflow: hidden; display: flex; flex-direction: column;
-    min-height: 0;
-}
-.overlay-view {
-    flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
-}
-.overlay-view.hidden { display: none; }
