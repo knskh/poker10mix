@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preset Segment Bar Demo</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --bg: #1a1d24;
+    --accent: #00e5ff;
+    --gold: #ffd700;
+    --text: #e0e0e0;
+}
+body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-start; min-height: 100dvh; padding: 40px 20px 20px; gap: 20px;
+}
+h2 { font-size: 14px; color: #888; font-weight: 400; }
+
+/* ==========================================
+   Segment Bar Preset
+   ========================================== */
+.preset-segment-bar {
+    display: flex;
+    position: relative;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 3px;
+    width: 100%;
+    max-width: 400px;
+    overflow: hidden;
+}
+
+.preset-segment-bar .segment-track {
+    position: absolute;
+    top: 3px; bottom: 3px; left: 3px;
+    border-radius: 8px;
+    background: rgba(0,229,255,0.15);
+    border: 1px solid rgba(0,229,255,0.4);
+    box-shadow: 0 0 10px rgba(0,229,255,0.2);
+    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.preset-segment {
+    flex: 1;
+    text-align: center;
+    padding: 10px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+    transition: color 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    white-space: nowrap;
+}
+.preset-segment:hover { color: #ccc; }
+.preset-segment.active { color: var(--accent); }
+
+.preset-segment .segment-value {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: #666;
+    margin-top: 2px;
+    transition: color 0.2s;
+}
+.preset-segment.active .segment-value { color: rgba(0,229,255,0.6); }
+
+/* All-in segment */
+.preset-segment.segment-allin.active {
+    color: #ce93d8;
+}
+.segment-track.track-allin {
+    background: rgba(106,27,154,0.25);
+    border-color: rgba(156,39,176,0.5);
+    box-shadow: 0 0 10px rgba(156,39,176,0.2);
+}
+
+/* ==========================================
+   Slider
+   ========================================== */
+.slider-area {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.slider-area input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.12);
+    outline: none;
+}
+.slider-area input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(0,229,255,0.4);
+}
+.slider-value {
+    font-size: 16px; font-weight: 700;
+    color: var(--gold);
+    min-width: 70px;
+    text-align: right;
+}
+
+/* ==========================================
+   Action buttons (for context)
+   ========================================== */
+.action-row {
+    display: flex; gap: 8px;
+    width: 100%; max-width: 400px;
+}
+.btn-demo {
+    flex: 1; padding: 12px 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+}
+.btn-fold { background: rgba(239,83,80,0.2); color: #ef5350; border-color: rgba(239,83,80,0.3); }
+.btn-call { background: rgba(76,175,80,0.2); color: #4caf50; border-color: rgba(76,175,80,0.3); }
+.btn-raise { background: rgba(0,229,255,0.15); color: var(--accent); border-color: rgba(0,229,255,0.3); }
+
+/* ==========================================
+   Scenario tabs
+   ========================================== */
+.scenario-tabs {
+    display: flex; gap: 6px;
+}
+.scenario-tab {
+    padding: 6px 14px; font-size: 12px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: #888; cursor: pointer;
+    transition: all 0.15s;
+}
+.scenario-tab.active {
+    background: rgba(0,229,255,0.1); border-color: rgba(0,229,255,0.3); color: var(--accent);
+}
+
+.demo-label {
+    font-size: 11px; color: #555; text-align: center;
+}
+</style>
+</head>
+<body>
+
+<h2>Preset Segment Bar - Demo</h2>
+
+<div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="preflop-open">Preflop Open</button>
+    <button class="scenario-tab" data-scenario="preflop-3bet">Preflop 3bet</button>
+    <button class="scenario-tab" data-scenario="postflop">Postflop</button>
+</div>
+
+<div class="preset-segment-bar" id="segment-bar">
+    <div class="segment-track" id="segment-track"></div>
+    <!-- segments injected by JS -->
+</div>
+
+<div class="demo-label" id="sync-label">スライダーを動かすとプリセットが自動ハイライト</div>
+
+<div class="slider-area">
+    <input type="range" id="bet-slider" min="100" max="10000" step="50" value="300">
+    <span class="slider-value" id="slider-val">300</span>
+</div>
+
+<div class="action-row">
+    <button class="btn-demo btn-fold">フォールド</button>
+    <button class="btn-demo btn-call">コール 100</button>
+    <button class="btn-demo btn-raise" id="btn-raise">レイズ 300</button>
+</div>
+
+<script>
+const scenarios = {
+    'preflop-open': {
+        bb: 100, pot: 150, tableBet: 100, min: 200, max: 10000,
+        presets: [
+            { label: '2bb', value: 200 },
+            { label: '2.5bb', value: 250 },
+            { label: '3bb', value: 300 },
+            { label: '3.5bb', value: 350 },
+            { label: '4bb', value: 400 },
+        ],
+        allin: { label: 'All-In', value: 10000 }
+    },
+    'preflop-3bet': {
+        bb: 100, pot: 450, tableBet: 300, min: 600, max: 10000,
+        presets: [
+            { label: '2x', value: 600 },
+            { label: '2.5x', value: 750 },
+            { label: '3x', value: 900 },
+            { label: '4x', value: 1200 },
+        ],
+        allin: { label: 'All-In', value: 10000 }
+    },
+    'postflop': {
+        bb: 100, pot: 600, tableBet: 0, min: 100, max: 10000,
+        presets: [
+            { label: '33%', value: 200 },
+            { label: '50%', value: 300 },
+            { label: '66%', value: 400 },
+            { label: 'Pot', value: 600 },
+        ],
+        allin: { label: 'All-In', value: 10000 }
+    }
+};
+
+let currentScenario = 'preflop-open';
+let activeIndex = -1;
+let ignoreSliderInput = false;
+
+const bar = document.getElementById('segment-bar');
+const track = document.getElementById('segment-track');
+const slider = document.getElementById('bet-slider');
+const sliderVal = document.getElementById('slider-val');
+const raiseBtn = document.getElementById('btn-raise');
+const syncLabel = document.getElementById('sync-label');
+
+function render(scenarioKey) {
+    currentScenario = scenarioKey;
+    const sc = scenarios[scenarioKey];
+    activeIndex = -1;
+
+    // Clear segments (keep track)
+    bar.querySelectorAll('.preset-segment').forEach(el => el.remove());
+
+    // Create segments
+    const allPresets = [...sc.presets];
+    if (sc.allin) allPresets.push({ ...sc.allin, isAllin: true });
+
+    allPresets.forEach((p, i) => {
+        const seg = document.createElement('div');
+        seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '');
+        seg.dataset.index = i;
+        seg.dataset.value = p.value;
+        seg.innerHTML = `${p.label}<span class="segment-value">${p.isAllin ? p.value.toLocaleString() : p.value.toLocaleString()}</span>`;
+        seg.addEventListener('click', () => {
+            ignoreSliderInput = true;
+            slider.value = valueToSlider(p.value);
+            updateSliderDisplay(p.value);
+            setActive(i);
+            requestAnimationFrame(() => ignoreSliderInput = false);
+        });
+        bar.appendChild(seg);
+    });
+
+    // Update slider: use 0-1000 internal range with non-linear mapping
+    slider.min = 0;
+    slider.max = 1000;
+    slider.step = 1;
+    slider.value = 0;
+    updateSliderDisplay(sc.min);
+    moveTrack(-1);
+
+    // Update tabs
+    document.querySelectorAll('.scenario-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.scenario === scenarioKey);
+    });
+}
+
+function setActive(index) {
+    activeIndex = index;
+    const segments = bar.querySelectorAll('.preset-segment');
+    segments.forEach((s, i) => s.classList.toggle('active', i === index));
+    moveTrack(index);
+}
+
+function moveTrack(index) {
+    const segments = bar.querySelectorAll('.preset-segment');
+    if (index < 0 || index >= segments.length) {
+        track.style.opacity = '0';
+        return;
+    }
+    track.style.opacity = '1';
+    const seg = segments[index];
+    const barRect = bar.getBoundingClientRect();
+    const segRect = seg.getBoundingClientRect();
+    // Extend highlight into neighboring segments
+    const expand = 8;
+    const rawLeft = segRect.left - barRect.left - expand;
+    const rawWidth = segRect.width + expand * 2;
+    const minLeft = 3;
+    const maxRight = barRect.width - 3;
+    const left = Math.max(minLeft, rawLeft);
+    const right = Math.min(maxRight, rawLeft + rawWidth);
+    track.style.left = left + 'px';
+    track.style.width = (right - left) + 'px';
+
+    // Allin style
+    if (seg.classList.contains('segment-allin')) {
+        track.classList.add('track-allin');
+    } else {
+        track.classList.remove('track-allin');
+    }
+}
+
+function updateSliderDisplay(val) {
+    const rounded = Math.round(val);
+    sliderVal.textContent = rounded.toLocaleString();
+    raiseBtn.textContent = `レイズ ${rounded.toLocaleString()}`;
+}
+
+// Non-linear slider mapping:
+// Slider 0-500 (first half) → betMin to presetMax (preset range)
+// Slider 500-1000 (second half) → presetMax to betMax (all-in range)
+function getPresetMax() {
+    const sc = scenarios[currentScenario];
+    return sc.presets.length > 0 ? sc.presets[sc.presets.length - 1].value : sc.min;
+}
+
+function sliderToValue(s) {
+    const sc = scenarios[currentScenario];
+    const betMin = sc.min;
+    const betMax = sc.max;
+    const presetMax = getPresetMax();
+    const half = 500;
+    let val;
+
+    if (s <= half) {
+        val = betMin + (presetMax - betMin) * (s / half);
+    } else {
+        val = presetMax + (betMax - presetMax) * ((s - half) / half);
+    }
+    // Round to nearest 50
+    return Math.round(val / 50) * 50;
+}
+
+function valueToSlider(val) {
+    const sc = scenarios[currentScenario];
+    const betMin = sc.min;
+    const betMax = sc.max;
+    const presetMax = getPresetMax();
+    const half = 500;
+
+    if (val <= presetMax) {
+        return half * (val - betMin) / (presetMax - betMin);
+    } else {
+        return half + half * (val - presetMax) / (betMax - presetMax);
+    }
+}
+
+function findClosestPreset(val) {
+    const sc = scenarios[currentScenario];
+    const allPresets = [...sc.presets];
+    if (sc.allin) allPresets.push({ ...sc.allin, isAllin: true });
+
+    let closest = -1;
+    let minDist = Infinity;
+    const presetMax = getPresetMax();
+    const presetRange = presetMax - sc.min;
+    const allinRange = sc.max - presetMax;
+    allPresets.forEach((p, i) => {
+        const dist = Math.abs(p.value - val);
+        const threshold = p.isAllin
+            ? allinRange * 0.05
+            : Math.max(presetRange * 0.08, 15);
+        if (dist <= threshold && dist < minDist) {
+            minDist = dist;
+            closest = i;
+        }
+    });
+    return closest;
+}
+
+slider.addEventListener('input', () => {
+    if (ignoreSliderInput) return;
+    const raw = parseInt(slider.value);
+    const val = sliderToValue(raw);
+    updateSliderDisplay(val);
+    const closest = findClosestPreset(val);
+    setActive(closest);
+    syncLabel.textContent = closest >= 0
+        ? 'プリセットにスナップ中'
+        : 'カスタム額 (プリセット外)';
+});
+
+// Scenario tab clicks
+document.querySelectorAll('.scenario-tab').forEach(tab => {
+    tab.addEventListener('click', () => render(tab.dataset.scenario));
+});
+
+// Init
+render('preflop-open');
+
+// Reposition track on resize
+window.addEventListener('resize', () => moveTrack(activeIndex));
+</script>
+</body>
+</html>

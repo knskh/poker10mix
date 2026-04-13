@@ -119,6 +119,147 @@ function hasPlayerNote(name) {
     return !!loadPlayerNotes()[name];
 }
 
+// ==========================================
+// Bet Preset Settings (localStorage)
+// ==========================================
+const PRESET_STORAGE_KEY = 'poker10mix_bet_presets';
+const DEFAULT_PRESETS = {
+    'preflop-open': [2, 2.5, 3, 3.5, 4],
+    'preflop-raise': [2, 2.5, 3, 4],
+    'postflop': [0.33, 0.5, 0.66, 1.0]
+};
+
+function loadBetPresets() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY));
+        if (saved && saved['preflop-open'] && saved['preflop-raise'] && saved['postflop']) return saved;
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+}
+
+function saveBetPresets(presets) {
+    try { localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets)); } catch (e) {}
+}
+
+let currentPresets = loadBetPresets();
+
+function setupPresetSettingsModal() {
+    const modal = document.getElementById('preset-settings-modal');
+    const editArea = document.getElementById('preset-edit-area');
+    let editingTab = 'preflop-open';
+    let tempPresets = null;
+
+    const unitHints = {
+        'preflop-open': 'BB倍率 (例: 2, 2.5, 3)',
+        'preflop-raise': 'レイズ倍率 (例: 2, 2.5, 3)',
+        'postflop': 'ポット比率 (例: 0.33, 0.5, 1.0)'
+    };
+    const labelFns = {
+        'preflop-open': v => `${v}bb`,
+        'preflop-raise': v => `${v}x`,
+        'postflop': v => v >= 1 ? 'Pot' : `${Math.round(v * 100)}%`
+    };
+
+    function renderEditArea() {
+        editArea.innerHTML = '';
+        const hint = document.createElement('div');
+        hint.className = 'preset-unit-hint';
+        hint.textContent = unitHints[editingTab];
+        editArea.appendChild(hint);
+
+        const values = tempPresets[editingTab];
+        values.forEach((val, i) => {
+            const row = document.createElement('div');
+            row.className = 'preset-row';
+            const label = document.createElement('span');
+            label.className = 'preset-row-label';
+            label.textContent = labelFns[editingTab](val);
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'preset-row-input';
+            input.value = val;
+            input.step = editingTab === 'postflop' ? '0.01' : '0.5';
+            input.min = '0';
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (!isNaN(v) && v > 0) {
+                    tempPresets[editingTab][i] = v;
+                    label.textContent = labelFns[editingTab](v);
+                }
+            });
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'preset-row-remove';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', () => {
+                tempPresets[editingTab].splice(i, 1);
+                renderEditArea();
+            });
+            row.appendChild(label);
+            row.appendChild(input);
+            row.appendChild(removeBtn);
+            editArea.appendChild(row);
+        });
+
+        const addBtn = document.createElement('div');
+        addBtn.className = 'preset-add-btn';
+        addBtn.textContent = '+ 追加';
+        addBtn.addEventListener('click', () => {
+            const last = values.length > 0 ? values[values.length - 1] : 1;
+            tempPresets[editingTab].push(editingTab === 'postflop' ? Math.min(last + 0.25, 2.0) : last + 0.5);
+            renderEditArea();
+        });
+        editArea.appendChild(addBtn);
+    }
+
+    // Tab clicks
+    document.querySelectorAll('.preset-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            editingTab = tab.dataset.tab;
+            renderEditArea();
+        });
+    });
+
+    // Open modal
+    document.getElementById('btn-preset-settings').addEventListener('click', () => {
+        tempPresets = JSON.parse(JSON.stringify(currentPresets));
+        editingTab = 'preflop-open';
+        document.querySelectorAll('.preset-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === editingTab));
+        renderEditArea();
+        modal.classList.remove('hidden');
+        // Close hamburger menu
+        document.getElementById('top-bar-menu').classList.add('hidden');
+    });
+
+    // Save
+    document.getElementById('preset-save-btn').addEventListener('click', () => {
+        // Sort each tab's values
+        for (const key of Object.keys(tempPresets)) {
+            tempPresets[key].sort((a, b) => a - b);
+        }
+        currentPresets = tempPresets;
+        saveBetPresets(currentPresets);
+        modal.classList.add('hidden');
+    });
+
+    // Reset
+    document.getElementById('preset-reset-btn').addEventListener('click', () => {
+        tempPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+        renderEditArea();
+    });
+
+    // Close
+    document.getElementById('preset-close-btn').addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    // Click outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+    });
+}
+
 // Save hand history on tab close/reload
 window.addEventListener('beforeunload', () => {
     saveCurrentHand();
@@ -134,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupChat();
     setupPreActions();
     setupEmotes();
+    setupPresetSettingsModal();
     setupFocusMode();
 
     // Request notification permission
@@ -580,55 +722,7 @@ function renderRoom(room) {
 // Game Screen
 // ==========================================
 function setupGameScreen() {
-    // Log/Chat tab switching
-    document.querySelectorAll('.log-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const mode = tab.dataset.tab;
-            const logPanel = document.getElementById('log-panel');
-            const gameLog = document.getElementById('game-log');
-            const chatLog = document.getElementById('chat-log');
-            const chatBar = document.querySelector('.game-chat-bar');
-
-            if (mode === 'none') {
-                // Collapse: hide content + tab labels, show only expand button
-                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                logPanel.classList.add('collapsed');
-            } else if (logPanel.classList.contains('collapsed') && mode === 'expand') {
-                // Expand from collapsed state — restore last active tab (default: log)
-                logPanel.classList.remove('collapsed');
-                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-                const logTab = document.querySelector('.log-tab[data-tab="log"]');
-                logTab.classList.add('active');
-                gameLog.classList.remove('hidden');
-                chatLog.classList.add('hidden');
-                chatBar.classList.add('hidden');
-            } else {
-                // Normal tab switch
-                logPanel.classList.remove('collapsed');
-                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-
-                if (mode === 'log') {
-                    gameLog.classList.remove('hidden');
-                    chatLog.classList.add('hidden');
-                    chatBar.classList.add('hidden');
-                } else if (mode === 'chat') {
-                    gameLog.classList.add('hidden');
-                    chatLog.classList.remove('hidden');
-                    chatBar.classList.remove('hidden');
-                    chatLog.scrollTop = chatLog.scrollHeight;
-                    // Clear unread badge
-                    chatUnreadCount = 0;
-                    updateChatBadge();
-                } else if (mode === 'both') {
-                    gameLog.classList.remove('hidden');
-                    chatLog.classList.add('hidden');
-                    chatBar.classList.remove('hidden');
-                }
-            }
-        });
-    });
+    // Bottom nav panel switching is handled in setupBottomNav()
 
     // Sound toggle button
     const soundBtn = document.getElementById('btn-sound-toggle');
@@ -725,11 +819,11 @@ function setupGameScreen() {
         updateRaiseBtnText(e.target.value);
     }, true);
 
-    // Slider area swipe gesture for preset switching
+    // Slider area swipe gesture for preset switching (segment bar)
     const sliderArea = document.getElementById('bet-slider-area');
     let swipeStartY = null;
     sliderArea.addEventListener('touchstart', (e) => {
-        if (e.target.id === 'bet-slider') return; // don't interfere with slider drag
+        if (e.target.id === 'bet-slider') return;
         swipeStartY = e.touches[0].clientY;
     }, { passive: true });
     sliderArea.addEventListener('touchend', (e) => {
@@ -737,16 +831,16 @@ function setupGameScreen() {
         const dy = swipeStartY - (e.changedTouches[0] ? e.changedTouches[0].clientY : swipeStartY);
         swipeStartY = null;
         if (Math.abs(dy) < 30) return;
-        const presetBtns = [...document.querySelectorAll('#bet-presets .btn-preset')];
-        if (presetBtns.length === 0) return;
-        const activeIdx = presetBtns.findIndex(b => b.classList.contains('active'));
+        const segments = [...document.querySelectorAll('#bet-presets .preset-segment')];
+        if (segments.length === 0) return;
+        const activeIdx = segments.findIndex(s => s.classList.contains('active'));
         let nextIdx;
-        if (dy > 0) { // swipe up = higher preset
-            nextIdx = activeIdx < 0 ? presetBtns.length - 1 : Math.min(presetBtns.length - 1, activeIdx + 1);
-        } else { // swipe down = lower preset
+        if (dy > 0) {
+            nextIdx = activeIdx < 0 ? segments.length - 1 : Math.min(segments.length - 1, activeIdx + 1);
+        } else {
             nextIdx = activeIdx < 0 ? 0 : Math.max(0, activeIdx - 1);
         }
-        presetBtns[nextIdx].click();
+        segments[nextIdx].click();
     }, { passive: true });
 
     // Slider ± buttons
@@ -814,16 +908,16 @@ function setupGameScreen() {
             slider.dispatchEvent(new Event('input'));
         } else if (hasSlider && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
             e.preventDefault();
-            const presetBtns = [...document.querySelectorAll('#bet-presets .btn-preset')];
-            if (presetBtns.length === 0) return;
-            const activeIdx = presetBtns.findIndex(b => b.classList.contains('active'));
+            const segments = [...document.querySelectorAll('#bet-presets .preset-segment')];
+            if (segments.length === 0) return;
+            const activeIdx = segments.findIndex(s => s.classList.contains('active'));
             let nextIdx;
             if (e.key === 'ArrowUp') {
-                nextIdx = activeIdx < 0 ? presetBtns.length - 1 : Math.max(0, activeIdx - 1);
+                nextIdx = activeIdx < 0 ? segments.length - 1 : Math.max(0, activeIdx - 1);
             } else {
-                nextIdx = activeIdx < 0 ? 0 : Math.min(presetBtns.length - 1, activeIdx + 1);
+                nextIdx = activeIdx < 0 ? 0 : Math.min(segments.length - 1, activeIdx + 1);
             }
-            presetBtns[nextIdx].click();
+            segments[nextIdx].click();
         } else if (e.key === 'Enter' && hasSlider) {
             e.preventDefault();
             const raiseBtn = document.getElementById('btn-raise-main');
@@ -1178,14 +1272,6 @@ function renderHandHistory(containerId) {
             detail.dataset.activeIdx = String(idx);
             detail.classList.remove('hidden');
             detail.innerHTML = renderHandDetail(handHistory[idx], idx);
-            // Attach share button handler
-            const shareBtn = detail.querySelector('.btn-hh-share');
-            if (shareBtn) {
-                shareBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    generateReplayURL(parseInt(shareBtn.dataset.hhIdx));
-                });
-            }
         });
     });
 }
@@ -1206,13 +1292,10 @@ function renderHandDetail(h, idx) {
     const hr = h.handResult;
     const myName = client.name;
 
-    // Header: game name + time + share button
+    // Header: game name + time
     let html = `<div class="hh-detail-header">`;
     html += `<span class="hh-detail-title">#${idx + 1} ${h.gameName || ''}</span>`;
     html += `<span class="hh-detail-time">${h.time || ''}</span>`;
-    if (hr) {
-        html += `<button class="btn-hh-share" data-hh-idx="${idx}" title="リプレイURLをコピー">🔗 共有</button>`;
-    }
     html += `</div>`;
 
     // === Player summary table (position, name, result, cards) ===
@@ -1496,63 +1579,6 @@ function renderVisualCardsWithType(cardObjs) {
     }).join('');
 }
 
-// ---- Replay URL generation ----
-async function compressForURL(str) {
-    const blob = new Blob([new TextEncoder().encode(str)]);
-    const stream = blob.stream().pipeThrough(new CompressionStream('deflate-raw'));
-    const buf = await new Response(stream).arrayBuffer();
-    return btoa(String.fromCharCode(...new Uint8Array(buf)))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function generateReplayURL(idx) {
-    const h = handHistory[idx];
-    if (!h || !h.handResult) return;
-    const hr = h.handResult;
-    // Compact data format for URL
-    const data = {
-        g: hr.gameName,
-        t: hr.gameType,
-        c: hr.communityCards,
-        d: hr.dealerSeat,
-        p: hr.players.map(p => ({
-            n: p.name, o: p.position, f: p.folded ? 1 : 0,
-            c: p.chips, s: p.startChips,
-            h: p.cards, u: p.upCards, w: p.downCards,
-        })),
-        l: h.logs,
-        ds: hr.drawSnapshots,
-    };
-    try {
-        const compressed = await compressForURL(JSON.stringify(data));
-        const url = window.location.origin + '/replay.html#' + compressed;
-        await navigator.clipboard.writeText(url);
-        showToast('リプレイURLをコピーしました');
-    } catch (e) {
-        // Fallback: textarea copy
-        const compressed = await compressForURL(JSON.stringify(data));
-        const url = window.location.origin + '/replay.html#' + compressed;
-        const ta = document.createElement('textarea');
-        ta.value = url; document.body.appendChild(ta);
-        ta.select(); document.execCommand('copy');
-        document.body.removeChild(ta);
-        showToast('リプレイURLをコピーしました');
-    }
-}
-
-function showToast(msg) {
-    let toast = document.getElementById('hh-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'hh-toast';
-        toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(74,222,128,0.9);color:#000;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:9999;opacity:0;transition:opacity 0.3s;';
-        document.body.appendChild(toast);
-    }
-    toast.textContent = msg;
-    toast.style.opacity = '1';
-    setTimeout(() => { toast.style.opacity = '0'; }, 2500);
-}
-
 function getActionClass(log) {
     if (log.includes('フォールド')) return 'act-fold';
     if (log.includes('レイズ') || log.includes('ベット')) return 'act-raise';
@@ -1643,7 +1669,18 @@ document.addEventListener('click', (e) => {
     }
 });
 
+function triggerTurnFlash() {
+    const flash = document.getElementById('turn-flash');
+    if (!flash) return;
+    flash.classList.remove('flash-active');
+    void flash.offsetWidth; // force reflow
+    flash.classList.add('flash-active');
+    flash.addEventListener('animationend', () => flash.classList.remove('flash-active'), { once: true });
+}
+
 function notifyYourTurn() {
+    // Turn flash effect
+    triggerTurnFlash();
     // Title flash when tab is hidden
     if (document.hidden) {
         if (!titleFlashInterval) {
@@ -1869,98 +1906,57 @@ function showActionButtons(actions, turnData) {
     }
 }
 
-// --- Custom Preset Management ---
-const CUSTOM_PRESETS_KEY = 'customPresets';
-const MAX_CUSTOM_PRESETS = 5;
-let presetEditMode = false;
-let lastPresetContext = null; // track current context for re-render
+// Non-linear slider helpers for segment bar
+let presetSliderPresetMax = 0;
+let presetSliderBetMin = 0;
+let presetSliderBetMax = 0;
 
-function getPresetContext(isFirstRound, tableBet, bb) {
-    if (isFirstRound && tableBet <= bb) return 'preflop_open';
-    if (isFirstRound && tableBet > bb) return 'preflop_raise';
-    return 'postflop';
+function presetSliderToValue(s) {
+    const half = 500;
+    if (s <= half) {
+        return presetSliderBetMin + (presetSliderPresetMax - presetSliderBetMin) * (s / half);
+    } else {
+        return presetSliderPresetMax + (presetSliderBetMax - presetSliderPresetMax) * ((s - half) / half);
+    }
 }
 
-function getDefaultUnit(context) {
-    if (context === 'preflop_open') return 'bb';
-    if (context === 'preflop_raise') return 'x';
-    return '%';
+function presetValueToSlider(val) {
+    const half = 500;
+    if (val <= presetSliderPresetMax) {
+        const range = presetSliderPresetMax - presetSliderBetMin;
+        return range > 0 ? half * (val - presetSliderBetMin) / range : 0;
+    } else {
+        const range = presetSliderBetMax - presetSliderPresetMax;
+        return range > 0 ? half + half * (val - presetSliderPresetMax) / range : 1000;
+    }
 }
-
-function loadCustomPresets() {
-    try { return JSON.parse(localStorage.getItem(CUSTOM_PRESETS_KEY)) || {}; } catch { return {}; }
-}
-
-function saveCustomPresets(data) {
-    localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(data));
-}
-
-function addCustomPreset(context, label, value, unit) {
-    const data = loadCustomPresets();
-    if (!data[context]) data[context] = [];
-    if (data[context].length >= MAX_CUSTOM_PRESETS) return false;
-    data[context].push({ label, value, unit });
-    saveCustomPresets(data);
-    return true;
-}
-
-function removeCustomPreset(context, index) {
-    const data = loadCustomPresets();
-    if (!data[context]) return;
-    data[context].splice(index, 1);
-    if (data[context].length === 0) delete data[context];
-    saveCustomPresets(data);
-}
-
-function resolvePresetTotal(p, bb, pot, tableBet) {
-    if (p.unit === 'bb') return Math.round(bb * p.value);
-    if (p.unit === 'x') return Math.round(tableBet * p.value);
-    if (p.unit === '%') return Math.round(pot * p.value) + tableBet;
-    return p.value;
-}
-
-// Saved render params for re-render after add/delete
-let _lastPresetParams = null;
 
 function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction) {
-    _lastPresetParams = { turnData, sliderAction, sliderMin, sliderMax, allInAction };
     const presetsDiv = document.getElementById('bet-presets');
     presetsDiv.innerHTML = '';
+    const presets = [];
     const bb = (turnData && turnData.bigBlind) || 100;
     const pot = (turnData && turnData.pot) || 0;
     const isFirstRound = turnData && turnData.isFirstRound;
     const tableBet = (turnData && turnData.currentBet) || 0;
 
-    const context = sliderAction ? getPresetContext(isFirstRound, tableBet, bb) : null;
-    lastPresetContext = context;
-
     if (sliderAction) {
-        const customData = loadCustomPresets();
-        const hasCustom = customData[context] && customData[context].length > 0;
-        let presets = [];
-
-        if (hasCustom) {
-            // Use custom presets
-            presets = customData[context].map((p, idx) => ({
-                label: p.label,
-                targetTotal: resolvePresetTotal(p, bb, pot, tableBet),
-                customIndex: idx
-            }));
-        } else {
-            // Default presets
-            if (context === 'preflop_open') {
-                [2, 2.5, 3, 3.5, 4].forEach(mult => {
-                    presets.push({ label: `${mult}bb`, targetTotal: Math.round(bb * mult) });
-                });
-            } else if (context === 'preflop_raise') {
-                [2, 2.5, 3, 4].forEach(mult => {
-                    presets.push({ label: `${mult}x`, targetTotal: Math.round(tableBet * mult) });
-                });
-            } else {
-                [{ label: '33%', pct: 0.33 }, { label: '50%', pct: 0.5 }, { label: '66%', pct: 0.66 }, { label: 'Pot', pct: 1.0 }].forEach(({ label, pct }) => {
-                    presets.push({ label, targetTotal: Math.round(pot * pct) + tableBet });
-                });
-            }
+        if (isFirstRound && tableBet <= bb) {
+            currentPresets['preflop-open'].forEach(mult => {
+                const targetTotal = Math.round(bb * mult);
+                presets.push({ label: `${mult}bb`, targetTotal });
+            });
+        } else if (isFirstRound && tableBet > bb) {
+            currentPresets['preflop-raise'].forEach(mult => {
+                const targetTotal = Math.round(tableBet * mult);
+                presets.push({ label: `${mult}x`, targetTotal });
+            });
+        } else if (!isFirstRound) {
+            currentPresets['postflop'].forEach(pct => {
+                const label = pct >= 1 ? 'Pot' : `${Math.round(pct * 100)}%`;
+                const targetTotal = Math.round(pot * pct) + tableBet;
+                presets.push({ label, targetTotal });
+            });
         }
 
         // Filter out presets outside slider range
@@ -1969,144 +1965,142 @@ function renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAct
             return outOfPocket <= sliderMax && outOfPocket >= sliderMin;
         });
 
-        for (const p of filtered) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'preset-wrapper' + (presetEditMode && p.customIndex !== undefined ? ' editing' : '');
+        // Build segment bar
+        const bar = document.createElement('div');
+        bar.className = 'preset-segment-bar';
+        const track = document.createElement('div');
+        track.className = 'segment-track';
+        bar.appendChild(track);
 
-            const btn = document.createElement('button');
-            btn.className = 'btn-preset';
-            btn.textContent = p.label;
-            btn.addEventListener('click', (e) => {
-                if (presetEditMode) return; // don't trigger bet in edit mode
+        const allItems = [...filtered];
+        let allinItem = null;
+        if (allInAction) {
+            const amount = allInAction.total || allInAction.amount;
+            allinItem = { label: 'All-In', targetTotal: amount, isAllin: true };
+            allItems.push(allinItem);
+        }
+
+        // Setup non-linear slider mapping
+        presetSliderBetMin = sliderMin + sliderOffset;
+        presetSliderBetMax = sliderMax + sliderOffset;
+        presetSliderPresetMax = filtered.length > 0 ? filtered[filtered.length - 1].targetTotal : presetSliderBetMin;
+
+        // Convert real slider to 0-1000 internal range
+        const slider = document.getElementById('bet-slider');
+        const realMin = parseInt(slider.min);
+        const realMax = parseInt(slider.max);
+        let ignoreSliderSync = false;
+
+        allItems.forEach((p, i) => {
+            const seg = document.createElement('div');
+            seg.className = 'preset-segment' + (p.isAllin ? ' segment-allin' : '');
+            seg.innerHTML = `${p.label}<span class="segment-value">${p.targetTotal.toLocaleString()}</span>`;
+            seg.addEventListener('click', () => {
+                ignoreSliderSync = true;
+                // Set slider to correct position
                 const outOfPocket = p.targetTotal - sliderOffset;
-                const slider = document.getElementById('bet-slider');
-                if (slider) slider.value = outOfPocket;
+                if (p.isAllin) {
+                    slider.value = realMax;
+                } else {
+                    // Map target to non-linear position, then back to real slider
+                    const nlPos = presetValueToSlider(p.targetTotal);
+                    slider.value = Math.round(realMin + (realMax - realMin) * nlPos / 1000);
+                }
                 const input = document.getElementById('bet-amount-input');
                 if (input) input.value = p.targetTotal;
                 updateRaiseBtnText(p.targetTotal);
-                presetsDiv.querySelectorAll('.btn-preset:not(.btn-preset-allin)').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
+                setSegActive(i);
+                requestAnimationFrame(() => ignoreSliderSync = false);
             });
+            bar.appendChild(seg);
+        });
 
-            // Long-press to enter edit mode
-            let pressTimer = null;
-            btn.addEventListener('pointerdown', () => {
-                pressTimer = setTimeout(() => {
-                    presetEditMode = !presetEditMode;
-                    reRenderPresets();
-                }, 500);
-            });
-            btn.addEventListener('pointerup', () => clearTimeout(pressTimer));
-            btn.addEventListener('pointerleave', () => clearTimeout(pressTimer));
-
-            wrapper.appendChild(btn);
-
-            // Delete button (edit mode only, custom presets only)
-            if (presetEditMode && p.customIndex !== undefined) {
-                const del = document.createElement('span');
-                del.className = 'preset-delete-x';
-                del.textContent = '\u00d7';
-                del.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    removeCustomPreset(context, p.customIndex);
-                    reRenderPresets();
-                });
-                wrapper.appendChild(del);
+        function setSegActive(index) {
+            const segments = bar.querySelectorAll('.preset-segment');
+            segments.forEach((s, i) => s.classList.toggle('active', i === index));
+            // Move track
+            if (index < 0 || index >= segments.length) {
+                track.style.opacity = '0';
+                return;
             }
-
-            presetsDiv.appendChild(wrapper);
+            track.style.opacity = '1';
+            const seg = segments[index];
+            const barRect = bar.getBoundingClientRect();
+            const segRect = seg.getBoundingClientRect();
+            const expand = 8;
+            const rawLeft = segRect.left - barRect.left - expand;
+            const rawWidth = segRect.width + expand * 2;
+            const minL = 3, maxR = barRect.width - 3;
+            const left = Math.max(minL, rawLeft);
+            const right = Math.min(maxR, rawLeft + rawWidth);
+            track.style.left = left + 'px';
+            track.style.width = (right - left) + 'px';
+            if (seg.classList.contains('segment-allin')) track.classList.add('track-allin');
+            else track.classList.remove('track-allin');
         }
 
-        // [+] add button (only if custom presets < max)
-        const currentCount = (hasCustom ? customData[context].length : 0);
-        if (currentCount < MAX_CUSTOM_PRESETS) {
-            const addBtn = document.createElement('button');
-            addBtn.className = 'btn-preset btn-preset-add';
-            addBtn.textContent = '+';
-            addBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                showPresetPopover(context, addBtn);
+        // Sync slider → segment highlight
+        function onSliderInput() {
+            if (ignoreSliderSync) return;
+            const rawVal = parseInt(slider.value);
+            // Convert real slider position to non-linear 0-1000
+            const nlPos = (rawVal - realMin) / (realMax - realMin) * 1000;
+            const betVal = presetSliderToValue(nlPos);
+            const rounded = Math.round(betVal / 50) * 50;
+            const input = document.getElementById('bet-amount-input');
+            if (input) input.value = Math.max(sliderOffset + parseInt(slider.min), Math.round(betVal));
+            updateRaiseBtnText(Math.round(betVal));
+
+            // Find closest preset
+            let closest = -1, minDist = Infinity;
+            const presetRange = presetSliderPresetMax - presetSliderBetMin;
+            const allinRange = presetSliderBetMax - presetSliderPresetMax;
+            allItems.forEach((p, i) => {
+                const dist = Math.abs(p.targetTotal - betVal);
+                const threshold = p.isAllin ? allinRange * 0.05 : Math.max(presetRange * 0.08, 15);
+                if (dist <= threshold && dist < minDist) {
+                    minDist = dist;
+                    closest = i;
+                }
             });
-            presetsDiv.appendChild(addBtn);
+            setSegActive(closest);
         }
-    }
 
-    // All-in preset button (last, distinct style)
-    if (allInAction) {
+        // Remove previous listener and add new one
+        slider._presetListener && slider.removeEventListener('input', slider._presetListener);
+        slider._presetListener = onSliderInput;
+        slider.addEventListener('input', onSliderInput);
+
+        presetsDiv.appendChild(bar);
+        // Initial track state
+        requestAnimationFrame(() => setSegActive(-1));
+
+    } else if (allInAction) {
+        // No slider action but all-in exists — simple all-in button
         const amount = allInAction.total || allInAction.amount;
-        const btn = document.createElement('button');
-        btn.className = 'btn-preset btn-preset-allin';
-        btn.textContent = `All-In ${amount.toLocaleString()}`;
-        btn.addEventListener('click', () => {
+        const bar = document.createElement('div');
+        bar.className = 'preset-segment-bar';
+        const track = document.createElement('div');
+        track.className = 'segment-track';
+        bar.appendChild(track);
+        const seg = document.createElement('div');
+        seg.className = 'preset-segment segment-allin';
+        seg.innerHTML = `All-In<span class="segment-value">${amount.toLocaleString()}</span>`;
+        seg.addEventListener('click', () => {
             const slider = document.getElementById('bet-slider');
             if (slider) slider.value = parseInt(slider.max);
             const total = parseInt(slider.max) + sliderOffset;
             const input = document.getElementById('bet-amount-input');
             if (input) input.value = total;
             updateRaiseBtnText(total);
-            presetsDiv.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
         });
-        presetsDiv.appendChild(btn);
+        bar.appendChild(seg);
+        presetsDiv.appendChild(bar);
     }
 
     if (presetsDiv.children.length > 0) {
         presetsDiv.classList.remove('hidden');
     }
-}
-
-function reRenderPresets() {
-    if (!_lastPresetParams) return;
-    const { turnData, sliderAction, sliderMin, sliderMax, allInAction } = _lastPresetParams;
-    renderBetPresets(turnData, sliderAction, sliderMin, sliderMax, allInAction);
-}
-
-function showPresetPopover(context, anchorBtn) {
-    // Remove existing popover
-    const existing = document.querySelector('.preset-popover');
-    if (existing) existing.remove();
-
-    const unit = getDefaultUnit(context);
-    const unitLabel = unit === 'bb' ? 'BB' : unit === 'x' ? 'x' : '%';
-    const placeholder = unit === 'bb' ? '2.5' : unit === 'x' ? '3' : '75';
-
-    const pop = document.createElement('div');
-    pop.className = 'preset-popover';
-    pop.innerHTML = `
-        <input type="number" class="popover-input" placeholder="${placeholder}" inputmode="decimal" step="any">
-        <span class="popover-unit">${unitLabel}</span>
-        <button class="popover-add-btn">追加</button>
-    `;
-    pop.addEventListener('click', e => e.stopPropagation());
-
-    const presetsDiv = document.getElementById('bet-presets');
-    presetsDiv.appendChild(pop);
-
-    const inp = pop.querySelector('.popover-input');
-    inp.focus();
-
-    const doAdd = () => {
-        const val = parseFloat(inp.value);
-        if (!val || val <= 0) return;
-        const realValue = unit === '%' ? val / 100 : val;
-        const label = unit === '%' ? (val === 100 ? 'Pot' : `${val}%`) : `${val}${unit}`;
-        addCustomPreset(context, label, realValue, unit);
-        pop.remove();
-        presetEditMode = false;
-        reRenderPresets();
-    };
-
-    pop.querySelector('.popover-add-btn').addEventListener('click', doAdd);
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
-
-    // Close on outside click
-    const closeHandler = (e) => {
-        if (!pop.contains(e.target)) {
-            pop.remove();
-            document.removeEventListener('pointerdown', closeHandler);
-        }
-    };
-    setTimeout(() => document.addEventListener('pointerdown', closeHandler), 0);
 }
 
 let sliderOffset = 0; // currentBet to add for total display
@@ -2131,6 +2125,13 @@ function setupSlider(min, max, currentBet) {
 }
 
 function sendActionAndHide(action) {
+    // Fold card animation
+    if (action.type === 'fold') {
+        document.querySelectorAll('#player-cards .card').forEach((card, i) => {
+            card.style.animationDelay = (i * 0.1) + 's';
+            card.classList.add('fold-anim');
+        });
+    }
     client.sendAction(action);
     document.getElementById('action-bar').classList.add('hidden');
     document.getElementById('bet-slider-area').classList.remove('visible');
@@ -2159,69 +2160,44 @@ function stopTurnTimer() {
 // ==========================================
 function clearPreAction() {
     preAction = null;
-    const overlay = document.getElementById('pre-action-overlay');
-    if (overlay) {
-        overlay.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
-    }
+    const bar = document.getElementById('pre-action-bar');
+    if (bar) bar.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
 }
 
 function hidePreActionBar() {
-    const overlay = document.getElementById('pre-action-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    const bar = document.getElementById('pre-action-bar');
+    if (bar) bar.classList.add('hidden');
 }
 
 function showPreActionBar() {
-    const overlay = document.getElementById('pre-action-overlay');
-    if (overlay) overlay.classList.remove('hidden');
+    const bar = document.getElementById('pre-action-bar');
+    if (bar) bar.classList.remove('hidden');
 }
 
 function setupPreActions() {
-    // Pre-action overlay is created dynamically on the seat
-}
-
-function ensurePreActionOverlay(seatIdx) {
-    let overlay = document.getElementById('pre-action-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'pre-action-overlay';
-        overlay.className = 'hidden';
-        overlay.innerHTML =
-            '<button class="pre-action-btn" data-action="check-fold">チェック/フォールド</button>' +
-            '<button class="pre-action-btn" data-action="fold">フォールド</button>';
-        overlay.addEventListener('click', (e) => {
-            const btn = e.target.closest('.pre-action-btn');
-            if (!btn) return;
-            const action = btn.dataset.action;
-            if (btn.classList.contains('active')) {
-                btn.classList.remove('active');
-                preAction = null;
-            } else {
-                overlay.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                preAction = action;
-            }
-        });
-        document.getElementById('table-felt').appendChild(overlay);
-    }
-    // Position near the player's seat
-    const seatEl = document.getElementById('seat-' + seatIdx);
-    if (seatEl) {
-        const seatStyle = getComputedStyle(seatEl);
-        overlay.style.left = seatStyle.left;
-        overlay.style.bottom = 'auto';
-        // Place above the seat
-        const seatTop = parseFloat(seatStyle.top) || parseFloat(seatStyle.bottom);
-        overlay.style.top = (parseFloat(seatStyle.top) - 30) + '%';
-        overlay.style.transform = 'translateX(-50%)';
-    }
-    return overlay;
+    const bar = document.getElementById('pre-action-bar');
+    bar.innerHTML =
+        '<button class="pre-action-btn" data-action="check-fold">チェック/フォールド</button>' +
+        '<button class="pre-action-btn" data-action="fold">フォールド</button>';
+    bar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.pre-action-btn');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (btn.classList.contains('active')) {
+            btn.classList.remove('active');
+            preAction = null;
+        } else {
+            bar.querySelectorAll('.pre-action-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            preAction = action;
+        }
+    });
 }
 
 function updatePreActionVisibility(state) {
     if (!state || !state.mySeatIndex && state.mySeatIndex !== 0) { hidePreActionBar(); return; }
     const me = state.players[state.mySeatIndex];
     if (me && !me.folded && !state.mySitout && state.currentPlayer !== state.mySeatIndex) {
-        ensurePreActionOverlay(state.mySeatIndex);
         showPreActionBar();
     } else {
         hidePreActionBar();
@@ -3277,26 +3253,21 @@ function addChatEntry(text, cls) {
     log.scrollTop = log.scrollHeight;
     while (log.children.length > 200) log.removeChild(log.firstChild);
     // Update unread badge if chat tab is not active
-    const chatTab = document.querySelector('.log-tab[data-tab="chat"]');
-    if (chatTab && !chatTab.classList.contains('active')) {
+    if (activeNavTab !== 'chat') {
         chatUnreadCount++;
         updateChatBadge();
     }
 }
 
 function updateChatBadge() {
-    const chatTab = document.querySelector('.log-tab[data-tab="chat"]');
-    if (!chatTab) return;
-    let badge = chatTab.querySelector('.chat-unread-badge');
-    if (chatUnreadCount > 0) {
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'chat-unread-badge';
-            chatTab.appendChild(badge);
+    const navBadge = document.getElementById('nav-chat-badge');
+    if (navBadge) {
+        if (chatUnreadCount > 0) {
+            navBadge.classList.remove('hidden');
+            navBadge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
+        } else {
+            navBadge.classList.add('hidden');
         }
-        badge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
-    } else if (badge) {
-        badge.remove();
     }
 }
 
@@ -3759,12 +3730,76 @@ function showGameChangeOverlay(state) {
         }, 400);
     }, 1800);
 
-    // Highlight banner
-    const banner = document.getElementById('table-game-banner');
-    if (banner) {
-        banner.classList.remove('banner-highlight');
-        void banner.offsetWidth; // force reflow for re-animation
-        banner.classList.add('banner-highlight');
-        setTimeout(() => banner.classList.remove('banner-highlight'), 1500);
+}
+
+// ==========================================
+// 案2: Ripple effect + vibration on action buttons
+// ==========================================
+function setupActionRipple() {
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-action');
+        if (!btn) return;
+
+        // Haptic feedback on mobile
+        if (navigator.vibrate) navigator.vibrate(30);
+
+        // Ripple effect
+        const rect = btn.getBoundingClientRect();
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+        btn.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove());
+    });
+}
+
+// ==========================================
+// 案3: Bottom Navigation Bar (3 tabs: chat/log/history)
+// ==========================================
+let activeNavTab = 'chat';
+
+function setupBottomNav() {
+    const nav = document.getElementById('bottom-nav');
+    if (!nav) return;
+
+    nav.addEventListener('click', (e) => {
+        const item = e.target.closest('.nav-item');
+        if (!item) return;
+        const tab = item.dataset.tab;
+        switchBottomTab(tab);
+    });
+}
+
+function switchBottomTab(tab) {
+    activeNavTab = tab;
+    const nav = document.getElementById('bottom-nav');
+    if (!nav) return;
+
+    // Update nav active state
+    nav.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+
+    // Switch panel views
+    document.querySelectorAll('#bottom-panel .panel-view').forEach(v => v.classList.remove('active'));
+    const targetView = document.getElementById('view-' + tab);
+    if (targetView) targetView.classList.add('active');
+
+    // Tab-specific actions
+    if (tab === 'chat') {
+        const chatLog = document.getElementById('chat-log');
+        if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+        chatUnreadCount = 0;
+        updateChatBadge();
+    } else if (tab === 'log') {
+        const gameLog = document.getElementById('game-log');
+        if (gameLog) gameLog.scrollTop = gameLog.scrollHeight;
+    } else if (tab === 'history') {
+        renderHandHistory('inline-hand-history');
     }
 }
+
+// Init 案2 + 案3
+setupActionRipple();
+setupBottomNav();

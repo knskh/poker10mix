@@ -170,6 +170,7 @@
                         <button id="btn-menu-history" class="menu-item">📋 ハンド履歴</button>
                         <button id="btn-focus-mode" class="menu-item">🎯 フォーカス OFF</button>
                         <button id="btn-theme-toggle" class="menu-item">🎨 テーマ</button>
+                        <button id="btn-preset-settings" class="menu-item">🎚️ プリセット設定</button>
                         <div id="game-rules-btn" class="menu-item" title="ルール表示">❓ ルール</div>
                     </div>
                 </div>
@@ -182,10 +183,27 @@
                 </div>
             </div>
 
+            <div id="preset-settings-modal" class="hidden">
+                <div id="preset-settings-inner">
+                    <h3>プリセット設定</h3>
+                    <div id="preset-tabs">
+                        <button class="preset-tab active" data-tab="preflop-open">Preflop Open</button>
+                        <button class="preset-tab" data-tab="preflop-raise">Facing Raise</button>
+                        <button class="preset-tab" data-tab="postflop">Postflop</button>
+                    </div>
+                    <div id="preset-edit-area"></div>
+                    <div class="preset-modal-actions">
+                        <button id="preset-reset-btn" class="btn-small">デフォルトに戻す</button>
+                        <button id="preset-save-btn" class="btn-small btn-primary">保存</button>
+                        <button id="preset-close-btn" class="btn-small">閉じる</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="turn-flash"></div>
             <div id="table-area">
                 <div id="table-container">
                     <div id="table-felt">
-                        <div id="table-game-banner"></div>
                         <div id="pot-display"></div>
                         <div id="table-info"></div>
                         <div id="community-cards" class="card-row"></div>
@@ -202,56 +220,60 @@
                 </div>
             </div>
 
-            <!-- Bottom area: log/chat (left) + actions (right) -->
+            <!-- Bottom area: panel + actions -->
             <div id="bottom-area">
-                <div id="log-panel">
-                    <div id="log-tab-bar">
-                        <button class="log-tab active" data-tab="log">ログ</button>
-                        <button class="log-tab" data-tab="chat">チャット</button>
-                        <button class="log-tab" data-tab="both">両方</button>
-                        <button class="log-tab log-tab-close" data-tab="none">✕</button>
-                        <button class="log-tab log-tab-expand" data-tab="expand">≡</button>
-                    </div>
-                    <div id="log-content">
-                        <div id="game-log"></div>
-                        <div id="chat-log" class="hidden"></div>
-                        <div class="chat-bar game-chat-bar hidden">
-                            <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                            <button id="btn-game-chat-send" class="btn-small">送信</button>
-                            <button id="btn-quick-chat" class="btn-small btn-quick-chat" title="クイックチャット">💬</button>
+                <div id="bottom-panel">
+                    <div class="panel-content">
+                        <!-- Chat View -->
+                        <div class="panel-view active" id="view-chat">
+                            <div id="chat-log"></div>
+                            <div class="chat-bar game-chat-bar">
+                                <input type="text" id="game-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                                <button id="btn-game-chat-send" class="btn-small">送信</button>
+                                <button id="btn-quick-chat" class="btn-small btn-quick-chat" title="クイックチャット">💬</button>
+                            </div>
+                            <div id="quick-chat-palette" class="hidden">
+                                <div class="qc-category">
+                                    <div class="qc-label">挨拶</div>
+                                    <div class="qc-items">
+                                        <button class="qc-btn" data-msg="よろしく！">よろしく！</button>
+                                        <button class="qc-btn" data-msg="gg">gg</button>
+                                        <button class="qc-btn" data-msg="またね！">またね！</button>
+                                        <button class="qc-btn" data-msg="おつかれ！">おつかれ！</button>
+                                    </div>
+                                </div>
+                                <div class="qc-category">
+                                    <div class="qc-label">リアクション</div>
+                                    <div class="qc-items">
+                                        <button class="qc-btn" data-msg="ナイスハンド！">ナイスハンド！</button>
+                                        <button class="qc-btn" data-msg="えぐい…">えぐい…</button>
+                                        <button class="qc-btn" data-msg="すごい！">すごい！</button>
+                                        <button class="qc-btn" data-msg="こわ！">こわ！</button>
+                                    </div>
+                                </div>
+                                <div class="qc-category">
+                                    <div class="qc-label">プレイ中</div>
+                                    <div class="qc-items">
+                                        <button class="qc-btn" data-msg="ラッキー">ラッキー</button>
+                                        <button class="qc-btn" data-msg="しょうがない">しょうがない</button>
+                                        <button class="qc-btn" data-msg="ナイスブラフ！">ナイスブラフ！</button>
+                                        <button class="qc-btn" data-msg="どんまい">どんまい</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div id="quick-chat-palette" class="hidden">
-                            <div class="qc-category">
-                                <div class="qc-label">挨拶</div>
-                                <div class="qc-items">
-                                    <button class="qc-btn" data-msg="よろしく！">よろしく！</button>
-                                    <button class="qc-btn" data-msg="gg">gg</button>
-                                    <button class="qc-btn" data-msg="またね！">またね！</button>
-                                    <button class="qc-btn" data-msg="おつかれ！">おつかれ！</button>
-                                </div>
-                            </div>
-                            <div class="qc-category">
-                                <div class="qc-label">リアクション</div>
-                                <div class="qc-items">
-                                    <button class="qc-btn" data-msg="ナイスハンド！">ナイスハンド！</button>
-                                    <button class="qc-btn" data-msg="えぐい…">えぐい…</button>
-                                    <button class="qc-btn" data-msg="すごい！">すごい！</button>
-                                    <button class="qc-btn" data-msg="こわ！">こわ！</button>
-                                </div>
-                            </div>
-                            <div class="qc-category">
-                                <div class="qc-label">プレイ中</div>
-                                <div class="qc-items">
-                                    <button class="qc-btn" data-msg="ラッキー">ラッキー</button>
-                                    <button class="qc-btn" data-msg="しょうがない">しょうがない</button>
-                                    <button class="qc-btn" data-msg="ナイスブラフ！">ナイスブラフ！</button>
-                                    <button class="qc-btn" data-msg="どんまい">どんまい</button>
-                                </div>
-                            </div>
+                        <!-- Log View -->
+                        <div class="panel-view" id="view-log">
+                            <div id="game-log"></div>
+                        </div>
+                        <!-- History View -->
+                        <div class="panel-view" id="view-history">
+                            <div id="inline-hand-history" class="hand-history-list"></div>
                         </div>
                     </div>
                 </div>
                 <div id="action-panel">
+                    <div id="pre-action-bar" class="hidden"></div>
                     <div id="action-bar" class="hidden">
                         <div id="bet-presets" class="hidden"></div>
                         <div id="bet-slider-area" class="hidden">
@@ -269,6 +291,19 @@
                     </div>
                 </div>
             </div>
+
+            <nav id="bottom-nav">
+                <button class="nav-item active" data-tab="chat">
+                    <span class="nav-icon">💬</span><span class="nav-label">チャット</span>
+                    <span class="nav-badge hidden" id="nav-chat-badge">0</span>
+                </button>
+                <button class="nav-item" data-tab="log">
+                    <span class="nav-icon">📋</span><span class="nav-label">ログ</span>
+                </button>
+                <button class="nav-item" data-tab="history">
+                    <span class="nav-icon">🕐</span><span class="nav-label">履歴</span>
+                </button>
+            </nav>
 
             <!-- Emote picker -->
             <div id="emote-picker" class="hidden">
