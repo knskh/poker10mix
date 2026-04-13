@@ -673,8 +673,7 @@ function handleMessage(ws, client, msg) {
             const p = room.game.players[seat];
             // Only allow rebuy when folded (between hands)
             if (!p.folded) break;
-            const bb = room.game.bigBlind || 100;
-            const rebuyAmount = bb * 100;
+            const rebuyAmount = 10000;
             if (p.chips >= rebuyAmount) break;
             p.chips = rebuyAmount;
             broadcastLog(room, `${client.name} がチップを補充しました (${rebuyAmount.toLocaleString()})`, 'important');
