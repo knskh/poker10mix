@@ -2578,17 +2578,19 @@ body {
 }
 
 /* --- Mobile (default): pills visible, side-panel replaces action-col --- */
-/* When side-panel is open on mobile, hide action-col */
+/* When side-panel is open on mobile, hide action-col and give panel height */
+#action-panel.sp-open { height: 40vh; max-height: 280px; }
 #action-panel.sp-open #action-col { display: none; }
-#action-panel.sp-open #side-panel { flex: 1; }
+#action-panel.sp-open #side-panel { flex: 1; min-height: 0; }
 
 /* --- PC (≥768px): side-by-side layout --- */
 @media (min-width: 768px) {
     #side-pills { display: none; }
+    #action-panel { height: 200px; }
     #side-panel {
         display: flex !important; /* always visible on PC */
         flex: 1; border-right: 1px solid rgba(255,255,255,0.08);
-        max-width: 50%;
+        max-width: 50%; min-height: 0;
     }
     #side-panel-close { display: none; }
     #action-col { flex: 1; }
