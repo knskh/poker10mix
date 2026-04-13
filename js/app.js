@@ -722,55 +722,7 @@ function renderRoom(room) {
 // Game Screen
 // ==========================================
 function setupGameScreen() {
-    // Log/Chat tab switching
-    document.querySelectorAll('.log-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const mode = tab.dataset.tab;
-            const logPanel = document.getElementById('log-panel');
-            const gameLog = document.getElementById('game-log');
-            const chatLog = document.getElementById('chat-log');
-            const chatBar = document.querySelector('.game-chat-bar');
-
-            if (mode === 'none') {
-                // Collapse: hide content + tab labels, show only expand button
-                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                logPanel.classList.add('collapsed');
-            } else if (logPanel.classList.contains('collapsed') && mode === 'expand') {
-                // Expand from collapsed state — restore last active tab (default: log)
-                logPanel.classList.remove('collapsed');
-                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-                const logTab = document.querySelector('.log-tab[data-tab="log"]');
-                logTab.classList.add('active');
-                gameLog.classList.remove('hidden');
-                chatLog.classList.add('hidden');
-                chatBar.classList.add('hidden');
-            } else {
-                // Normal tab switch
-                logPanel.classList.remove('collapsed');
-                document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-
-                if (mode === 'log') {
-                    gameLog.classList.remove('hidden');
-                    chatLog.classList.add('hidden');
-                    chatBar.classList.add('hidden');
-                } else if (mode === 'chat') {
-                    gameLog.classList.add('hidden');
-                    chatLog.classList.remove('hidden');
-                    chatBar.classList.remove('hidden');
-                    chatLog.scrollTop = chatLog.scrollHeight;
-                    // Clear unread badge
-                    chatUnreadCount = 0;
-                    updateChatBadge();
-                } else if (mode === 'both') {
-                    gameLog.classList.remove('hidden');
-                    chatLog.classList.add('hidden');
-                    chatBar.classList.remove('hidden');
-                }
-            }
-        });
-    });
+    // Bottom nav panel switching is handled in setupBottomNav()
 
     // Sound toggle button
     const soundBtn = document.getElementById('btn-sound-toggle');
@@ -3301,28 +3253,13 @@ function addChatEntry(text, cls) {
     log.scrollTop = log.scrollHeight;
     while (log.children.length > 200) log.removeChild(log.firstChild);
     // Update unread badge if chat tab is not active
-    const chatTab = document.querySelector('.log-tab[data-tab="chat"]');
-    if (chatTab && !chatTab.classList.contains('active')) {
+    if (activeNavTab !== 'chat') {
         chatUnreadCount++;
         updateChatBadge();
     }
 }
 
 function updateChatBadge() {
-    const chatTab = document.querySelector('.log-tab[data-tab="chat"]');
-    if (!chatTab) return;
-    let badge = chatTab.querySelector('.chat-unread-badge');
-    if (chatUnreadCount > 0) {
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'chat-unread-badge';
-            chatTab.appendChild(badge);
-        }
-        badge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
-    } else if (badge) {
-        badge.remove();
-    }
-    // Sync bottom nav chat badge
     const navBadge = document.getElementById('nav-chat-badge');
     if (navBadge) {
         if (chatUnreadCount > 0) {
@@ -3820,68 +3757,47 @@ function setupActionRipple() {
 }
 
 // ==========================================
-// 案3: Bottom Navigation Bar (mobile)
+// 案3: Bottom Navigation Bar (3 tabs: chat/log/history)
 // ==========================================
+let activeNavTab = 'chat';
+
 function setupBottomNav() {
     const nav = document.getElementById('bottom-nav');
     if (!nav) return;
 
-    function updateNavVisibility() {
-        const gameScreen = document.getElementById('game-screen');
-        const isMobile = window.innerWidth <= 600;
-        if (isMobile && gameScreen && !gameScreen.classList.contains('hidden')) {
-            nav.classList.add('visible');
-        } else {
-            nav.classList.remove('visible');
-        }
-    }
-
-    window.addEventListener('resize', updateNavVisibility);
-
-    // Observe game-screen visibility changes
-    const observer = new MutationObserver(updateNavVisibility);
-    const gameScreen = document.getElementById('game-screen');
-    if (gameScreen) observer.observe(gameScreen, { attributes: true, attributeFilter: ['class'] });
-
-    // Tab switching
     nav.addEventListener('click', (e) => {
         const item = e.target.closest('.nav-item');
         if (!item) return;
         const tab = item.dataset.tab;
-
-        // Update active state
-        nav.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        item.classList.add('active');
-
-        switch (tab) {
-            case 'table':
-                // Show table, hide any modals opened by nav
-                document.getElementById('stats-modal')?.classList.add('hidden');
-                document.getElementById('history-modal')?.classList.add('hidden');
-                break;
-            case 'chat':
-                // Switch log panel to chat tab
-                const chatLogTab = document.querySelector('.log-tab[data-tab="chat"]');
-                if (chatLogTab) chatLogTab.click();
-                break;
-            case 'history':
-                // Open hand history modal
-                renderHandHistory('lobby-hand-history');
-                document.getElementById('history-modal')?.classList.remove('hidden');
-                break;
-            case 'stats':
-                // Open stats modal
-                client.getStats();
-                document.getElementById('stats-modal')?.classList.remove('hidden');
-                break;
-            case 'settings':
-                // Toggle hamburger menu
-                document.getElementById('top-bar-menu')?.classList.toggle('hidden');
-                break;
-        }
+        switchBottomTab(tab);
     });
+}
 
-    updateNavVisibility();
+function switchBottomTab(tab) {
+    activeNavTab = tab;
+    const nav = document.getElementById('bottom-nav');
+    if (!nav) return;
+
+    // Update nav active state
+    nav.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+
+    // Switch panel views
+    document.querySelectorAll('#bottom-panel .panel-view').forEach(v => v.classList.remove('active'));
+    const targetView = document.getElementById('view-' + tab);
+    if (targetView) targetView.classList.add('active');
+
+    // Tab-specific actions
+    if (tab === 'chat') {
+        const chatLog = document.getElementById('chat-log');
+        if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+        chatUnreadCount = 0;
+        updateChatBadge();
+    } else if (tab === 'log') {
+        const gameLog = document.getElementById('game-log');
+        if (gameLog) gameLog.scrollTop = gameLog.scrollHeight;
+    } else if (tab === 'history') {
+        renderHandHistory('inline-hand-history');
+    }
 }
 
 // Init 案2 + 案3
