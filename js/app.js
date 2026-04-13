@@ -1088,7 +1088,7 @@ function renderRoom(room) {
 // Game Screen
 // ==========================================
 function setupGameScreen() {
-    // Bottom nav panel switching is handled in setupBottomNav()
+    // Overlay panel (chat/log) is handled in setupOverlayPanel()
 
     // Sound toggle button
     const soundBtn = document.getElementById('btn-sound-toggle');
@@ -3590,21 +3590,21 @@ function addChatEntry(text, cls) {
     log.appendChild(entry);
     log.scrollTop = log.scrollHeight;
     while (log.children.length > 200) log.removeChild(log.firstChild);
-    // Update unread badge if chat tab is not active
-    if (activeNavTab !== 'chat') {
+    // Update unread badge if chat panel is not open
+    if (activeOverlayPanel !== 'chat') {
         chatUnreadCount++;
         updateChatBadge();
     }
 }
 
 function updateChatBadge() {
-    const navBadge = document.getElementById('nav-chat-badge');
-    if (navBadge) {
+    const badge = document.getElementById('top-chat-badge');
+    if (badge) {
         if (chatUnreadCount > 0) {
-            navBadge.classList.remove('hidden');
-            navBadge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
+            badge.classList.remove('hidden');
+            badge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
         } else {
-            navBadge.classList.add('hidden');
+            badge.classList.add('hidden');
         }
     }
 }
@@ -4069,49 +4069,61 @@ function setupActionRipple() {
 }
 
 // ==========================================
-// 案3: Bottom Navigation Bar (3 tabs: chat/log/history)
+// Overlay Panel (chat / log) — top-bar icon buttons
 // ==========================================
-let activeNavTab = 'chat';
+let activeOverlayPanel = null; // 'chat' | 'log' | null
 
-function setupBottomNav() {
-    const nav = document.getElementById('bottom-nav');
-    if (!nav) return;
+function openOverlayPanel(panel) {
+    if (activeOverlayPanel === panel) {
+        closeOverlayPanel();
+        return;
+    }
+    activeOverlayPanel = panel;
+    const bg = document.getElementById('overlay-panel-bg');
+    const overlay = document.getElementById('overlay-panel');
+    const title = document.getElementById('overlay-panel-title');
+    bg.classList.remove('hidden');
+    overlay.classList.remove('hidden');
 
-    nav.addEventListener('click', (e) => {
-        const item = e.target.closest('.nav-item');
-        if (!item) return;
-        const tab = item.dataset.tab;
-        switchBottomTab(tab);
-    });
-}
+    // Switch views
+    document.querySelectorAll('.overlay-view').forEach(v => v.classList.add('hidden'));
+    const target = document.getElementById('ov-' + panel);
+    if (target) target.classList.remove('hidden');
 
-function switchBottomTab(tab) {
-    activeNavTab = tab;
-    const nav = document.getElementById('bottom-nav');
-    if (!nav) return;
+    // Title
+    title.textContent = panel === 'chat' ? 'チャット' : 'ログ';
 
-    // Update nav active state
-    nav.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+    // Highlight active icon
+    document.getElementById('btn-open-chat').classList.toggle('panel-open', panel === 'chat');
+    document.getElementById('btn-open-log').classList.toggle('panel-open', panel === 'log');
 
-    // Switch panel views
-    document.querySelectorAll('#bottom-panel .panel-view').forEach(v => v.classList.remove('active'));
-    const targetView = document.getElementById('view-' + tab);
-    if (targetView) targetView.classList.add('active');
-
-    // Tab-specific actions
-    if (tab === 'chat') {
+    // Panel-specific actions
+    if (panel === 'chat') {
         const chatLog = document.getElementById('chat-log');
-        if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+        if (chatLog) setTimeout(() => chatLog.scrollTop = chatLog.scrollHeight, 50);
         chatUnreadCount = 0;
         updateChatBadge();
-    } else if (tab === 'log') {
+    } else if (panel === 'log') {
         const gameLog = document.getElementById('game-log');
-        if (gameLog) gameLog.scrollTop = gameLog.scrollHeight;
-    } else if (tab === 'history') {
-        renderHandHistory('inline-hand-history');
+        if (gameLog) setTimeout(() => gameLog.scrollTop = gameLog.scrollHeight, 50);
     }
 }
 
-// Init 案2 + 案3
+function closeOverlayPanel() {
+    activeOverlayPanel = null;
+    document.getElementById('overlay-panel-bg').classList.add('hidden');
+    document.getElementById('overlay-panel').classList.add('hidden');
+    document.getElementById('btn-open-chat').classList.remove('panel-open');
+    document.getElementById('btn-open-log').classList.remove('panel-open');
+}
+
+function setupOverlayPanel() {
+    document.getElementById('btn-open-chat').addEventListener('click', () => openOverlayPanel('chat'));
+    document.getElementById('btn-open-log').addEventListener('click', () => openOverlayPanel('log'));
+    document.getElementById('overlay-panel-close').addEventListener('click', closeOverlayPanel);
+    document.getElementById('overlay-panel-bg').addEventListener('click', closeOverlayPanel);
+}
+
+// Init
 setupActionRipple();
-setupBottomNav();
+setupOverlayPanel();

@@ -561,7 +561,7 @@ body {
 #game-rotation { font-size: 13px; color: var(--text-dim); }
 
 /* Hamburger menu */
-#top-bar-menu-wrap { position: relative; margin-left: auto; }
+#top-bar-menu-wrap { position: relative; }
 #btn-hamburger { font-size: 16px; padding: 4px 10px; }
 #top-bar-menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px;
@@ -1203,42 +1203,9 @@ body {
 
 /* === Action Bar === */
 /* === Bottom Area: panel + actions === */
-#bottom-area {
-    display: flex; flex-direction: row; flex-shrink: 0;
-    background: #111318; border-top: 1px solid #2a2d35;
-    min-height: 80px; max-height: 200px;
-    flex: 0 1 auto;
-    overflow: hidden;
-}
-
-/* Bottom Panel (replaces log-panel) */
-#bottom-panel {
-    flex: 0 0 50%;
-    display: flex; flex-direction: column;
-    border-right: 1px solid #2a2d35;
-    overflow: hidden;
-    min-width: 0;
-}
-.panel-content {
-    flex: 1; display: flex; flex-direction: column;
-    overflow: hidden; min-height: 0;
-    position: relative;
-}
-.panel-view {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.2s;
-    overflow: hidden;
-}
-.panel-view.active {
-    position: relative;
-    opacity: 1; pointer-events: auto;
-    flex: 1;
-}
-
+/* Action panel (fixed to bottom) */
 #action-panel {
-    flex: 1; display: flex; flex-direction: column;
+    flex-shrink: 0; display: flex; flex-direction: column;
     justify-content: center; overflow: hidden;
 }
 
@@ -1593,8 +1560,6 @@ body {
 /* Focus Mode — hide social/distraction elements */
 .focus-mode #btn-quick-chat,
 .focus-mode #quick-chat-palette,
-.focus-mode .log-tab[data-tab="chat"],
-.focus-mode .log-tab[data-tab="both"],
 .focus-mode .reaction-bar,
 .focus-mode .emote-float,
 .focus-mode .quick-chat-float {
@@ -2015,7 +1980,6 @@ body {
 
     /* Game Log */
     #game-log { height: auto; padding: 4px 8px; font-size: 10px; }
-    #bottom-panel { flex-basis: 45%; }
     .btn-action { padding: 13px 16px; font-size: 15px; }
 
     /* Chat */
@@ -2087,7 +2051,6 @@ body {
     #player-cards .card-suit { font-size: 12px; }
     #player-hand { height: 66px; margin-top: 36px; }
     #game-log { height: auto; font-size: 9px; }
-    #bottom-panel { flex-basis: 42%; }
     .btn-action { padding: 12px 12px; font-size: 14px; }
 }
 
@@ -2104,7 +2067,6 @@ body {
     #player-cards .card-rank { font-size: 14px; }
     #player-cards .card-suit { font-size: 12px; }
     #game-log { height: auto; font-size: 9px; }
-    #bottom-panel { width: 110px; }
     #table-felt { margin: 10px 0 2px; }
 
     .btn-action { padding: 8px 12px; font-size: 13px; }
@@ -2563,39 +2525,66 @@ body {
 /* ==========================================
    案3: Bottom Navigation Bar (mobile)
    ========================================== */
-#bottom-nav {
-    display: flex;
-    flex-shrink: 0;
-    background: #0d0f14;
-    border-top: 1px solid #2a2d35;
-    padding: 2px 0 env(safe-area-inset-bottom, 2px);
-    min-height: 32px;
-    z-index: 10;
+/* Top bar icon buttons (chat, log) */
+#top-bar-icons {
+    display: flex; gap: 4px; margin-left: auto; margin-right: 6px;
 }
-.nav-item {
-    flex: 1; display: flex; flex-direction: column; align-items: center;
-    gap: 1px; padding: 5px 4px;
-    font-size: 9px; color: #666;
-    cursor: pointer; transition: all 0.2s;
-    background: none; border: none;
+.top-icon-btn {
     position: relative;
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    font-size: 15px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    transition: background 0.15s;
 }
-.nav-item:active { transform: scale(0.92); }
-.nav-item .nav-icon { font-size: 16px; line-height: 1; }
-.nav-item .nav-label { font-weight: 500; }
-.nav-item.active { color: var(--accent); }
-.nav-item.active::after {
-    content: '';
-    position: absolute; top: 0; left: 25%; right: 25%;
-    height: 2px; border-radius: 1px;
-    background: var(--accent);
-}
-.nav-badge {
-    position: absolute; top: 1px; right: 50%; transform: translateX(14px);
+.top-icon-btn:active { background: rgba(255,255,255,0.1); }
+.top-icon-btn.panel-open { background: rgba(0,191,255,0.15); border-color: rgba(0,191,255,0.3); }
+.top-icon-badge {
+    position: absolute; top: -3px; right: -3px;
     background: #ef5350; color: #fff;
-    font-size: 8px; font-weight: 700;
-    min-width: 14px; height: 14px;
-    border-radius: 7px; display: flex; align-items: center; justify-content: center;
-    padding: 0 3px;
+    font-size: 7px; font-weight: 800;
+    min-width: 14px; height: 14px; line-height: 14px;
+    border-radius: 7px; text-align: center; padding: 0 3px;
 }
-.nav-badge.hidden { display: none; }
+.top-icon-badge.hidden { display: none; }
+
+/* Overlay panel */
+#overlay-panel-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 60;
+}
+#overlay-panel-bg.hidden { display: none; }
+#overlay-panel {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 50%; max-height: 360px;
+    background: #111318; border-top: 2px solid rgba(0,191,255,0.2);
+    border-radius: 14px 14px 0 0;
+    z-index: 61; display: flex; flex-direction: column;
+    transform: translateY(0);
+    transition: transform 0.25s ease;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+}
+#overlay-panel.hidden { transform: translateY(100%); pointer-events: none; }
+#overlay-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#overlay-panel-title {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+}
+#overlay-panel-close {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: none; background: rgba(255,255,255,0.06);
+    color: #888; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+#overlay-panel-close:active { background: rgba(255,255,255,0.12); }
+#overlay-panel-body {
+    flex: 1; overflow: hidden; display: flex; flex-direction: column;
+    min-height: 0;
+}
+.overlay-view {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
+}
+.overlay-view.hidden { display: none; }
