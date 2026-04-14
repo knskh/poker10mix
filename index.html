@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=40">
+    <link rel="stylesheet" href="css/style.css?v=41">
 </head>
 <body>
     <div id="app">
@@ -114,13 +114,13 @@
                     <h3>プレイしたいゲームを選択</h3>
                     <div id="room-game-checkboxes"></div>
                     <div class="lobby-options">
-                        <label>開始チップ: <select id="room-starting-chips">
-                            <option value="5000">5,000</option>
-                            <option value="10000" selected>10,000</option>
-                            <option value="20000">20,000</option>
-                            <option value="50000">50,000</option>
-                        </select></label>
+                        <span class="starting-chips-fixed">開始チップ: 10,000</span>
+                        <label id="lock-toggle-label" class="lock-toggle-label hidden">
+                            <input type="checkbox" id="room-lock-toggle">
+                            <span class="lock-toggle-text">🔓 承認制テーブル</span>
+                        </label>
                     </div>
+                    <div id="pending-joins" class="pending-joins hidden"></div>
                     <button id="btn-start-game" class="btn-primary btn-large">ゲーム開始</button>
                 </div>
                 <div id="room-waiting-msg" class="room-waiting" style="display:none">

@@ -613,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     client.on('room_joined', (msg) => {
+        hideJoinPendingOverlay(); // Dismiss pending overlay on successful join
         const rid = msg.roomId || msg.room.id;
         getOrCreateTable(rid);
         // If this is the first or only table, or we're in lobby, make it active
@@ -771,6 +772,38 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('10分間離席のため自動退室されました');
         showScreen('lobby');
     });
+
+    // 承認制テーブル: 参加リクエスト送信後の待機
+    client.on('join_pending', (msg) => {
+        showJoinPendingOverlay(msg.roomId);
+    });
+    client.on('join_rejected', (msg) => {
+        hideJoinPendingOverlay();
+        alert(msg.reason || '参加が拒否されました');
+    });
+    client.on('join_cancelled', () => {
+        hideJoinPendingOverlay();
+    });
+    // ホスト側: 参加リクエスト通知 (ゲーム中にも受信)
+    client.on('join_request', (msg) => {
+        // If on room screen, re-render pending joins
+        if (currentRoom && currentRoom.id === msg.roomId) {
+            if (!currentRoom.pendingJoins) currentRoom.pendingJoins = [];
+            if (!currentRoom.pendingJoins.some(p => p.clientId === msg.clientId)) {
+                currentRoom.pendingJoins.push({ clientId: msg.clientId, name: msg.name, avatar: msg.avatar });
+            }
+            renderPendingJoins(currentRoom);
+        }
+        // Also show notification if in game screen
+        showJoinRequestNotification(msg);
+    });
+    client.on('join_request_cancelled', (msg) => {
+        if (currentRoom && currentRoom.id === msg.roomId && currentRoom.pendingJoins) {
+            currentRoom.pendingJoins = currentRoom.pendingJoins.filter(p => p.clientId !== msg.clientId);
+            renderPendingJoins(currentRoom);
+        }
+    });
+
     client.on('error', (msg) => alert(msg));
 });
 
@@ -1005,7 +1038,7 @@ function renderRoomList(data) {
 
         card.innerHTML = `
             <div class="room-card-header">
-                <span class="room-card-id">${r.id}</span>
+                <span class="room-card-id">${r.locked ? '🔓 ' : ''}${r.id}</span>
                 <span class="room-card-status ${statusCls}">${statusText}</span>
             </div>
             <div class="room-card-host">
@@ -1074,15 +1107,16 @@ function setupRoomScreen() {
         container.appendChild(label);
     });
 
-    document.getElementById('room-starting-chips').addEventListener('change', (e) => {
-        client.updateSettings({ startingChips: parseInt(e.target.value) });
-    });
-
     document.getElementById('btn-start-game').addEventListener('click', () => client.startGame(activeTableId));
     document.getElementById('btn-leave-room').addEventListener('click', () => {
         client.leaveRoom(activeTableId);
         if (activeTableId) removeTable(activeTableId);
         else showScreen('lobby');
+    });
+
+    // Lock toggle (承認制テーブル)
+    document.getElementById('room-lock-toggle').addEventListener('change', (e) => {
+        client.toggleLock(e.target.checked, activeTableId);
     });
 }
 
@@ -1160,17 +1194,122 @@ function renderRoom(room) {
         }
     });
 
-    // Host-only: starting chips + start button
+    // Host-only: start button
     const isHost = room.hostId === client.clientId;
     document.getElementById('btn-start-game').style.display = isHost ? '' : 'none';
-    const chipsLabel = document.getElementById('room-starting-chips')?.closest('label');
-    if (chipsLabel) chipsLabel.style.display = isHost ? '' : 'none';
     document.getElementById('room-waiting-msg').style.display = isHost ? 'none' : 'block';
     document.getElementById('room-host-controls').style.display = 'block';
 
-    if (room.settings) {
-        document.getElementById('room-starting-chips').value = room.settings.startingChips;
+    // Lock toggle: only for non-guest hosts
+    const lockLabel = document.getElementById('lock-toggle-label');
+    const lockToggle = document.getElementById('room-lock-toggle');
+    if (isHost && loggedInAccount) {
+        lockLabel.classList.remove('hidden');
+        lockToggle.checked = !!room.locked;
+    } else {
+        lockLabel.classList.add('hidden');
     }
+
+    // Render pending join requests (host only)
+    renderPendingJoins(room);
+}
+
+// ==========================================
+// Join Pending Overlay (参加リクエスト待機)
+// ==========================================
+let joinPendingRoomId = null;
+
+function showJoinPendingOverlay(roomId) {
+    joinPendingRoomId = roomId;
+    let overlay = document.getElementById('join-pending-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'join-pending-overlay';
+        overlay.className = 'join-pending-overlay';
+        overlay.innerHTML = `
+            <div class="join-pending-box">
+                <div class="join-pending-spinner"></div>
+                <p>参加リクエストを送信しました</p>
+                <p class="join-pending-sub">ホストの承認を待っています...</p>
+                <button id="btn-cancel-join" class="btn-small btn-danger">キャンセル</button>
+            </div>
+        `;
+        document.getElementById('app').appendChild(overlay);
+        document.getElementById('btn-cancel-join').addEventListener('click', () => {
+            if (joinPendingRoomId) client.cancelJoin(joinPendingRoomId);
+            hideJoinPendingOverlay();
+        });
+    }
+    overlay.classList.remove('hidden');
+}
+
+function hideJoinPendingOverlay() {
+    joinPendingRoomId = null;
+    const overlay = document.getElementById('join-pending-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+// ==========================================
+// Join Request Notification (ホスト側通知)
+// ==========================================
+function showJoinRequestNotification(msg) {
+    // Remove existing notification for same player
+    const existing = document.querySelector(`.join-notif[data-cid="${msg.clientId}"]`);
+    if (existing) existing.remove();
+
+    const notif = document.createElement('div');
+    notif.className = 'join-notif';
+    notif.dataset.cid = msg.clientId;
+    const avatarHtml = msg.avatar
+        ? `<img class="join-notif-avatar" src="avatars/${msg.avatar}.svg" alt="">`
+        : '';
+    notif.innerHTML = `
+        ${avatarHtml}
+        <span class="join-notif-text"><b>${msg.name}</b> が参加を希望</span>
+        <button class="btn-small btn-approve join-notif-approve">承認</button>
+        <button class="btn-small btn-danger join-notif-reject">拒否</button>
+    `;
+    notif.querySelector('.join-notif-approve').addEventListener('click', () => {
+        client.approveJoin(msg.clientId, msg.roomId);
+        notif.remove();
+    });
+    notif.querySelector('.join-notif-reject').addEventListener('click', () => {
+        client.rejectJoin(msg.clientId, msg.roomId);
+        notif.remove();
+    });
+    document.getElementById('app').appendChild(notif);
+    // Auto-remove after 30 seconds
+    setTimeout(() => { if (notif.parentNode) notif.remove(); }, 30000);
+}
+
+function renderPendingJoins(room) {
+    const container = document.getElementById('pending-joins');
+    const isHost = room.hostId === client.clientId;
+    if (!isHost || !room.pendingJoins || room.pendingJoins.length === 0) {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+    }
+    container.classList.remove('hidden');
+    container.innerHTML = `<h3>参加リクエスト (${room.pendingJoins.length})</h3>` +
+        room.pendingJoins.map(p => {
+            const avatarHtml = p.avatar
+                ? `<img class="pending-avatar" src="avatars/${p.avatar}.svg" alt="">`
+                : `<span class="pending-avatar-initial">${(p.name || '?').charAt(0).toUpperCase()}</span>`;
+            return `<div class="pending-join-item">
+                ${avatarHtml}
+                <span class="pending-join-name">${p.name}</span>
+                <button class="btn-small btn-approve" data-id="${p.clientId}">承認</button>
+                <button class="btn-small btn-danger btn-reject" data-id="${p.clientId}">拒否</button>
+            </div>`;
+        }).join('');
+
+    container.querySelectorAll('.btn-approve').forEach(btn => {
+        btn.addEventListener('click', () => client.approveJoin(parseInt(btn.dataset.id), activeTableId));
+    });
+    container.querySelectorAll('.btn-reject').forEach(btn => {
+        btn.addEventListener('click', () => client.rejectJoin(parseInt(btn.dataset.id), activeTableId));
+    });
 }
 
 // ==========================================

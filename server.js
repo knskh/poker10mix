@@ -174,6 +174,8 @@ class Room {
         this.pending = null; // { type, playerId, resolve, timer }
         this.seatMap = {};   // clientId -> seatIndex
         this.stats = new StatsTracker();
+        this.locked = false; // 承認制テーブル
+        this.pendingJoins = []; // [{ clientId, name, avatar, ws }]
     }
 
     // Intersection of all members' selected games (only games everyone wants)
@@ -214,6 +216,8 @@ class Room {
             mergedGames: this.getMergedGames(),
             playing: this.playing,
             playerCount: this.members.length,
+            locked: this.locked,
+            pendingJoins: this.pendingJoins.map(p => ({ clientId: p.clientId, name: p.name, avatar: p.avatar })),
         };
     }
 }
@@ -248,7 +252,9 @@ function broadcastRoomList() {
         hostAvatar: r.members[0]?.avatar || null,
         playerCount: r.members.length, playing: r.playing,
         gameName: r.game?.gameConfig?.name || '',
-        mergedGames: r.getMergedGames()
+        mergedGames: r.getMergedGames(),
+        locked: r.locked,
+        pendingCount: r.pendingJoins.length
     }));
     for (const [ws] of clients) {
         send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
@@ -493,6 +499,30 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(msg.roomId);
             if (!room) { send(ws, { type: 'error', message: 'ルームが見つかりません' }); return; }
             if (room.members.length >= 6) { send(ws, { type: 'error', message: 'ルームが満員です' }); return; }
+
+            // 承認制テーブル: ホスト承認待ちキューに追加
+            if (room.locked && room.hostId !== client.id) {
+                // Already pending?
+                if (room.pendingJoins.some(p => p.clientId === client.id)) {
+                    send(ws, { type: 'error', message: 'すでに参加リクエスト送信済みです' }); return;
+                }
+                room.pendingJoins.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
+                send(ws, { type: 'join_pending', roomId: room.id, roomName: room.id });
+                // ホストに通知
+                const hostMember = room.members.find(m => m.clientId === room.hostId);
+                if (hostMember) {
+                    send(hostMember.ws, {
+                        type: 'join_request',
+                        roomId: room.id,
+                        clientId: client.id,
+                        name: client.name,
+                        avatar: client.avatar,
+                        pendingCount: room.pendingJoins.length
+                    });
+                }
+                break;
+            }
+
             room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
             client.roomId = room.id;
             if (!client.roomIds.includes(room.id)) client.roomIds.push(room.id);
@@ -585,10 +615,131 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(msg.roomId || client.roomId);
             if (!room || room.playing) return;
             if (msg.settings) {
-                // Only host can change startingChips
-                if (msg.settings.startingChips && room.hostId === client.id) {
-                    room.settings.startingChips = msg.settings.startingChips;
+                // startingChips is fixed at 10000
+            }
+            broadcastRoomUpdate(room);
+            break;
+        }
+
+        case 'toggle_lock': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room) return;
+            if (room.hostId !== client.id) { send(ws, { type: 'error', message: 'ホストのみ変更できます' }); return; }
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではこの機能は使用できません' }); return; }
+            room.locked = !!msg.locked;
+            // If unlocking, auto-approve all pending joins
+            if (!room.locked && room.pendingJoins.length > 0) {
+                for (const pj of room.pendingJoins) {
+                    send(pj.ws, { type: 'join_rejected', roomId: room.id, reason: 'ロックが解除されました。再度参加してください。' });
                 }
+                room.pendingJoins = [];
+            }
+            broadcastRoomUpdate(room);
+            broadcastRoomList();
+            break;
+        }
+
+        case 'approve_join': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room) return;
+            if (room.hostId !== client.id) return;
+            const idx = room.pendingJoins.findIndex(p => p.clientId === msg.targetId);
+            if (idx < 0) { send(ws, { type: 'error', message: 'リクエストが見つかりません' }); return; }
+            const pj = room.pendingJoins.splice(idx, 1)[0];
+            if (room.members.length >= 6) {
+                send(pj.ws, { type: 'join_rejected', roomId: room.id, reason: 'ルームが満員です' });
+                broadcastRoomUpdate(room);
+                break;
+            }
+            // Find the pending client data
+            const pjClient = clients.get(pj.ws);
+            if (!pjClient) { broadcastRoomUpdate(room); break; }
+            // Add to room
+            room.members.push({ clientId: pj.clientId, name: pj.name, avatar: pj.avatar, ws: pj.ws });
+            pjClient.roomId = room.id;
+            if (!pjClient.roomIds.includes(room.id)) pjClient.roomIds.push(room.id);
+
+            // Handle mid-join if game is in progress
+            let midJoinSeat = undefined;
+            if (room.playing && room.game) {
+                let seatIdx = -1;
+                let isReturning = false;
+                if (room.disconnectedPlayers && room.disconnectedPlayers[pj.name]) {
+                    seatIdx = room.disconnectedPlayers[pj.name].seat;
+                    delete room.disconnectedPlayers[pj.name];
+                    isReturning = true;
+                }
+                if (seatIdx < 0) seatIdx = room.game.players.findIndex(p => !p.connected && p.chips <= 0);
+                if (seatIdx < 0) seatIdx = room.game.players.findIndex(p => !p.connected);
+
+                if (seatIdx >= 0) {
+                    let p = room.game.players[seatIdx];
+                    p.name = pj.name;
+                    if (!isReturning) p.chips = MID_JOIN_CHIPS;
+                    p.connected = true;
+                    p.folded = true;
+                    p.id = seatIdx;
+                } else {
+                    seatIdx = room.game.players.length;
+                    room.game.players.push({
+                        id: seatIdx, name: pj.name, chips: MID_JOIN_CHIPS,
+                        isHuman: true, connected: true, hand: [], folded: true,
+                        allIn: false, currentBet: 0, seatBet: 0, upCards: [], downCards: [],
+                        lastAction: '',
+                    });
+                    room.game.playerCount = room.game.players.length;
+                }
+                if (!room.initialChips) room.initialChips = {};
+                room.initialChips[pj.name] = MID_JOIN_CHIPS;
+                if (!room.totalRebuys) room.totalRebuys = {};
+                room.totalRebuys[pj.name] = 0;
+                room.seatMap[pj.clientId] = seatIdx;
+                midJoinSeat = seatIdx;
+            }
+
+            if (!room.playing) {
+                room.settings.selectedGames = room.getMergedGames();
+            }
+
+            send(pj.ws, { type: 'room_joined', room: room.toJSON(), roomId: room.id });
+
+            if (midJoinSeat !== undefined) {
+                send(pj.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, midJoinSeat), roomId: room.id });
+                for (const m of room.members) {
+                    if (m.clientId !== pj.clientId && room.seatMap[m.clientId] !== undefined) {
+                        send(m.ws, { type: 'game_state', state: getStateForPlayer(room.game, room, room.seatMap[m.clientId]), roomId: room.id });
+                    }
+                }
+                broadcastToRoom(room, { type: 'log', message: `${pj.name} が途中参加しました`, cls: 'important' });
+            }
+
+            broadcastRoomUpdate(room);
+            broadcastRoomList();
+            broadcastOnlineUsers();
+            break;
+        }
+
+        case 'reject_join': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room) return;
+            if (room.hostId !== client.id) return;
+            const idx = room.pendingJoins.findIndex(p => p.clientId === msg.targetId);
+            if (idx < 0) return;
+            const pj = room.pendingJoins.splice(idx, 1)[0];
+            send(pj.ws, { type: 'join_rejected', roomId: room.id, reason: 'ホストにより拒否されました' });
+            broadcastRoomUpdate(room);
+            break;
+        }
+
+        case 'cancel_join': {
+            const room = rooms.get(msg.roomId);
+            if (!room) return;
+            room.pendingJoins = room.pendingJoins.filter(p => p.clientId !== client.id);
+            send(ws, { type: 'join_cancelled', roomId: room.id });
+            // Notify host
+            const hostMember = room.members.find(m => m.clientId === room.hostId);
+            if (hostMember) {
+                send(hostMember.ws, { type: 'join_request_cancelled', roomId: room.id, clientId: client.id, name: client.name });
             }
             broadcastRoomUpdate(room);
             break;
@@ -876,6 +1027,17 @@ function leaveRoom(client, targetRoomId) {
 
 function handleDisconnect(client) {
     if (client.inZoom) leaveZoom(client);
+    // Clean up pending join requests from this client
+    for (const [, room] of rooms) {
+        const before = room.pendingJoins.length;
+        room.pendingJoins = room.pendingJoins.filter(p => p.clientId !== client.id);
+        if (room.pendingJoins.length !== before) {
+            const hostMember = room.members.find(m => m.clientId === room.hostId);
+            if (hostMember) {
+                send(hostMember.ws, { type: 'join_request_cancelled', roomId: room.id, clientId: client.id, name: client.name });
+            }
+        }
+    }
     // Handle all rooms the client is in
     const roomIdsCopy = [...client.roomIds];
     for (const rid of roomIdsCopy) {

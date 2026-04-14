@@ -154,6 +154,21 @@ class PokerClient {
             case 'auto_kicked':
                 this.emit('auto_kicked');
                 break;
+            case 'join_pending':
+                this.emit('join_pending', msg);
+                break;
+            case 'join_rejected':
+                this.emit('join_rejected', msg);
+                break;
+            case 'join_cancelled':
+                this.emit('join_cancelled', msg);
+                break;
+            case 'join_request':
+                this.emit('join_request', msg);
+                break;
+            case 'join_request_cancelled':
+                this.emit('join_request_cancelled', msg);
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -181,4 +196,8 @@ class PokerClient {
     rebuyChips(amount, roomId) { this.send({ type: 'rebuy_chips', amount, roomId: roomId || this.roomId }); }
     getStats(roomId) { this.send({ type: 'get_stats', roomId: roomId || this.roomId }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
+    toggleLock(locked, roomId) { this.send({ type: 'toggle_lock', locked, roomId: roomId || this.roomId }); }
+    approveJoin(targetId, roomId) { this.send({ type: 'approve_join', targetId, roomId: roomId || this.roomId }); }
+    rejectJoin(targetId, roomId) { this.send({ type: 'reject_join', targetId, roomId: roomId || this.roomId }); }
+    cancelJoin(roomId) { this.send({ type: 'cancel_join', roomId }); }
 }
