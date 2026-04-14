@@ -103,6 +103,18 @@ class PokerClient {
             case 'lobby_chat':
                 this.emit('lobby_chat', { from: msg.from, message: msg.message });
                 break;
+            case 'online_users':
+                this.emit('online_users', msg.users);
+                break;
+            case 'dm':
+                this.emit('dm', msg);
+                break;
+            case 'dm_sent':
+                this.emit('dm_sent', msg);
+                break;
+            case 'dm_failed':
+                this.emit('dm_failed', msg);
+                break;
             case 'game_over':
                 this.emit('game_over', msg);
                 break;
@@ -148,7 +160,8 @@ class PokerClient {
         }
     }
 
-    setName(name) { this.name = name; this.send({ type: 'set_name', name }); }
+    setName(name, avatar, isGuest) { this.name = name; this.avatar = avatar; this.send({ type: 'set_name', name, avatar, isGuest: !!isGuest }); }
+    sendDM(to, message) { this.send({ type: 'dm', to, message }); }
     createRoom() { this.send({ type: 'create_room' }); }
     joinZoom() { this.send({ type: 'join_zoom' }); }
     leaveZoom() { this.send({ type: 'leave_zoom' }); }

@@ -3,6 +3,88 @@ const client = new PokerClient();
 const ui = new PokerUI();
 
 // ==========================================
+// Avatar System
+// ==========================================
+const AVATAR_LIST = {
+    people: [
+        { id: 'samurai', label: '侍' }, { id: 'ninja', label: '忍者' },
+        { id: 'wizard', label: '魔法使い' }, { id: 'king', label: '王' },
+        { id: 'queen', label: '女王' }, { id: 'knight', label: '騎士' },
+        { id: 'pirate', label: '海賊' }, { id: 'cowboy', label: 'カウボーイ' },
+        { id: 'astronaut', label: '宇宙飛行士' }, { id: 'detective', label: '探偵' },
+    ],
+    animals: [
+        { id: 'wolf', label: 'オオカミ' }, { id: 'eagle', label: 'ワシ' },
+        { id: 'lion', label: 'ライオン' }, { id: 'fox', label: 'キツネ' },
+        { id: 'owl', label: 'フクロウ' }, { id: 'dragon', label: 'ドラゴン' },
+        { id: 'shark', label: 'サメ' }, { id: 'cat', label: 'ネコ' },
+        { id: 'bear', label: 'クマ' }, { id: 'phoenix', label: 'フェニックス' },
+    ],
+    zodiac: [
+        { id: 'aries', label: '牡羊座' }, { id: 'taurus', label: '牡牛座' },
+        { id: 'gemini', label: '双子座' }, { id: 'leo', label: '獅子座' },
+        { id: 'scorpio', label: '蠍座' }, { id: 'sagittarius', label: '射手座' },
+        { id: 'star', label: '星' }, { id: 'moon', label: '月' },
+        { id: 'sun', label: '太陽' }, { id: 'comet', label: '彗星' },
+    ],
+};
+const ALL_AVATARS = [...AVATAR_LIST.people, ...AVATAR_LIST.animals, ...AVATAR_LIST.zodiac];
+let selectedAvatar = localStorage.getItem('poker10mix_avatar') || null;
+
+function getAvatarSrc(avatarId) {
+    return avatarId ? `avatars/${avatarId}.svg` : null;
+}
+
+function setupAvatarPicker() {
+    const grid = document.getElementById('avatar-grid');
+    if (!grid) return;
+
+    function renderCategory(cat) {
+        grid.innerHTML = '';
+        const items = AVATAR_LIST[cat] || [];
+        items.forEach(a => {
+            const div = document.createElement('div');
+            div.className = 'avatar-option' + (selectedAvatar === a.id ? ' selected' : '');
+            div.title = a.label;
+            div.dataset.avatar = a.id;
+            div.innerHTML = `<img src="avatars/${a.id}.svg" alt="${a.label}">`;
+            div.addEventListener('click', () => {
+                selectedAvatar = a.id;
+                localStorage.setItem('poker10mix_avatar', a.id);
+                grid.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
+                div.classList.add('selected');
+            });
+            grid.appendChild(div);
+        });
+    }
+
+    // Tab switching
+    document.querySelectorAll('.avatar-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.avatar-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            renderCategory(tab.dataset.cat);
+        });
+    });
+
+    // Restore saved avatar or default to first category
+    const savedCat = selectedAvatar
+        ? (AVATAR_LIST.people.find(a => a.id === selectedAvatar) ? 'people'
+            : AVATAR_LIST.animals.find(a => a.id === selectedAvatar) ? 'animals' : 'zodiac')
+        : 'people';
+    document.querySelector(`.avatar-tab[data-cat="${savedCat}"]`)?.classList.add('active');
+    renderCategory(savedCat);
+
+    // If no avatar saved, randomly assign one
+    if (!selectedAvatar) {
+        const rand = ALL_AVATARS[Math.floor(Math.random() * ALL_AVATARS.length)];
+        selectedAvatar = rand.id;
+        localStorage.setItem('poker10mix_avatar', rand.id);
+        grid.querySelector(`[data-avatar="${rand.id}"]`)?.classList.add('selected');
+    }
+}
+
+// ==========================================
 // Sound System (Web Audio API)
 // ==========================================
 const sound = (() => {
@@ -494,6 +576,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
     setupAccountLogin();
     setupLobbyScreen();
+    setupLobbyBottomTabs();
+    setupDMModal();
     setupRoomScreen();
     setupGameScreen();
     setupStatsModal();
@@ -648,6 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
         onChat(msg);
     });
     client.on('lobby_chat', onLobbyChat);
+    client.on('online_users', renderOnlineUsers);
     client.on('game_over', (msg) => {
         const rid = msg.roomId;
         if (rid && rid !== activeTableId) {
@@ -705,12 +790,13 @@ function showScreen(name) {
 // ==========================================
 function setupLoginScreen() {
     const input = document.getElementById('login-name');
+    setupAvatarPicker();
     // Guest login
     document.getElementById('btn-enter').addEventListener('click', () => {
         const name = input.value.trim();
         if (!name || name.length < 1) { alert('名前を入力してください'); return; }
         loggedInAccount = null;
-        client.setName(name);
+        client.setName(name, null, true);
         enterLobby(name);
     });
     input.addEventListener('keydown', (e) => {
@@ -751,7 +837,9 @@ function setupLoginScreen() {
 function enterLobby(displayName) {
     showScreen('lobby');
     const userEl = document.getElementById('lobby-username');
-    userEl.textContent = displayName;
+    const avatarSrc = getAvatarSrc(selectedAvatar);
+    userEl.innerHTML = (avatarSrc ? `<img class="lobby-avatar" src="${avatarSrc}" alt="">` : '') +
+        document.createTextNode(displayName).textContent;
 }
 
 // ==========================================
@@ -827,7 +915,7 @@ function onAuthResult(data) {
 
     if (data.success) {
         loggedInAccount = { name: data.name, email: data.email };
-        client.setName(data.name);
+        client.setName(data.name, selectedAvatar, false);
         enterLobby(data.name);
     } else {
         showLoginError(data.message || 'エラーが発生しました');
@@ -906,8 +994,11 @@ function renderRoomList(data) {
             return `<span class="room-card-game-tag tag-${gType}">${g.shortName}</span>`;
         }).filter(Boolean).join('');
 
-        // Avatar initial
-        const initial = (r.hostName || '?').charAt(0).toUpperCase();
+        // Avatar
+        const hostAvatarSrc = r.hostAvatar ? `avatars/${r.hostAvatar}.svg` : null;
+        const avatarHtml = hostAvatarSrc
+            ? `<img class="room-card-avatar" src="${hostAvatarSrc}" alt="">`
+            : `<div class="room-card-avatar">${(r.hostName || '?').charAt(0).toUpperCase()}</div>`;
 
         // Player bar fill
         const fillPct = Math.round((r.playerCount / 6) * 100);
@@ -918,7 +1009,7 @@ function renderRoomList(data) {
                 <span class="room-card-status ${statusCls}">${statusText}</span>
             </div>
             <div class="room-card-host">
-                <div class="room-card-avatar">${initial}</div>
+                ${avatarHtml}
                 <span class="room-card-hostname">${r.hostName}</span>
                 ${currentGame ? `<span class="room-card-game">▶ ${currentGame}</span>` : ''}
             </div>
@@ -2652,15 +2743,16 @@ function showSessionSummary(ranking) {
         const rowCls = i < 3 ? `ss-rank-${i + 1}` : 'ss-rank-other';
         const pos = i < 3 ? medals[i] : `${i + 1}`;
         const isMe = p.name === myName;
-        const diff = p.totalWin;
+        const diff = p.netProfit !== undefined ? p.netProfit : p.totalWin;
         let diffCls, diffStr;
         if (diff > 0) { diffCls = 'ss-rank-plus'; diffStr = `+${diff.toLocaleString()}`; }
         else if (diff < 0) { diffCls = 'ss-rank-minus'; diffStr = diff.toLocaleString(); }
         else { diffCls = 'ss-rank-zero'; diffStr = '±0'; }
+        const rebuyStr = p.totalRebuys ? `<span class="ss-rank-rebuy">補充: +${p.totalRebuys.toLocaleString()}</span>` : '';
 
         rankHtml += `<div class="ss-rank-row ${rowCls}">`;
         rankHtml += `<span class="ss-rank-pos">${pos}</span>`;
-        rankHtml += `<span class="ss-rank-name${isMe ? ' ss-rank-me' : ''}">${p.name}${isMe ? ' (自分)' : ''}</span>`;
+        rankHtml += `<span class="ss-rank-name${isMe ? ' ss-rank-me' : ''}">${p.name}${isMe ? ' (自分)' : ''}${rebuyStr}</span>`;
         rankHtml += `<span class="ss-rank-diff ${diffCls}">${diffStr}</span>`;
         rankHtml += `</div>`;
     });
@@ -2695,8 +2787,10 @@ function showSessionSummary(ranking) {
     shareBtn.onclick = () => {
         const lines = ['【セッションサマリー】'];
         ranking.forEach((p, i) => {
-            const sign = p.totalWin >= 0 ? '+' : '';
-            lines.push(`${i + 1}位 ${p.name}: ${sign}${p.totalWin}`);
+            const profit = p.netProfit !== undefined ? p.netProfit : p.totalWin;
+            const sign = profit >= 0 ? '+' : '';
+            const rebuy = p.totalRebuys ? ` (補充: +${p.totalRebuys})` : '';
+            lines.push(`${i + 1}位 ${p.name}: ${sign}${profit}${rebuy}`);
         });
         highlights.forEach(hl => {
             lines.push(`${hl.icon} ${hl.title}: ${hl.name}`);
@@ -2929,6 +3023,8 @@ function onStatsUpdate(data) {
             gid: gameId,
             zm: isZoom ? 1 : 0,
             rid: roomId,
+            ts: Date.now(),
+            pls: Object.keys(data.stats).filter(n => n !== name),
         };
         if (!history[name]) history[name] = [];
         const arr = history[name];
@@ -3311,11 +3407,31 @@ function initGraphTab(graphContent, playerName) {
     const pData = history[playerName] || [];
     const roomSelect = controls.querySelector('.graph-filter-room');
     if (roomSelect) {
-        const rooms = new Set();
-        for (const d of pData) { if (d.rid && d.rid !== 'zoom') rooms.add(d.rid); }
+        // Collect room metadata: latest timestamp, all players per room
+        const roomMeta = {};
+        for (const d of pData) {
+            if (!d.rid || d.rid === 'zoom') continue;
+            if (!roomMeta[d.rid]) roomMeta[d.rid] = { ts: d.ts || 0, players: new Set() };
+            if (d.ts && d.ts > roomMeta[d.rid].ts) roomMeta[d.rid].ts = d.ts;
+            if (d.pls) d.pls.forEach(p => roomMeta[d.rid].players.add(p));
+        }
+        // Sort by date descending
+        const sorted = Object.entries(roomMeta).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
+        const isMobile = window.innerWidth <= 600;
         roomSelect.innerHTML = '<option value="">全ルーム</option>';
-        for (const rid of rooms) {
-            roomSelect.innerHTML += `<option value="${rid}">${rid}</option>`;
+        for (const [rid, meta] of sorted) {
+            const dateStr = meta.ts ? new Date(meta.ts).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '';
+            const playerArr = [...meta.players];
+            let playersStr = '';
+            if (playerArr.length > 0) {
+                if (isMobile && playerArr.length > 1) {
+                    playersStr = playerArr[0] + '、他' + (playerArr.length - 1) + '名';
+                } else {
+                    playersStr = playerArr.join(', ');
+                }
+            }
+            const label = `${rid}${dateStr ? ' ' + dateStr : ''}${playersStr ? ' / ' + playersStr : ''}`;
+            roomSelect.innerHTML += `<option value="${rid}">${label}</option>`;
         }
     }
 
@@ -3618,6 +3734,206 @@ function onLobbyChat(data) {
     appendChatMsg('lobby-chat-log', data.from, data.message);
 }
 
+// ==========================================
+// Online User List
+// ==========================================
+function setupLobbyBottomTabs() {
+    document.querySelectorAll('.lobby-bottom-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.lobby-bottom-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const target = tab.dataset.tab;
+            document.getElementById('lobby-tab-chat').classList.toggle('hidden', target !== 'chat');
+            document.getElementById('lobby-tab-online').classList.toggle('hidden', target !== 'online');
+        });
+    });
+}
+
+function renderOnlineUsers(users) {
+    const container = document.getElementById('online-user-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const statusOrder = { lobby: 0, playing: 1, zoom: 2 };
+    const statusLabel = { lobby: 'ロビー', playing: 'ゲーム中', zoom: 'Zoom' };
+    users.sort((a, b) => (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0));
+
+    const myName = client.name;
+    const iAmGuest = !loggedInAccount;
+
+    for (const u of users) {
+        const item = document.createElement('div');
+        item.className = 'online-user-item';
+
+        const avatarHtml = u.avatar
+            ? `<img src="avatars/${u.avatar}.svg" alt="">`
+            : `<div class="online-user-initial">${(u.name || '?').charAt(0).toUpperCase()}</div>`;
+
+        // Show DM button: only if both parties are non-guest and not self
+        const showDM = !iAmGuest && !u.isGuest && u.name !== myName;
+        const hasUnread = dmUnread.has(u.name);
+        const dmBtnHtml = showDM
+            ? `<button class="online-user-dm" data-dm-target="${u.name}" title="DMを送る">💬${hasUnread ? '<span class="dm-unread-dot"></span>' : ''}</button>`
+            : '';
+
+        item.innerHTML = `
+            ${avatarHtml}
+            <span class="online-user-name">${u.name}</span>
+            <span class="online-user-status">
+                <span class="online-status-dot ${u.status}"></span>
+                ${statusLabel[u.status] || ''}
+            </span>
+            ${dmBtnHtml}
+        `;
+
+        if (showDM) {
+            item.querySelector('.online-user-dm').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openDMModal(u.name);
+            });
+        }
+
+        container.appendChild(item);
+    }
+}
+
+// ==========================================
+// Direct Message System
+// ==========================================
+const DM_STORAGE_KEY = 'poker10mix_dm_history';
+const DM_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+let currentDMTarget = null;
+const dmUnread = new Set();
+
+function getDMHistory() {
+    try {
+        const raw = localStorage.getItem(DM_STORAGE_KEY);
+        if (!raw) return {};
+        const data = JSON.parse(raw);
+        // Purge expired messages
+        const now = Date.now();
+        let changed = false;
+        for (const name in data) {
+            const before = data[name].length;
+            data[name] = data[name].filter(m => now - m.ts < DM_EXPIRY_MS);
+            if (data[name].length === 0) { delete data[name]; changed = true; }
+            else if (data[name].length !== before) changed = true;
+        }
+        if (changed) localStorage.setItem(DM_STORAGE_KEY, JSON.stringify(data));
+        return data;
+    } catch { return {}; }
+}
+
+function saveDMMessage(partnerName, msg) {
+    const history = getDMHistory();
+    if (!history[partnerName]) history[partnerName] = [];
+    history[partnerName].push(msg);
+    localStorage.setItem(DM_STORAGE_KEY, JSON.stringify(history));
+}
+
+function formatDMTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+function openDMModal(targetName) {
+    currentDMTarget = targetName;
+    dmUnread.delete(targetName);
+
+    const modal = document.getElementById('dm-modal');
+    const title = document.getElementById('dm-modal-title');
+    const body = document.getElementById('dm-modal-body');
+    const input = document.getElementById('dm-input');
+
+    title.textContent = targetName + ' とのDM';
+    modal.classList.remove('hidden');
+
+    renderDMMessages(targetName);
+    input.value = '';
+    setTimeout(() => input.focus(), 100);
+}
+
+function closeDMModal() {
+    document.getElementById('dm-modal').classList.add('hidden');
+    currentDMTarget = null;
+}
+
+function renderDMMessages(targetName) {
+    const body = document.getElementById('dm-modal-body');
+    const history = getDMHistory();
+    const msgs = history[targetName] || [];
+
+    body.innerHTML = '';
+    if (msgs.length === 0) {
+        body.innerHTML = '<div class="dm-empty">メッセージはまだありません</div>';
+        return;
+    }
+
+    for (const m of msgs) {
+        const div = document.createElement('div');
+        div.className = 'dm-msg';
+        const isMe = m.from === client.name;
+        div.innerHTML = `<span class="dm-msg-from ${isMe ? 'me' : 'other'}">${m.from}:</span>${m.message}<span class="dm-msg-time">${formatDMTime(m.ts)}</span>`;
+        body.appendChild(div);
+    }
+    body.scrollTop = body.scrollHeight;
+}
+
+function setupDMModal() {
+    document.getElementById('dm-modal-close').addEventListener('click', closeDMModal);
+    document.getElementById('dm-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'dm-modal') closeDMModal();
+    });
+
+    const input = document.getElementById('dm-input');
+    const sendBtn = document.getElementById('btn-dm-send');
+
+    function sendDM() {
+        const text = input.value.trim();
+        if (!text || !currentDMTarget) return;
+        client.sendDM(currentDMTarget, text);
+        input.value = '';
+        input.focus();
+    }
+
+    sendBtn.addEventListener('click', sendDM);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendDM();
+    });
+
+    // Receive DM
+    client.on('dm', (msg) => {
+        const m = { from: msg.from, message: msg.message, ts: msg.ts };
+        saveDMMessage(msg.from, m);
+        if (currentDMTarget === msg.from) {
+            renderDMMessages(msg.from);
+        } else {
+            dmUnread.add(msg.from);
+        }
+    });
+
+    // DM sent confirmation
+    client.on('dm_sent', (msg) => {
+        const m = { from: client.name, message: msg.message, ts: msg.ts };
+        saveDMMessage(msg.to, m);
+        if (currentDMTarget === msg.to) {
+            renderDMMessages(msg.to);
+        }
+    });
+
+    // DM failed
+    client.on('dm_failed', (msg) => {
+        if (currentDMTarget === msg.to) {
+            const body = document.getElementById('dm-modal-body');
+            const div = document.createElement('div');
+            div.className = 'dm-msg';
+            div.innerHTML = `<span style="color:#ef5350;font-size:11px">⚠ ${msg.to} は${msg.reason}</span>`;
+            body.appendChild(div);
+            body.scrollTop = body.scrollHeight;
+        }
+    });
+}
 
 function setupFocusMode() {
     const btn = document.getElementById('btn-focus-mode');

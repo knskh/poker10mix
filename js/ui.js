@@ -392,6 +392,14 @@ class PokerUI {
             el.appendChild(btn);
         }
 
+        // Avatar
+        if (p.avatar) {
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'seat-avatar';
+            avatarDiv.innerHTML = `<img src="avatars/${p.avatar}.svg" alt="">`;
+            el.appendChild(avatarDiv);
+        }
+
         // Name (clickable — shows enlarged hand popup)
         const nameDiv = document.createElement('div');
         nameDiv.className = 'seat-name';
