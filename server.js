@@ -22,6 +22,56 @@ const { GAME_LIST, GameState } = require('./js/game');
 const { StatsTracker } = require('./js/stats');
 
 // ============================================
+// Follow System (local JSON persistence)
+// ============================================
+const FOLLOWS_DIR = path.join(__dirname, 'data');
+const FOLLOWS_FILE = path.join(FOLLOWS_DIR, 'follows.json');
+const followsMap = new Map(); // followerName -> Set<followedName>
+
+function loadFollows() {
+    try {
+        if (!fs.existsSync(FOLLOWS_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(FOLLOWS_FILE, 'utf8'));
+        for (const [follower, list] of Object.entries(data)) {
+            followsMap.set(follower, new Set(Array.isArray(list) ? list : []));
+        }
+        console.log(`Loaded follows for ${followsMap.size} users`);
+    } catch (e) {
+        console.warn('Failed to load follows.json:', e.message);
+    }
+}
+
+let saveFollowsTimer = null;
+function saveFollowsDebounced() {
+    if (saveFollowsTimer) return;
+    saveFollowsTimer = setTimeout(() => {
+        saveFollowsTimer = null;
+        try {
+            if (!fs.existsSync(FOLLOWS_DIR)) fs.mkdirSync(FOLLOWS_DIR, { recursive: true });
+            const obj = {};
+            for (const [k, v] of followsMap) obj[k] = [...v];
+            fs.writeFileSync(FOLLOWS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Failed to save follows.json:', e.message);
+        }
+    }, 500);
+}
+
+function getFollowing(name) {
+    return [...(followsMap.get(name) || [])];
+}
+
+function getFollowers(name) {
+    const out = [];
+    for (const [follower, set] of followsMap) {
+        if (set.has(name)) out.push(follower);
+    }
+    return out;
+}
+
+loadFollows();
+
+// ============================================
 // Account System (Supabase + password hashing)
 // ============================================
 const crypto = require('crypto');
@@ -270,10 +320,20 @@ function broadcastOnlineUsers() {
         else if (c.roomIds.length > 0) status = 'playing';
         users.push({ name: c.name, avatar: c.avatar || null, status, isGuest: !!c.isGuest });
     }
-    const data = { type: 'online_users', users };
-    for (const [ws] of clients) {
-        send(ws, data);
+    // Send personalized online_users with my following list
+    for (const [ws, c] of clients) {
+        const myFollowing = c.name ? getFollowing(c.name) : [];
+        send(ws, { type: 'online_users', users, following: myFollowing });
     }
+}
+
+function sendFollows(ws, client) {
+    if (!client.name) return;
+    send(ws, {
+        type: 'follows',
+        following: getFollowing(client.name),
+        followers: getFollowers(client.name)
+    });
 }
 
 function broadcastRoomUpdate(room) {
@@ -440,6 +500,7 @@ function handleMessage(ws, client, msg) {
             client.isGuest = !!msg.isGuest;
             send(ws, { type: 'name_set', name: client.name });
             broadcastOnlineUsers();
+            sendFollows(ws, client);
             if (client.roomId) {
                 const room = rooms.get(client.roomId);
                 if (room) {
@@ -927,6 +988,52 @@ function handleMessage(ws, client, msg) {
                     }
                 }
             }
+            break;
+        }
+
+        case 'follow': {
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではフォローできません' }); break; }
+            if (!client.name) break;
+            const target = (msg.target || '').trim();
+            if (!target || target === client.name) break;
+            // Verify target is a real (non-guest) account by checking online clients
+            // Allow following anyone known (online or offline) — relax check for v1
+            if (!followsMap.has(client.name)) followsMap.set(client.name, new Set());
+            followsMap.get(client.name).add(target);
+            saveFollowsDebounced();
+            sendFollows(ws, client);
+            // Notify target if online
+            for (const [tws, tc] of clients) {
+                if (tc.name === target) {
+                    send(tws, { type: 'followed_by', name: client.name });
+                    sendFollows(tws, tc);
+                }
+            }
+            broadcastOnlineUsers();
+            break;
+        }
+
+        case 'unfollow': {
+            if (!client.name) break;
+            const target = (msg.target || '').trim();
+            if (!target) break;
+            const set = followsMap.get(client.name);
+            if (set) {
+                set.delete(target);
+                if (set.size === 0) followsMap.delete(client.name);
+                saveFollowsDebounced();
+            }
+            sendFollows(ws, client);
+            // Update target's followers list if online
+            for (const [tws, tc] of clients) {
+                if (tc.name === target) sendFollows(tws, tc);
+            }
+            broadcastOnlineUsers();
+            break;
+        }
+
+        case 'get_follows': {
+            sendFollows(ws, client);
             break;
         }
 

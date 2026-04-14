@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>poker10mix - Twitter風デモ</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #ffffff;
+    --bg-soft: #f7f9fa;
+    --bg-hover: #eff3f4;
+    --border: #eff3f4;
+    --border-strong: #cfd9de;
+    --text: #0f1419;
+    --text-dim: #536471;
+    --accent: #1d9bf0;
+    --accent-hover: #1a8cd8;
+    --accent-soft: #e8f5fd;
+    --green: #00ba7c;
+    --red: #f4212e;
+    --gold: #ffd400;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* === Layout === */
+.app {
+    max-width: 1265px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 275px 600px 350px;
+    gap: 0;
+    min-height: 100vh;
+}
+
+/* === Left Sidebar === */
+.sidebar-left {
+    border-right: 1px solid var(--border);
+    padding: 12px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+.logo {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    padding: 8px 14px 16px;
+    letter-spacing: -0.5px;
+}
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--text);
+    transition: background 0.15s;
+    margin-bottom: 4px;
+}
+.nav-item:hover {
+    background: var(--bg-hover);
+}
+.nav-item.active {
+    font-weight: 700;
+}
+.nav-icon {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+}
+.nav-badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 2px 7px;
+    margin-left: auto;
+}
+.btn-create-room {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin: 16px 0;
+    width: 100%;
+    transition: background 0.15s;
+}
+.btn-create-room:hover { background: var(--accent-hover); }
+
+.profile-card {
+    margin-top: auto;
+    padding: 12px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.profile-card:hover { background: var(--bg-hover); }
+.profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff9800, #f44336);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.profile-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.profile-name {
+    font-weight: 700;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.profile-handle {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+.profile-menu { color: var(--text-dim); padding: 0 4px; }
+
+/* === Main / Timeline === */
+.main {
+    border-right: 1px solid var(--border);
+    min-height: 100vh;
+}
+.main-header {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+}
+.main-title {
+    font-size: 20px;
+    font-weight: 800;
+}
+.main-tabs {
+    display: flex;
+    margin-top: 12px;
+    gap: 0;
+}
+.main-tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 15px;
+    border-radius: 0;
+    background: transparent;
+    border: none;
+    position: relative;
+    transition: background 0.15s;
+}
+.main-tab:hover { background: var(--bg-hover); }
+.main-tab.active {
+    color: var(--text);
+    font-weight: 700;
+}
+.main-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+/* === Compose Box (新規ルーム作成 - quick) === */
+.compose-box {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+}
+.compose-input {
+    flex: 1;
+    border: none;
+    font-size: 18px;
+    color: var(--text);
+    background: transparent;
+    outline: none;
+    padding: 8px 0;
+    font-family: inherit;
+}
+.compose-input::placeholder { color: var(--text-dim); }
+.compose-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
+    margin-left: 52px;
+}
+.compose-icons { display: flex; gap: 6px; }
+.compose-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    font-size: 18px;
+    transition: background 0.15s;
+}
+.compose-icon-btn:hover { background: var(--accent-soft); }
+.btn-tweet {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-tweet:hover { background: var(--accent-hover); }
+
+/* === Feed Posts === */
+.post {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.post:hover { background: var(--bg-soft); }
+.post-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+}
+.av-1 { background: linear-gradient(135deg, #ff9800, #f44336); }
+.av-2 { background: linear-gradient(135deg, #2196f3, #00bcd4); }
+.av-3 { background: linear-gradient(135deg, #9c27b0, #e91e63); }
+.av-4 { background: linear-gradient(135deg, #4caf50, #8bc34a); }
+.av-5 { background: linear-gradient(135deg, #ff5722, #ffc107); }
+.av-6 { background: linear-gradient(135deg, #607d8b, #455a64); }
+.av-7 { background: linear-gradient(135deg, #3f51b5, #2196f3); }
+
+.post-content {
+    flex: 1;
+    min-width: 0;
+}
+.post-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 15px;
+    flex-wrap: wrap;
+}
+.post-name {
+    font-weight: 700;
+    color: var(--text);
+}
+.post-handle, .post-time {
+    color: var(--text-dim);
+}
+.post-time::before { content: '·'; margin: 0 2px; }
+.post-menu {
+    margin-left: auto;
+    color: var(--text-dim);
+    padding: 0 8px;
+    cursor: pointer;
+}
+.post-body {
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+    word-wrap: break-word;
+}
+.post-body strong { font-weight: 700; }
+.tag-link {
+    color: var(--accent);
+    font-weight: 500;
+    cursor: pointer;
+}
+.tag-link:hover { text-decoration: underline; }
+
+/* === Embedded "card" inside a post === */
+.post-card {
+    margin-top: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.post-card:hover { background: var(--bg-soft); }
+.post-card-header {
+    padding: 12px 14px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.post-card-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+}
+.post-card-title {
+    font-weight: 700;
+    font-size: 14px;
+}
+.post-card-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+.post-card-body {
+    padding: 12px 14px;
+}
+.room-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+.room-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.room-tag.tag-stud { background: #ffe5e5; color: #c62828; }
+.room-tag.tag-draw { background: #e3f2fd; color: #1565c0; }
+.room-tag.tag-plo { background: #e8f5e9; color: #2e7d32; }
+.room-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+.room-players {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.player-stack {
+    display: flex;
+}
+.player-stack > span {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    margin-left: -8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+}
+.player-stack > span:first-child { margin-left: 0; }
+.btn-join {
+    background: var(--text);
+    color: #fff;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-join:hover { background: #272c30; }
+
+/* === Result card (big win) === */
+.result-card {
+    margin-top: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    padding: 14px;
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3c4 100%);
+}
+.result-card.loss { background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%); }
+.result-amount {
+    font-size: 28px;
+    font-weight: 800;
+    color: #e65100;
+}
+.result-card.loss .result-amount { color: #c62828; }
+.result-card.win-big .result-amount { color: #2e7d32; }
+.result-card.win-big { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); }
+.result-detail {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+}
+.result-hand {
+    margin-top: 10px;
+    display: flex;
+    gap: 4px;
+}
+.mini-card {
+    width: 28px;
+    height: 38px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.mini-card.red { color: #d32f2f; }
+.mini-card.black { color: #212121; }
+
+/* === Post actions === */
+.post-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    max-width: 425px;
+    color: var(--text-dim);
+}
+.post-action {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    transition: all 0.15s;
+}
+.post-action:hover { background: var(--accent-soft); color: var(--accent); }
+.post-action.like:hover { background: #fdeaef; color: #f91880; }
+.post-action.repost:hover { background: #def1e7; color: var(--green); }
+
+/* === Right Sidebar === */
+.sidebar-right {
+    padding: 12px 16px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+}
+.search-box {
+    background: var(--bg-soft);
+    border-radius: 999px;
+    padding: 10px 16px 10px 44px;
+    border: 1px solid transparent;
+    width: 100%;
+    font-size: 15px;
+    outline: none;
+    color: var(--text);
+    position: relative;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23536471' width='18' height='18'%3E%3Cpath d='M21 21l-4.34-4.34M11 19a8 8 0 100-16 8 8 0 000 16z' stroke='%23536471' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 16px center;
+    font-family: inherit;
+}
+.search-box:focus {
+    background-color: #fff;
+    border-color: var(--accent);
+}
+
+.widget {
+    background: var(--bg-soft);
+    border-radius: 16px;
+    margin-top: 16px;
+    overflow: hidden;
+}
+.widget-title {
+    font-size: 20px;
+    font-weight: 800;
+    padding: 12px 16px 4px;
+}
+.widget-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.widget-item:hover { background: var(--bg-hover); }
+.widget-cat {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+.widget-main {
+    font-weight: 700;
+    font-size: 15px;
+    margin-top: 2px;
+}
+.widget-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.widget-footer {
+    padding: 14px 16px;
+    color: var(--accent);
+    font-size: 14px;
+    cursor: pointer;
+    border-top: 1px solid var(--border);
+}
+.widget-footer:hover { background: var(--bg-hover); }
+
+/* Online friend item */
+.friend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.friend-item:hover { background: var(--bg-hover); }
+.friend-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    position: relative;
+}
+.friend-avatar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 2px solid #fff;
+}
+.friend-avatar.in-game::after { background: var(--gold); }
+.friend-info { flex: 1; min-width: 0; }
+.friend-name {
+    font-weight: 700;
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.friend-status {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+.btn-dm-mini {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-dm-mini:hover { background: var(--text); color: #fff; }
+
+/* mini cards icons */
+.icn-trophy { background: #fff3c4; color: #f57c00; }
+.icn-room { background: var(--accent-soft); color: var(--accent); }
+.icn-fire { background: #ffe5e5; color: #c62828; }
+
+/* Demo banner */
+.demo-banner {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: var(--text);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 100;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ========== LEFT SIDEBAR ========== -->
+<aside class="sidebar-left">
+    <div class="logo">♠ poker10mix</div>
+
+    <div class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span>ホーム</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">🔍</span>
+        <span>探す</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">🎰</span>
+        <span>ルーム</span>
+        <span class="nav-badge">12</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">🔔</span>
+        <span>通知</span>
+        <span class="nav-badge">3</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">✉️</span>
+        <span>DM</span>
+        <span class="nav-badge">2</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">📊</span>
+        <span>Stats</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">📜</span>
+        <span>ハンド履歴</span>
+    </div>
+    <div class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span>プロフィール</span>
+    </div>
+
+    <button class="btn-create-room">＋ ルーム作成</button>
+
+    <div class="profile-card">
+        <div class="profile-avatar">テ</div>
+        <div class="profile-info">
+            <div class="profile-name">テスター</div>
+            <div class="profile-handle">@tester · オンライン</div>
+        </div>
+        <div class="profile-menu">⋯</div>
+    </div>
+</aside>
+
+<!-- ========== MAIN TIMELINE ========== -->
+<main class="main">
+    <header class="main-header">
+        <h1 class="main-title">ホーム</h1>
+        <div class="main-tabs">
+            <button class="main-tab active">フィード</button>
+            <button class="main-tab">フォロー中</button>
+            <button class="main-tab">人気</button>
+        </div>
+    </header>
+
+    <!-- Quick action -->
+    <div class="compose-box">
+        <div class="post-avatar av-1">テ</div>
+        <div style="flex:1;display:flex;flex-direction:column;">
+            <input class="compose-input" placeholder="新しいルームを作る or つぶやく...">
+            <div class="compose-actions">
+                <div class="compose-icons">
+                    <button class="compose-icon-btn" title="ルーム作成">🎰</button>
+                    <button class="compose-icon-btn" title="絵文字">😀</button>
+                    <button class="compose-icon-btn" title="ハンド共有">🃏</button>
+                </div>
+                <button class="btn-tweet">投稿</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Post 1: Friend won big -->
+    <article class="post">
+        <div class="post-avatar av-3">山</div>
+        <div class="post-content">
+            <div class="post-header">
+                <span class="post-name">山田ハナ</span>
+                <span class="post-handle">@hana_poker</span>
+                <span class="post-time">3分前</span>
+                <span class="post-menu">⋯</span>
+            </div>
+            <div class="post-body">
+                ロイヤルストレートフラッシュ出ました！！！🎉🔥<br>
+                <span class="tag-link">#NLHE</span> <span class="tag-link">#poker10mix</span>
+            </div>
+            <div class="result-card win-big">
+                <div class="result-amount">+45,000</div>
+                <div class="result-detail">ルーム <strong>K7M3</strong> · NLHE · ロイヤル</div>
+                <div class="result-hand">
+                    <div class="mini-card red">A♥</div>
+                    <div class="mini-card red">K♥</div>
+                    <div class="mini-card red">Q♥</div>
+                    <div class="mini-card red">J♥</div>
+                    <div class="mini-card red">10♥</div>
+                </div>
+            </div>
+            <div class="post-actions">
+                <span class="post-action">💬 12</span>
+                <span class="post-action repost">🔄 8</span>
+                <span class="post-action like">♡ 47</span>
+                <span class="post-action">📊</span>
+                <span class="post-action">🔖</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Post 2: New room created -->
+    <article class="post">
+        <div class="post-avatar av-2">健</div>
+        <div class="post-content">
+            <div class="post-header">
+                <span class="post-name">健太</span>
+                <span class="post-handle">@kenta98</span>
+                <span class="post-time">8分前</span>
+                <span class="post-menu">⋯</span>
+            </div>
+            <div class="post-body">
+                夜のミックスゲーム始めます〜誰でも参加OK！</br>
+            </div>
+            <div class="post-card">
+                <div class="post-card-header">
+                    <div class="post-card-icon icn-room">🎰</div>
+                    <div>
+                        <div class="post-card-title">ルーム K7M3 · ミックス</div>
+                        <div class="post-card-sub">poker10mix · 待機中</div>
+                    </div>
+                </div>
+                <div class="post-card-body">
+                    <div class="room-tags">
+                        <span class="room-tag">NLHE</span>
+                        <span class="room-tag tag-plo">PLO</span>
+                        <span class="room-tag tag-stud">Stud</span>
+                        <span class="room-tag tag-draw">2-7TD</span>
+                    </div>
+                    <div class="room-card-footer">
+                        <div class="room-players">
+                            <div class="player-stack">
+                                <span class="av-2">健</span>
+                                <span class="av-4">サ</span>
+                                <span class="av-5">ミ</span>
+                            </div>
+                            <span>3/6 · 開始チップ 10,000</span>
+                        </div>
+                        <button class="btn-join">参加</button>
+                    </div>
+                </div>
+            </div>
+            <div class="post-actions">
+                <span class="post-action">💬 4</span>
+                <span class="post-action repost">🔄 2</span>
+                <span class="post-action like">♡ 15</span>
+                <span class="post-action">📊</span>
+                <span class="post-action">🔖</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Post 3: Bad beat -->
+    <article class="post">
+        <div class="post-avatar av-5">サ</div>
+        <div class="post-content">
+            <div class="post-header">
+                <span class="post-name">サクラ</span>
+                <span class="post-handle">@sakura_p</span>
+                <span class="post-time">14分前</span>
+                <span class="post-menu">⋯</span>
+            </div>
+            <div class="post-body">
+                AAでオールインしたのにK引かれた…バッドビート😭<br>
+                <span class="tag-link">#バッドビート</span>
+            </div>
+            <div class="result-card loss">
+                <div class="result-amount">-12,500</div>
+                <div class="result-detail">ルーム <strong>K7M3</strong> · NLHE · 2nd Pair</div>
+                <div class="result-hand">
+                    <div class="mini-card black">A♠</div>
+                    <div class="mini-card red">A♦</div>
+                </div>
+            </div>
+            <div class="post-actions">
+                <span class="post-action">💬 23</span>
+                <span class="post-action repost">🔄 1</span>
+                <span class="post-action like">♡ 89</span>
+                <span class="post-action">📊</span>
+                <span class="post-action">🔖</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Post 4: Session summary -->
+    <article class="post">
+        <div class="post-avatar av-1">テ</div>
+        <div class="post-content">
+            <div class="post-header">
+                <span class="post-name">テスター</span>
+                <span class="post-handle">@tester</span>
+                <span class="post-time">1時間前</span>
+                <span class="post-menu">⋯</span>
+            </div>
+            <div class="post-body">
+                今日のセッション終了。プラスで終われた👏<br>
+                補充1回で純利益 +18,000。
+            </div>
+            <div class="result-card">
+                <div class="result-amount">+18,000</div>
+                <div class="result-detail">3時間 · 47ハンド · 補充: +10,000 · 純損益 <strong>+18,000</strong></div>
+            </div>
+            <div class="post-actions">
+                <span class="post-action">💬 2</span>
+                <span class="post-action repost">🔄 0</span>
+                <span class="post-action like">♡ 11</span>
+                <span class="post-action">📊</span>
+                <span class="post-action">🔖</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Post 5: System / friend joined -->
+    <article class="post">
+        <div class="post-avatar av-7">公</div>
+        <div class="post-content">
+            <div class="post-header">
+                <span class="post-name">poker10mix公式</span>
+                <span class="post-handle">@poker10mix</span>
+                <span class="post-time">2時間前</span>
+                <span class="post-menu">⋯</span>
+            </div>
+            <div class="post-body">
+                🎉 新機能：承認制テーブル（鍵テーブル）が追加されました！本アカウントのホストはゲーム画面から有効化できます。詳細は<span class="tag-link">@poker10mix</span>のお知らせをご覧ください。
+            </div>
+            <div class="post-actions">
+                <span class="post-action">💬 18</span>
+                <span class="post-action repost">🔄 32</span>
+                <span class="post-action like">♡ 156</span>
+                <span class="post-action">📊</span>
+                <span class="post-action">🔖</span>
+            </div>
+        </div>
+    </article>
+
+</main>
+
+<!-- ========== RIGHT SIDEBAR ========== -->
+<aside class="sidebar-right">
+    <input class="search-box" placeholder="ルーム・プレイヤー検索">
+
+    <div class="widget">
+        <h2 class="widget-title">人気のルーム</h2>
+        <div class="widget-item">
+            <div class="widget-cat">🔥 急上昇 · NLHE</div>
+            <div class="widget-main">ルーム K7M3</div>
+            <div class="widget-sub">3/6人 · ミックス</div>
+        </div>
+        <div class="widget-item">
+            <div class="widget-cat">PLO · 進行中</div>
+            <div class="widget-main">ルーム X8N2</div>
+            <div class="widget-sub">5/6人 · 平均ポット 4,200</div>
+        </div>
+        <div class="widget-item">
+            <div class="widget-cat">🔓 鍵テーブル</div>
+            <div class="widget-main">ルーム Q4P9</div>
+            <div class="widget-sub">2/6人 · スタッド系</div>
+        </div>
+        <div class="widget-item">
+            <div class="widget-cat">Zoom卓</div>
+            <div class="widget-main">高速ローテーション</div>
+            <div class="widget-sub">8人プレイ中</div>
+        </div>
+        <div class="widget-footer">もっと見る</div>
+    </div>
+
+    <div class="widget">
+        <h2 class="widget-title">オンラインの友達</h2>
+        <div class="friend-item">
+            <div class="friend-avatar av-3">山</div>
+            <div class="friend-info">
+                <div class="friend-name">山田ハナ</div>
+                <div class="friend-status">ロビー</div>
+            </div>
+            <button class="btn-dm-mini">DM</button>
+        </div>
+        <div class="friend-item">
+            <div class="friend-avatar av-2 in-game">健</div>
+            <div class="friend-info">
+                <div class="friend-name">健太</div>
+                <div class="friend-status">プレイ中 · K7M3</div>
+            </div>
+            <button class="btn-dm-mini">DM</button>
+        </div>
+        <div class="friend-item">
+            <div class="friend-avatar av-4">マ</div>
+            <div class="friend-info">
+                <div class="friend-name">マサル</div>
+                <div class="friend-status">ロビー</div>
+            </div>
+            <button class="btn-dm-mini">DM</button>
+        </div>
+        <div class="friend-item">
+            <div class="friend-avatar av-5 in-game">サ</div>
+            <div class="friend-info">
+                <div class="friend-name">サクラ</div>
+                <div class="friend-status">プレイ中 · K7M3</div>
+            </div>
+            <button class="btn-dm-mini">DM</button>
+        </div>
+        <div class="friend-item">
+            <div class="friend-avatar av-6">リ</div>
+            <div class="friend-info">
+                <div class="friend-name">リョウ</div>
+                <div class="friend-status">ロビー</div>
+            </div>
+            <button class="btn-dm-mini">DM</button>
+        </div>
+        <div class="widget-footer">すべて表示</div>
+    </div>
+
+    <div class="widget">
+        <h2 class="widget-title">今週のトップ</h2>
+        <div class="widget-item">
+            <div class="widget-cat">💰 最大勝利</div>
+            <div class="widget-main">山田ハナ</div>
+            <div class="widget-sub">+45,000 (ロイヤル)</div>
+        </div>
+        <div class="widget-item">
+            <div class="widget-cat">🎯 勝率トップ</div>
+            <div class="widget-main">マサル</div>
+            <div class="widget-sub">勝率 68% (32/47)</div>
+        </div>
+        <div class="widget-item">
+            <div class="widget-cat">🃏 ハンド数</div>
+            <div class="widget-main">健太</div>
+            <div class="widget-sub">312ハンド</div>
+        </div>
+    </div>
+</aside>
+
+</div>
+
+<div class="demo-banner">📐 案①：Twitter/X風デモ</div>
+</body>
+</html>

@@ -157,6 +157,9 @@ let turnTimer = null;
 let turnTimerStart = 0;
 let turnTimeLimit = 45;
 let loggedInAccount = null; // { name, email }
+let myFollowing = new Set(); // names this user follows
+let myFollowers = new Set(); // names that follow this user
+let lastOnlineUsers = []; // cached for re-render after follow change
 let isInZoom = false;
 let currentTurnBB = 100; // bigBlind for current turn (for bb display in action buttons)
 let handHistory = loadHandHistory(); // last 30 hands [{gameName, logs:[]}]
@@ -733,7 +736,24 @@ document.addEventListener('DOMContentLoaded', () => {
         onChat(msg);
     });
     client.on('lobby_chat', onLobbyChat);
-    client.on('online_users', renderOnlineUsers);
+    client.on('online_users', (data) => {
+        // Backward-compat: data may be array (old) or { users, following } (new)
+        if (Array.isArray(data)) {
+            renderOnlineUsers(data);
+        } else {
+            if (Array.isArray(data.following)) myFollowing = new Set(data.following);
+            renderOnlineUsers(data.users || []);
+        }
+    });
+    client.on('follows', (msg) => {
+        myFollowing = new Set(msg.following || []);
+        myFollowers = new Set(msg.followers || []);
+        renderOnlineUsers(lastOnlineUsers);
+    });
+    client.on('followed_by', (msg) => {
+        myFollowers.add(msg.name);
+        showToast(`${msg.name} さんがあなたをフォローしました`);
+    });
     client.on('game_over', (msg) => {
         const rid = msg.roomId;
         if (rid && rid !== activeTableId) {
@@ -1325,12 +1345,15 @@ function setupGameScreen() {
     soundBtn.addEventListener('click', () => { sound.toggle(); updateSoundBtn(); });
 
     // Theme toggle button
-    const THEMES = ['dark', 'classic', 'midnight'];
-    const THEME_LABELS = { dark: '🎨 ダーク', classic: '🎨 クラシック', midnight: '🎨 ミッドナイト' };
-    let currentThemeIdx = THEMES.indexOf(localStorage.getItem('poker10mix_theme') || 'dark');
+    const THEMES = ['light', 'classic', 'midnight'];
+    const THEME_LABELS = { light: '🎨 ライト', classic: '🎨 クラシック', midnight: '🎨 ミッドナイト' };
+    // Migrate old 'dark' → 'light' (was the legacy default)
+    let savedTheme = localStorage.getItem('poker10mix_theme');
+    if (savedTheme === 'dark') savedTheme = 'light';
+    let currentThemeIdx = THEMES.indexOf(savedTheme || 'light');
     if (currentThemeIdx < 0) currentThemeIdx = 0;
     function applyTheme(idx) {
-        document.body.classList.remove('theme-dark', 'theme-classic', 'theme-midnight');
+        document.body.classList.remove('theme-dark', 'theme-light', 'theme-classic', 'theme-midnight');
         document.body.classList.add('theme-' + THEMES[idx]);
         localStorage.setItem('poker10mix_theme', THEMES[idx]);
         const btn = document.getElementById('btn-theme-toggle');
@@ -3889,6 +3912,7 @@ function setupLobbyBottomTabs() {
 }
 
 function renderOnlineUsers(users) {
+    if (Array.isArray(users)) lastOnlineUsers = users;
     const container = document.getElementById('online-user-list');
     if (!container) return;
 
@@ -3896,14 +3920,21 @@ function renderOnlineUsers(users) {
 
     const statusOrder = { lobby: 0, playing: 1, zoom: 2 };
     const statusLabel = { lobby: 'ロビー', playing: 'ゲーム中', zoom: 'Zoom' };
-    users.sort((a, b) => (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0));
-
     const myName = client.name;
     const iAmGuest = !loggedInAccount;
+
+    // Sort: followed users first, then by status
+    users.sort((a, b) => {
+        const af = myFollowing.has(a.name) ? 0 : 1;
+        const bf = myFollowing.has(b.name) ? 0 : 1;
+        if (af !== bf) return af - bf;
+        return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
+    });
 
     for (const u of users) {
         const item = document.createElement('div');
         item.className = 'online-user-item';
+        if (myFollowing.has(u.name)) item.classList.add('is-following');
 
         const avatarHtml = u.avatar
             ? `<img src="avatars/${u.avatar}.svg" alt="">`
@@ -3916,6 +3947,13 @@ function renderOnlineUsers(users) {
             ? `<button class="online-user-dm" data-dm-target="${u.name}" title="DMを送る">💬${hasUnread ? '<span class="dm-unread-dot"></span>' : ''}</button>`
             : '';
 
+        // Show follow button: only if I'm logged in, target is non-guest, and not self
+        const showFollow = !iAmGuest && !u.isGuest && u.name !== myName;
+        const isFollowing = myFollowing.has(u.name);
+        const followBtnHtml = showFollow
+            ? `<button class="online-user-follow ${isFollowing ? 'following' : ''}" data-follow-target="${u.name}" title="${isFollowing ? 'フォロー解除' : 'フォロー'}">${isFollowing ? '★' : '☆'}</button>`
+            : '';
+
         item.innerHTML = `
             ${avatarHtml}
             <span class="online-user-name">${u.name}</span>
@@ -3923,6 +3961,7 @@ function renderOnlineUsers(users) {
                 <span class="online-status-dot ${u.status}"></span>
                 ${statusLabel[u.status] || ''}
             </span>
+            ${followBtnHtml}
             ${dmBtnHtml}
         `;
 
@@ -3930,6 +3969,19 @@ function renderOnlineUsers(users) {
             item.querySelector('.online-user-dm').addEventListener('click', (e) => {
                 e.stopPropagation();
                 openDMModal(u.name);
+            });
+        }
+        if (showFollow) {
+            item.querySelector('.online-user-follow').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (myFollowing.has(u.name)) {
+                    client.unfollow(u.name);
+                    myFollowing.delete(u.name);
+                } else {
+                    client.follow(u.name);
+                    myFollowing.add(u.name);
+                }
+                renderOnlineUsers(lastOnlineUsers);
             });
         }
 
