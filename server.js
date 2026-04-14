@@ -208,7 +208,7 @@ class Room {
         return {
             id: this.id,
             hostId: this.hostId,
-            members: this.members.map(m => ({ clientId: m.clientId, name: m.name })),
+            members: this.members.map(m => ({ clientId: m.clientId, name: m.name, avatar: m.avatar })),
             settings: this.settings,
             playerGames: this.playerGames,
             mergedGames: this.getMergedGames(),
@@ -245,12 +245,28 @@ function broadcastToRoom(room, data) {
 function broadcastRoomList() {
     const list = [...rooms.values()].map(r => ({
         id: r.id, hostName: r.members[0]?.name || '???',
+        hostAvatar: r.members[0]?.avatar || null,
         playerCount: r.members.length, playing: r.playing,
         gameName: r.game?.gameConfig?.name || '',
         mergedGames: r.getMergedGames()
     }));
     for (const [ws] of clients) {
         send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
+    }
+}
+
+function broadcastOnlineUsers() {
+    const users = [];
+    for (const [, c] of clients) {
+        if (c.name.startsWith('Player') && !c.avatar) continue; // skip unnamed clients
+        let status = 'lobby';
+        if (c.inZoom) status = 'zoom';
+        else if (c.roomIds.length > 0) status = 'playing';
+        users.push({ name: c.name, avatar: c.avatar || null, status, isGuest: !!c.isGuest });
+    }
+    const data = { type: 'online_users', users };
+    for (const [ws] of clients) {
+        send(ws, data);
     }
 }
 
@@ -329,8 +345,9 @@ function getStateForPlayer(game, room, playerSeat) {
         players: game.players.map((p, i) => {
             const isMe = i === playerSeat;
             const showCards = isMe || game.isShowdown;
+            const member = room.members.find(m => m.clientId === p.id);
             return {
-                id: p.id, name: p.name, chips: p.chips,
+                id: p.id, name: p.name, avatar: member?.avatar || null, chips: p.chips,
                 folded: p.folded, allIn: p.allIn,
                 seatBet: p.seatBet, lastAction: p.lastAction,
                 connected: p.connected, sitout: !!(room.sitout && room.sitout[i]),
@@ -390,6 +407,7 @@ wss.on('connection', (ws) => {
 
     send(ws, { type: 'welcome', clientId });
     broadcastRoomList();
+    broadcastOnlineUsers();
 
     ws.on('message', (raw) => {
         let msg;
@@ -401,6 +419,7 @@ wss.on('connection', (ws) => {
         handleDisconnect(client);
         clients.delete(ws);
         broadcastRoomList();
+        broadcastOnlineUsers();
     });
 });
 
@@ -411,12 +430,15 @@ function handleMessage(ws, client, msg) {
     switch (msg.type) {
         case 'set_name':
             client.name = (msg.name || '').trim().slice(0, 20) || 'Player' + client.id;
+            if (msg.avatar && typeof msg.avatar === 'string') client.avatar = msg.avatar.slice(0, 30);
+            client.isGuest = !!msg.isGuest;
             send(ws, { type: 'name_set', name: client.name });
+            broadcastOnlineUsers();
             if (client.roomId) {
                 const room = rooms.get(client.roomId);
                 if (room) {
                     const m = room.getMember(client.id);
-                    if (m) m.name = client.name;
+                    if (m) { m.name = client.name; m.avatar = client.avatar; }
                     broadcastRoomUpdate(room);
                 }
             }
@@ -427,7 +449,7 @@ function handleMessage(ws, client, msg) {
                     const dp = room.disconnectedPlayers[client.name];
                     const seat = dp.seat;
                     delete room.disconnectedPlayers[client.name];
-                    room.members.push({ clientId: client.id, name: client.name, ws });
+                    room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
                     client.roomId = roomId;
                     if (!client.roomIds.includes(roomId)) client.roomIds.push(roomId);
                     room.seatMap[client.id] = seat;
@@ -455,12 +477,13 @@ function handleMessage(ws, client, msg) {
             if (client.inZoom) leaveZoom(client);
             const roomId = generateRoomId();
             const room = new Room(roomId, client.id, client.name);
-            room.members.push({ clientId: client.id, name: client.name, ws });
+            room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
             rooms.set(roomId, room);
             client.roomId = roomId;
             if (!client.roomIds.includes(roomId)) client.roomIds.push(roomId);
             send(ws, { type: 'room_joined', room: room.toJSON(), roomId });
             broadcastRoomList();
+            broadcastOnlineUsers();
             break;
         }
 
@@ -470,7 +493,7 @@ function handleMessage(ws, client, msg) {
             const room = rooms.get(msg.roomId);
             if (!room) { send(ws, { type: 'error', message: 'ルームが見つかりません' }); return; }
             if (room.members.length >= 6) { send(ws, { type: 'error', message: 'ルームが満員です' }); return; }
-            room.members.push({ clientId: client.id, name: client.name, ws });
+            room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
             client.roomId = room.id;
             if (!client.roomIds.includes(room.id)) client.roomIds.push(room.id);
 
@@ -516,6 +539,8 @@ function handleMessage(ws, client, msg) {
                 // Record initial chips for end-of-game ranking
                 if (!room.initialChips) room.initialChips = {};
                 room.initialChips[client.name] = MID_JOIN_CHIPS;
+                if (!room.totalRebuys) room.totalRebuys = {};
+                room.totalRebuys[client.name] = 0;
                 room.seatMap[client.id] = seatIdx;
                 midJoinSeat = seatIdx;
             }
@@ -543,6 +568,7 @@ function handleMessage(ws, client, msg) {
 
             broadcastRoomUpdate(room);
             broadcastRoomList();
+            broadcastOnlineUsers();
             break;
         }
 
@@ -551,6 +577,7 @@ function handleMessage(ws, client, msg) {
             leaveRoom(client, targetRoomId);
             send(ws, { type: 'room_left', roomId: targetRoomId });
             broadcastRoomList();
+            broadcastOnlineUsers();
             break;
         }
 
@@ -675,8 +702,11 @@ function handleMessage(ws, client, msg) {
             if (!p.folded) break;
             const rebuyAmount = 10000;
             if (p.chips >= rebuyAmount) break;
+            const addedChips = rebuyAmount - p.chips;
             p.chips = rebuyAmount;
-            broadcastLog(room, `${client.name} がチップを補充しました (${rebuyAmount.toLocaleString()})`, 'important');
+            if (!room.totalRebuys) room.totalRebuys = {};
+            room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + addedChips;
+            broadcastLog(room, `${client.name} がチップを補充しました (+${addedChips.toLocaleString()})`, 'important');
             broadcastGameState(room);
             break;
         }
@@ -745,6 +775,26 @@ function handleMessage(ws, client, msg) {
                         send(ws, { type: 'lobby_chat', from: client.name, message: text });
                     }
                 }
+            }
+            break;
+        }
+
+        case 'dm': {
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではDMを送信できません' }); break; }
+            const toName = (msg.to || '').trim();
+            const dmText = (msg.message || '').slice(0, 200);
+            if (!toName || !dmText) break;
+            // Find target client by name
+            let targetWs = null;
+            for (const [tws, tc] of clients) {
+                if (tc.name === toName && tws !== ws) { targetWs = tws; break; }
+            }
+            if (targetWs) {
+                const ts = Date.now();
+                send(targetWs, { type: 'dm', from: client.name, message: dmText, ts });
+                send(ws, { type: 'dm_sent', to: toName, message: dmText, ts });
+            } else {
+                send(ws, { type: 'dm_failed', to: toName, reason: 'オフラインです' });
             }
             break;
         }
@@ -874,7 +924,8 @@ function startGame(room) {
     const game = new GameState(names, room.settings.startingChips);
     // Record each player's starting chips for end-of-game ranking
     room.initialChips = {};
-    names.forEach(n => { room.initialChips[n] = room.settings.startingChips; });
+    room.totalRebuys = {}; // Track total rebuy chips per player
+    names.forEach(n => { room.initialChips[n] = room.settings.startingChips; room.totalRebuys[n] = 0; });
     game.filteredGames = filteredGames;
     game.delay = (ms) => new Promise(r => setTimeout(r, Math.min(ms, 800)));
 
@@ -1162,14 +1213,22 @@ async function runGameLoop(room) {
     broadcastGameState(room);
 
     const initialChips = room.initialChips || {};
+    const totalRebuys = room.totalRebuys || {};
     const ranking = game.players
         .filter(p => p.name)
-        .map(p => ({
-            name: p.name,
-            finalChips: p.chips,
-            initialChips: initialChips[p.name] || room.settings.startingChips,
-            totalWin: p.chips - (initialChips[p.name] || room.settings.startingChips),
-        }))
+        .map(p => {
+            const init = initialChips[p.name] || room.settings.startingChips;
+            const rebuys = totalRebuys[p.name] || 0;
+            const netProfit = p.chips - init - rebuys;
+            return {
+                name: p.name,
+                finalChips: p.chips,
+                initialChips: init,
+                totalRebuys: rebuys,
+                netProfit,
+                totalWin: netProfit, // net profit = pure game result
+            };
+        })
         .sort((a, b) => b.totalWin - a.totalWin);
 
     broadcastToRoom(room, {
@@ -1193,10 +1252,11 @@ function handleJoinZoom(ws, client) {
     if (client.inZoom) return;
 
     client.inZoom = true;
-    zoomPlayers.set(client.id, { name: client.name, ws, tableId: null });
+    zoomPlayers.set(client.id, { name: client.name, avatar: client.avatar, ws, tableId: null });
     send(ws, { type: 'zoom_joined' });
     addToZoomPool(client.id);
     broadcastRoomList();
+    broadcastOnlineUsers();
 }
 
 function handleLeaveZoom(ws, client) {
@@ -1204,6 +1264,7 @@ function handleLeaveZoom(ws, client) {
     leaveZoom(client);
     send(ws, { type: 'zoom_left' });
     broadcastRoomList();
+    broadcastOnlineUsers();
 }
 
 function handleZoomSitout(ws, client) {
@@ -1260,7 +1321,7 @@ function addToZoomPool(clientId) {
     // Prevent duplicates
     if (zoomPool.some(p => p.clientId === clientId)) return;
 
-    zoomPool.push({ clientId, name: pd.name, ws: pd.ws });
+    zoomPool.push({ clientId, name: pd.name, avatar: pd.avatar, ws: pd.ws });
     send(pd.ws, { type: 'zoom_waiting', poolSize: zoomPool.length });
 
     zoomMatchmake();

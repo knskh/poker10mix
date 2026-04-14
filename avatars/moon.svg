@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs><clipPath id="clip"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<circle cx="128" cy="128" r="128" fill="#0a0c1a"/>
+<g clip-path="url(#clip)">
+        <circle cx="128" cy="128" r="55" fill="#FDD835"/>
+        <circle cx="153" cy="113" r="45" fill="#0a0c1a"/>
+        <circle cx="108" cy="118" r="3" fill="#333"/>
+        <circle cx="118" cy="143" r="2" fill="#333"/>
+        <circle cx="98" cy="133" r="2.5" fill="#333"/>
+        <circle cx="123" cy="103" r="1.5" fill="#FBC02D" opacity="0.5"/>
+        <circle cx="93" cy="113" r="2" fill="#FBC02D" opacity="0.5"/></g>
+</svg>

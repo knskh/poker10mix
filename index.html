@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=37">
+    <link rel="stylesheet" href="css/style.css?v=40">
 </head>
 <body>
     <div id="app">
@@ -38,6 +38,15 @@
                     <input type="text" id="account-name" placeholder="名前" maxlength="20" autocomplete="username">
                     <input type="email" id="account-email" placeholder="メールアドレス" autocomplete="email">
                     <input type="password" id="account-password" placeholder="パスワード" autocomplete="current-password">
+                    <div class="avatar-picker" id="avatar-picker">
+                        <p class="avatar-picker-label">アバターを選択</p>
+                        <div class="avatar-picker-tabs">
+                            <button class="avatar-tab active" data-cat="people">人物</button>
+                            <button class="avatar-tab" data-cat="animals">動物</button>
+                            <button class="avatar-tab" data-cat="zodiac">星座</button>
+                        </div>
+                        <div class="avatar-grid" id="avatar-grid"></div>
+                    </div>
                     <button id="btn-account-submit" class="btn-primary">ログイン</button>
                 </div>
             </div>
@@ -71,10 +80,19 @@
             </div>
             <div id="big-hand-feed" class="big-hand-feed hidden"></div>
             <div class="room-chat">
-                <div id="lobby-chat-log" class="room-chat-log"></div>
-                <div class="chat-bar">
-                    <input type="text" id="lobby-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                    <button id="btn-lobby-chat-send" class="btn-small">送信</button>
+                <div class="lobby-bottom-tabs">
+                    <button class="lobby-bottom-tab active" id="tab-lobby-chat" data-tab="chat">チャット</button>
+                    <button class="lobby-bottom-tab" id="tab-lobby-online" data-tab="online">ユーザーリスト</button>
+                </div>
+                <div id="lobby-tab-chat">
+                    <div id="lobby-chat-log" class="room-chat-log"></div>
+                    <div class="chat-bar">
+                        <input type="text" id="lobby-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                        <button id="btn-lobby-chat-send" class="btn-small">送信</button>
+                    </div>
+                </div>
+                <div id="lobby-tab-online" class="hidden">
+                    <div id="online-user-list" class="online-user-list"></div>
                 </div>
             </div>
         </div>
@@ -363,6 +381,22 @@
                 </div>
             </div>
 
+        </div>
+
+        <!-- DM Modal -->
+        <div id="dm-modal" class="dm-modal hidden">
+            <div class="dm-modal-content">
+                <div class="dm-modal-header">
+                    <span class="dm-modal-title" id="dm-modal-title"></span>
+                    <button id="dm-modal-close" class="dm-modal-close">✕</button>
+                </div>
+                <div class="dm-modal-body" id="dm-modal-body"></div>
+                <div class="dm-modal-notice">メッセージ履歴は1週間で自動削除されます</div>
+                <div class="dm-modal-input">
+                    <input type="text" id="dm-input" placeholder="メッセージを入力..." maxlength="200" autocomplete="off">
+                    <button id="btn-dm-send" class="btn-small">送信</button>
+                </div>
+            </div>
         </div>
     </div>
 
