@@ -230,9 +230,11 @@ loadFootprints();
 // ============================================
 // Notable Hand Detection (for auto-share)
 // ============================================
-function isNotableHand(handResult, winnerName, totalPot, bigBlind) {
-    // Trigger 1: pot >= 100 BB
-    const bigPot = totalPot >= bigBlind * 100;
+function isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBet) {
+    // Trigger 1: pot >= 50 BB OR pot >= 25 big bets
+    const bbThreshold = (bigBlind || 100) * 50;
+    const bigBetThreshold = (bigBet || (bigBlind || 100) * 2) * 25;
+    const bigPot = totalPot >= bbThreshold || totalPot >= bigBetThreshold;
     // Trigger 2: strong hand rank (royal flush, straight flush, 4 of a kind)
     let strongHand = false;
     let handRank = '';
@@ -1706,7 +1708,7 @@ function startGame(room) {
         broadcastStatsUpdate(room);
 
         // Big hand detection → broadcast to lobby
-        const bigBlind = game.bigBlind || 100;
+        const bigBlind = (gc && gc.bigBlind) || game.bigBlind || 100;
         const potThreshold = bigBlind * 50;
         // Calculate pot from chip changes
         let totalPot = 0;
@@ -1744,7 +1746,8 @@ function startGame(room) {
 
         // Auto-share notable hand to SNS timeline
         if (winnerName) {
-            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind);
+            const bigBetVal = (gc && gc.bigBet) || bigBlind * 2;
+            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBetVal);
             if (notable.notable) {
                 autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name);
             }
@@ -2020,7 +2023,7 @@ function createZoomTable(members) {
         broadcastZoomStatsUpdate(table);
 
         // Big hand detection → broadcast to lobby
-        const bigBlind = game.bigBlind || 100;
+        const bigBlind = (gc && gc.bigBlind) || game.bigBlind || 100;
         const potThreshold = bigBlind * 50;
         let totalPot = 0;
         let winnerName = '';
@@ -2056,7 +2059,8 @@ function createZoomTable(members) {
 
         // Auto-share notable hand to SNS timeline (Zoom)
         if (winnerName) {
-            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind);
+            const bigBetVal = (gc && gc.bigBet) || bigBlind * 2;
+            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBetVal);
             if (notable.notable) {
                 autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name);
             }
