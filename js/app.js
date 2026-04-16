@@ -610,7 +610,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRoomList(data);
         // Cache for SNS screen and add-table modal
         window.lastRoomList = data.rooms || [];
+        window.lastZoomCount = data.zoomCount || 0;
         addTableRoomListCache = data.rooms || [];
+        if (typeof updateSNSCTACounts === 'function') updateSNSCTACounts();
+        const roomPickerModal = document.getElementById('room-picker-modal');
+        if (roomPickerModal && !roomPickerModal.classList.contains('hidden')) {
+            renderRoomModalList();
+        }
         const modal = document.getElementById('add-table-modal');
         if (modal && !modal.classList.contains('hidden')) {
             renderAddTableRooms();
@@ -744,6 +750,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             if (Array.isArray(data.following)) myFollowing = new Set(data.following);
             renderOnlineUsers(data.users || []);
+        }
+        if (typeof updateSNSCTACounts === 'function') updateSNSCTACounts();
+        const onlineModal = document.getElementById('online-picker-modal');
+        if (onlineModal && !onlineModal.classList.contains('hidden')) {
+            renderOnlineUsersInModal();
         }
     });
     client.on('follows', (msg) => {
@@ -892,11 +903,13 @@ function setupLoginScreen() {
 }
 
 function enterLobby(displayName) {
-    showScreen('lobby');
+    // Unified: go to SNS as the main landing
     const userEl = document.getElementById('lobby-username');
     const avatarSrc = getAvatarSrc(selectedAvatar);
     userEl.innerHTML = (avatarSrc ? `<img class="lobby-avatar" src="${avatarSrc}" alt="">` : '') +
         document.createTextNode(displayName).textContent;
+    showScreen('sns');
+    client.getRooms(); // fetch rooms so CTA count populates
 }
 
 // ==========================================
@@ -1000,14 +1013,6 @@ function setupLobbyScreen() {
     document.getElementById('btn-ranking-close').addEventListener('click', () => {
         document.getElementById('ranking-modal').classList.add('hidden');
     });
-
-    // SNS button
-    const snsBtn = document.getElementById('btn-lobby-sns');
-    if (snsBtn) {
-        snsBtn.addEventListener('click', () => {
-            showScreen('sns');
-        });
-    }
 
     // Hand history button
     document.getElementById('btn-lobby-history').addEventListener('click', () => {
@@ -4677,18 +4682,42 @@ function initSNSScreen() {
     }
     client.getTimeline();
     client.getFootprints();
-    const roomCountEl = document.getElementById('sns-room-count');
-    if (roomCountEl && typeof lastRoomList !== 'undefined' && Array.isArray(lastRoomList)) {
-        roomCountEl.textContent = lastRoomList.length;
+    updateSNSCTACounts();
+    // Re-render lobby-chat room modal if open
+    if (document.getElementById('room-picker-modal') && !document.getElementById('room-picker-modal').classList.contains('hidden')) {
+        renderRoomModalList();
     }
 }
 
+function updateSNSCTACounts() {
+    const roomCountEl = document.getElementById('sns-cta-room-count');
+    const onlineCountEl = document.getElementById('sns-cta-online-count');
+    const roomSideEl = document.getElementById('sns-room-count');
+    const rooms = window.lastRoomList || [];
+    const availableRooms = rooms.filter(r => r.playerCount < 6).length;
+    if (roomCountEl) roomCountEl.textContent = availableRooms;
+    if (roomSideEl) roomSideEl.textContent = rooms.length;
+    if (onlineCountEl) onlineCountEl.textContent = (lastOnlineUsers || []).length;
+}
+
 function setupSNSEvents() {
-    document.getElementById('btn-sns-close').addEventListener('click', (e) => {
-        e.preventDefault();
-        showScreen('lobby');
+    // Header action buttons
+    const statsBtn = document.getElementById('sns-header-stats');
+    if (statsBtn) statsBtn.addEventListener('click', () => {
+        const lobbyStatsBtn = document.getElementById('btn-lobby-stats');
+        if (lobbyStatsBtn) lobbyStatsBtn.click();
     });
-    document.getElementById('btn-sns-to-lobby').addEventListener('click', () => showScreen('lobby'));
+    const histBtn = document.getElementById('sns-header-history');
+    if (histBtn) histBtn.addEventListener('click', () => {
+        const lobbyHistBtn = document.getElementById('btn-lobby-history');
+        if (lobbyHistBtn) lobbyHistBtn.click();
+    });
+    const logoutBtn = document.getElementById('sns-header-logout');
+    if (logoutBtn) logoutBtn.addEventListener('click', () => {
+        const lobbyLogoutBtn = document.getElementById('btn-logout');
+        if (lobbyLogoutBtn) lobbyLogoutBtn.click();
+    });
+    document.getElementById('btn-sns-to-lobby').addEventListener('click', () => openRoomModal());
 
     // Tab navigation
     document.querySelectorAll('#sns-screen [data-sns-tab]').forEach(el => {
@@ -4698,18 +4727,56 @@ function setupSNSEvents() {
         });
     });
 
-    // Diary composer
-    document.getElementById('menu-new-diary').addEventListener('click', (e) => {
-        e.preventDefault();
-        openComposer();
-    });
-    document.getElementById('btn-composer-close').addEventListener('click', closeComposer);
+    // Chat composer
+    const menuNewDiary = document.getElementById('menu-new-diary');
+    if (menuNewDiary) menuNewDiary.addEventListener('click', (e) => { e.preventDefault(); openComposer(); });
     document.getElementById('btn-composer-submit').addEventListener('click', submitComposer);
+    const composerBody = document.getElementById('composer-body');
+    if (composerBody) composerBody.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComposer(); }
+    });
 
-    // Refresh
-    document.getElementById('btn-sns-refresh').addEventListener('click', (e) => {
-        e.preventDefault();
-        client.getTimeline();
+    // Refresh timeline
+    const refreshBtn = document.getElementById('btn-sns-refresh');
+    if (refreshBtn) refreshBtn.addEventListener('click', (e) => { e.preventDefault(); client.getTimeline(); });
+
+    // CTA buttons
+    document.getElementById('btn-open-rooms').addEventListener('click', openRoomModal);
+    document.getElementById('btn-open-online').addEventListener('click', openOnlineModal);
+    document.getElementById('btn-open-chat').addEventListener('click', openChatModal);
+
+    // Room picker modal
+    document.getElementById('btn-rp-close').addEventListener('click', closeRoomModal);
+    document.querySelector('#room-picker-modal .rp-backdrop').addEventListener('click', closeRoomModal);
+    document.getElementById('btn-rp-create').addEventListener('click', () => {
+        closeRoomModal();
+        client.createRoom();
+    });
+    document.getElementById('btn-rp-zoom').addEventListener('click', () => {
+        closeRoomModal();
+        client.joinZoom();
+    });
+    document.getElementById('btn-rp-refresh').addEventListener('click', () => client.getRooms());
+    document.getElementById('btn-rp-join-by-id').addEventListener('click', () => {
+        const id = document.getElementById('rp-room-id-input').value.trim().toUpperCase();
+        if (!id) return;
+        client.joinRoom(id);
+        closeRoomModal();
+    });
+    document.getElementById('rp-room-id-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('btn-rp-join-by-id').click();
+    });
+
+    // Online picker modal
+    document.getElementById('btn-op-close').addEventListener('click', closeOnlineModal);
+    document.querySelector('#online-picker-modal .rp-backdrop').addEventListener('click', closeOnlineModal);
+
+    // Chat picker modal (lobby chat)
+    document.getElementById('btn-cp-close').addEventListener('click', closeChatModal);
+    document.querySelector('#chat-picker-modal .rp-backdrop').addEventListener('click', closeChatModal);
+    document.getElementById('btn-cp-chat-send').addEventListener('click', sendChatModalMsg);
+    document.getElementById('cp-chat-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendChatModalMsg();
     });
 
     // Auto-share modal handlers
@@ -4727,6 +4794,162 @@ function setupSNSEvents() {
     });
 }
 
+// ---- Room picker modal ----
+function openRoomModal() {
+    client.getRooms();
+    document.getElementById('room-picker-modal').classList.remove('hidden');
+    renderRoomModalList();
+}
+function closeRoomModal() {
+    document.getElementById('room-picker-modal').classList.add('hidden');
+}
+function renderRoomModalList() {
+    const container = document.getElementById('rp-room-list');
+    if (!container) return;
+    const rooms = window.lastRoomList || [];
+    if (rooms.length === 0) {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:#888">参加可能なルームがありません</div>';
+        return;
+    }
+    container.innerHTML = '';
+    for (const r of rooms) {
+        const canJoin = r.playerCount < 6;
+        const row = document.createElement('div');
+        row.className = 'rp-room-row' + (canJoin ? '' : ' rp-room-full');
+        const statusText = !r.playing ? '待機中' : (canJoin ? '参加可' : '満員');
+        const lock = r.locked ? '🔓 ' : '';
+        const hostInitial = (r.hostName || '?').charAt(0).toUpperCase();
+        const hostAvatarHtml = r.hostAvatar
+            ? `<img src="avatars/${r.hostAvatar}.svg" alt="" class="rp-host-avatar">`
+            : `<div class="rp-host-avatar">${hostInitial}</div>`;
+        row.innerHTML = `
+            ${hostAvatarHtml}
+            <div class="rp-room-info">
+                <div class="rp-room-title">${lock}${r.id} <span style="color:#888;font-size:11px">${escapeHtml(r.hostName || '')}</span></div>
+                <div class="rp-room-meta">${r.playerCount}/6 人 ｜ ${statusText} ${r.gameName ? '｜ ' + escapeHtml(r.gameName) : ''}</div>
+            </div>
+            <button class="btn-mixi rp-room-join" ${canJoin ? '' : 'disabled'}>${canJoin ? '参加' : '満員'}</button>
+        `;
+        const btn = row.querySelector('.rp-room-join');
+        if (canJoin) {
+            btn.addEventListener('click', () => {
+                client.joinRoom(r.id);
+                closeRoomModal();
+            });
+        }
+        container.appendChild(row);
+    }
+    // Update Zoom count in modal
+    const zcEl = document.getElementById('rp-zoom-count');
+    if (zcEl && typeof window.lastZoomCount === 'number') {
+        zcEl.textContent = window.lastZoomCount > 0 ? ` (${window.lastZoomCount}人)` : '';
+    }
+}
+
+// ---- Online picker modal ----
+function openOnlineModal() {
+    document.getElementById('online-picker-modal').classList.remove('hidden');
+    // Re-render into modal container
+    renderOnlineUsersInModal();
+}
+function closeOnlineModal() {
+    document.getElementById('online-picker-modal').classList.add('hidden');
+}
+function renderOnlineUsersInModal() {
+    const container = document.getElementById('op-user-list');
+    if (!container) return;
+    // Clone the online-user-list markup from lobby by rendering the cached list
+    const temp = renderOnlineUsersInto(container, lastOnlineUsers || []);
+}
+function renderOnlineUsersInto(container, users) {
+    container.innerHTML = '';
+    const statusOrder = { lobby: 0, playing: 1, zoom: 2 };
+    const statusLabel = { lobby: 'ロビー', playing: 'ゲーム中', zoom: 'Zoom' };
+    const myName = client.name;
+    const iAmGuest = !loggedInAccount;
+    users = [...users].sort((a, b) => {
+        const af = myFollowing.has(a.name) ? 0 : 1;
+        const bf = myFollowing.has(b.name) ? 0 : 1;
+        if (af !== bf) return af - bf;
+        return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
+    });
+    for (const u of users) {
+        const item = document.createElement('div');
+        item.className = 'online-user-item';
+        if (myFollowing.has(u.name)) item.classList.add('is-following');
+        const avatarHtml = u.avatar
+            ? `<img src="avatars/${u.avatar}.svg" alt="">`
+            : `<div class="online-user-initial">${(u.name || '?').charAt(0).toUpperCase()}</div>`;
+        const showDM = !iAmGuest && !u.isGuest && u.name !== myName;
+        const showFollow = !iAmGuest && !u.isGuest && u.name !== myName;
+        const isFollowing = myFollowing.has(u.name);
+        const followBtnHtml = showFollow
+            ? `<button class="online-user-follow ${isFollowing ? 'following' : ''}">${isFollowing ? '★' : '☆'}</button>`
+            : '';
+        const dmBtnHtml = showDM
+            ? `<button class="online-user-dm">💬</button>`
+            : '';
+        item.innerHTML = `
+            ${avatarHtml}
+            <span class="online-user-name">${escapeHtml(u.name)}</span>
+            <span class="online-user-status">
+                <span class="online-status-dot ${u.status}"></span>
+                ${statusLabel[u.status] || ''}
+            </span>
+            ${followBtnHtml}
+            ${dmBtnHtml}
+        `;
+        if (showFollow) {
+            item.querySelector('.online-user-follow').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (myFollowing.has(u.name)) { client.unfollow(u.name); myFollowing.delete(u.name); }
+                else { client.follow(u.name); myFollowing.add(u.name); }
+                renderOnlineUsersInto(container, users);
+            });
+        }
+        if (showDM) {
+            item.querySelector('.online-user-dm').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openDMModal(u.name);
+            });
+        }
+        item.querySelector('.online-user-name').addEventListener('click', () => {
+            client.viewProfile(u.name);
+            closeOnlineModal();
+        });
+        container.appendChild(item);
+    }
+}
+
+// ---- Chat picker modal (lobby chat) ----
+function openChatModal() {
+    document.getElementById('chat-picker-modal').classList.remove('hidden');
+    // Sync log from lobby to modal
+    const lobbyLog = document.getElementById('lobby-chat-log');
+    const modalLog = document.getElementById('cp-chat-log');
+    if (lobbyLog && modalLog) {
+        modalLog.innerHTML = lobbyLog.innerHTML;
+        modalLog.scrollTop = modalLog.scrollHeight;
+    }
+    document.getElementById('cp-chat-input').focus();
+}
+function closeChatModal() {
+    document.getElementById('chat-picker-modal').classList.add('hidden');
+}
+function sendChatModalMsg() {
+    const input = document.getElementById('cp-chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    // Reuse lobby chat send flow
+    const lobbyInput = document.getElementById('lobby-chat-input');
+    if (lobbyInput) {
+        lobbyInput.value = msg;
+        const sendBtn = document.getElementById('btn-lobby-chat-send');
+        if (sendBtn) sendBtn.click();
+    }
+    input.value = '';
+}
+
 function switchSNSTab(tab) {
     snsActiveTab = tab;
     document.querySelectorAll('#sns-screen .m-nav-item').forEach(el => {
@@ -4740,10 +4963,8 @@ function switchSNSTab(tab) {
     } else if (tab === 'profile') {
         titleEl.innerHTML = 'あなたのプロフィール';
         renderOwnProfile();
-    } else if (tab === 'diary') {
-        titleEl.innerHTML = 'あなたの日記 <span class="m-panel-more" id="btn-new-diary-inline">新規作成</span>';
-        const btn = document.getElementById('btn-new-diary-inline');
-        if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); openComposer(); });
+    } else if (tab === 'chat' || tab === 'diary') {
+        titleEl.innerHTML = 'あなたのチャット投稿';
         renderOwnDiary();
     } else if (tab === 'friends') {
         titleEl.innerHTML = 'ポーカー仲間';
@@ -4763,9 +4984,23 @@ function switchSNSTab(tab) {
 function renderSNSSelf() {
     const name = client.name || 'ゲスト';
     document.getElementById('sns-header-name').textContent = name;
+    const avatarWrap = document.getElementById('sns-header-avatar-wrap');
+    if (avatarWrap) {
+        const avatarSrc = getAvatarSrc(selectedAvatar || (client.avatar || ''));
+        avatarWrap.innerHTML = avatarSrc ? `<img src="${avatarSrc}" class="sns-header-avatar" alt="">` : '';
+    }
     document.getElementById('sns-welcome-title').textContent = `こんにちは、${name}さん！`;
     document.getElementById('sns-self-name').textContent = name;
-    document.getElementById('sns-self-avatar').textContent = (name.charAt(0) || '?').toUpperCase();
+    // Left sidebar avatar: prefer real avatar image, fallback to initial
+    const selfAvatarEl = document.getElementById('sns-self-avatar');
+    if (selfAvatarEl) {
+        const avatarSrc = getAvatarSrc(selectedAvatar || (client.avatar || ''));
+        if (avatarSrc) {
+            selfAvatarEl.innerHTML = `<img src="${avatarSrc}" alt="" style="width:100%;height:100%;border-radius:4px;object-fit:cover">`;
+        } else {
+            selfAvatarEl.textContent = (name.charAt(0) || '?').toUpperCase();
+        }
+    }
     document.getElementById('sns-self-meta').textContent = loggedInAccount ? 'レギュラー会員' : 'ゲスト';
     document.getElementById('sns-stat-following').textContent = myFollowing.size;
     document.getElementById('sns-stat-followers').textContent = myFollowers.size;
@@ -5040,25 +5275,23 @@ function renderFootprintsTab() {
 }
 
 function openComposer() {
-    if (!loggedInAccount) { showToast('ログインすると日記を書けます'); return; }
-    document.getElementById('sns-composer').classList.remove('hidden');
-    document.getElementById('composer-body').focus();
+    if (!loggedInAccount) { showToast('ログインするとチャット投稿できます'); return; }
+    // Composer is now always visible on home tab; just focus it
+    const bodyEl = document.getElementById('composer-body');
+    if (bodyEl) bodyEl.focus();
 }
 
 function closeComposer() {
-    document.getElementById('sns-composer').classList.add('hidden');
-    document.getElementById('composer-title').value = '';
-    document.getElementById('composer-body').value = '';
-    document.getElementById('composer-mood').value = '';
+    const bodyEl = document.getElementById('composer-body');
+    if (bodyEl) bodyEl.value = '';
 }
 
 function submitComposer() {
-    const title = document.getElementById('composer-title').value.trim();
     const body = document.getElementById('composer-body').value.trim();
-    const mood = document.getElementById('composer-mood').value;
-    if (!body && !title) { showToast('本文またはタイトルを入力してください'); return; }
-    client.createPost(title, body, mood);
-    closeComposer();
+    if (!body) { showToast('メッセージを入力してください'); return; }
+    if (!loggedInAccount) { showToast('ログインするとチャット投稿できます'); return; }
+    client.createPost('', body, '');
+    document.getElementById('composer-body').value = '';
 }
 
 function showAutoShareModal(post) {

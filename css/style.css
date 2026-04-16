@@ -3547,3 +3547,191 @@ body:not(.theme-classic):not(.theme-midnight) .pending-join-name {
     }
     #sns-screen .m-col-center { order: 1; }
 }
+
+/* ==========================================
+   SNS Header icons + CTA row
+   ========================================== */
+#sns-screen .btn-header-icon {
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+    color: white; padding: 3px 7px; font-size: 13px; border-radius: 3px;
+    cursor: pointer; margin-left: 4px; line-height: 1;
+}
+#sns-screen .btn-header-icon:hover {
+    background: rgba(255,255,255,0.35);
+}
+#sns-screen .sns-header-avatar {
+    width: 22px; height: 22px; border-radius: 3px; vertical-align: middle;
+    border: 1px solid rgba(255,255,255,0.5); margin-right: 4px;
+}
+
+/* Prominent CTA bar under header */
+#sns-screen .sns-cta-row {
+    background: #fff8e8; border-bottom: 1px solid #e8dcc4;
+    padding: 8px 0;
+}
+#sns-screen .sns-cta-inner {
+    max-width: 960px; margin: 0 auto; padding: 0 12px;
+    display: flex; gap: 8px; align-items: center;
+}
+#sns-screen .sns-cta-primary {
+    background: linear-gradient(to bottom, #ffa534, #ff8500);
+    color: white; border: 1px solid #cc6a00; border-bottom-width: 3px;
+    padding: 8px 16px; font-size: 13px; font-weight: 700;
+    border-radius: 4px; cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.1s;
+}
+#sns-screen .sns-cta-primary:hover {
+    background: linear-gradient(to bottom, #ff9820, #e67300);
+}
+#sns-screen .sns-cta-primary:active {
+    transform: translateY(1px);
+    border-bottom-width: 2px;
+}
+#sns-screen .sns-cta-primary span {
+    display: inline-block; background: rgba(255,255,255,0.3);
+    padding: 1px 8px; border-radius: 10px; margin-left: 4px; font-size: 12px;
+}
+#sns-screen .sns-cta-secondary {
+    background: white; color: #e67300;
+    border: 1px solid #ff8500; border-bottom-width: 2px;
+    padding: 6px 12px; font-size: 12px; font-weight: 500;
+    border-radius: 4px; cursor: pointer;
+    font-family: inherit;
+}
+#sns-screen .sns-cta-secondary:hover {
+    background: #fff3dd;
+}
+#sns-screen .sns-cta-secondary span {
+    display: inline-block; background: #ff8500; color: white;
+    padding: 1px 6px; border-radius: 8px; margin-left: 4px; font-size: 11px;
+}
+
+/* Chat composer inline row */
+#sns-screen .composer-chat-row {
+    display: flex; gap: 6px;
+}
+#sns-screen .composer-chat-row .composer-input {
+    flex: 1;
+}
+
+/* ==========================================
+   Room / Online / Chat picker modals
+   ========================================== */
+.rp-modal {
+    position: fixed; inset: 0; z-index: 8000;
+}
+.rp-modal.hidden { display: none !important; }
+.rp-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(3px);
+}
+.rp-content {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: white; border-radius: 8px;
+    width: 90%; max-width: 560px; max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    font-family: 'Noto Sans JP', sans-serif;
+    overflow: hidden;
+    border-top: 4px solid #ff8500;
+}
+.rp-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(to bottom, #fff8e8, #fff3dd);
+    border-bottom: 1px solid #e8dcc4;
+}
+.rp-title { font-size: 15px; font-weight: 700; color: #e67300; }
+.rp-close {
+    background: none; border: none; font-size: 18px;
+    color: #888; cursor: pointer; padding: 2px 8px; line-height: 1;
+}
+.rp-close:hover { color: #333; }
+.rp-actions {
+    display: flex; gap: 8px; padding: 10px 16px;
+    background: #fffaf2; border-bottom: 1px solid #e8dcc4;
+    flex-wrap: wrap; align-items: center;
+}
+.rp-join-by-id {
+    display: flex; gap: 4px; align-items: center;
+}
+.rp-join-by-id input {
+    width: 80px; padding: 4px 8px; font-size: 12px;
+    border: 1px solid #e8dcc4; border-radius: 3px; outline: none;
+    font-family: inherit;
+}
+.rp-join-by-id input:focus { border-color: #ff8500; }
+.rp-room-list {
+    overflow-y: auto; padding: 8px;
+    flex: 1; min-height: 120px;
+}
+.rp-room-row {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px; border: 1px solid #e8dcc4; border-radius: 4px;
+    margin-bottom: 6px; background: white;
+    transition: background 0.15s;
+}
+.rp-room-row:hover { background: #fffaf2; }
+.rp-room-row.rp-room-full { opacity: 0.6; }
+.rp-host-avatar {
+    width: 36px; height: 36px; border-radius: 3px;
+    background: linear-gradient(135deg, #ffd699, #ff9933);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 16px;
+    flex-shrink: 0;
+}
+.rp-host-avatar[src] {
+    background: none;
+}
+img.rp-host-avatar { object-fit: cover; }
+.rp-room-info { flex: 1; min-width: 0; }
+.rp-room-title {
+    font-size: 13px; font-weight: 700; color: #e67300;
+}
+.rp-room-meta {
+    font-size: 11px; color: #666; margin-top: 2px;
+}
+.rp-room-join {
+    padding: 5px 14px; font-size: 11px;
+}
+.rp-room-join:disabled {
+    background: #ccc; border-color: #999; cursor: not-allowed;
+}
+
+/* Online picker modal list */
+#online-picker-modal #op-user-list {
+    max-height: 70vh; overflow-y: auto; padding: 8px;
+    background: white;
+}
+
+/* Chat picker modal */
+.cp-chat-wrap {
+    display: flex; flex-direction: column; height: 60vh;
+}
+.cp-chat-wrap #cp-chat-log {
+    flex: 1; overflow-y: auto; padding: 10px; background: #fffaf2;
+}
+.cp-chat-wrap .chat-bar {
+    display: flex; gap: 4px; padding: 8px; background: white;
+    border-top: 1px solid #e8dcc4;
+}
+.cp-chat-wrap .chat-bar input {
+    flex: 1; padding: 6px 8px; font-size: 12px;
+    border: 1px solid #e8dcc4; border-radius: 3px; outline: none;
+    font-family: inherit;
+}
+.cp-chat-wrap .chat-bar input:focus { border-color: #ff8500; }
+
+/* Big hand feed as global overlay */
+#big-hand-feed {
+    position: fixed; top: 70px; right: 10px; z-index: 900;
+    max-width: 300px;
+}
+
+@media (max-width: 600px) {
+    #sns-screen .sns-cta-inner { flex-wrap: wrap; }
+    #sns-screen .sns-cta-primary, #sns-screen .sns-cta-secondary { flex: 1 1 auto; }
+    .rp-actions { flex-wrap: wrap; }
+}

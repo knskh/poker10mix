@@ -58,7 +58,6 @@
                 <img class="site-logo-lobby" src="logos/logo.png" alt="mix-1">
                 <div class="lobby-user">
                     <span id="lobby-username"></span>
-                    <button id="btn-lobby-sns" class="btn-small">🧡 SNS</button>
                     <button id="btn-lobby-stats" class="btn-small">Stats</button>
                     <button id="btn-lobby-history" class="btn-small">ハンド履歴</button>
                     <button id="btn-logout">ログアウト</button>
@@ -79,8 +78,7 @@
                     <div id="room-list-body" class="room-card-grid"></div>
                 </div>
             </div>
-            <div id="big-hand-feed" class="big-hand-feed hidden"></div>
-            <div class="room-chat">
+            <div class="room-chat hidden">
                 <div class="lobby-bottom-tabs">
                     <button class="lobby-bottom-tab active" id="tab-lobby-chat" data-tab="chat">チャット</button>
                     <button class="lobby-bottom-tab" id="tab-lobby-online" data-tab="online">ユーザーリスト</button>
@@ -98,6 +96,9 @@
             </div>
         </div>
 
+        <!-- Big hand feed (global overlay, not tied to lobby) -->
+        <div id="big-hand-feed" class="big-hand-feed hidden"></div>
+
         <!-- SNS (mixi-style) Screen -->
         <div id="sns-screen" class="hidden">
             <div class="sns-root">
@@ -110,9 +111,27 @@
                             <button>検索</button>
                         </div>
                         <div class="m-header-user">
-                            こんにちは、<a href="#" id="sns-header-name">ゲスト</a>さん ｜
-                            <a href="#" id="btn-sns-close">ロビーへ戻る</a>
+                            <span id="sns-header-avatar-wrap"></span>
+                            こんにちは、<a href="#" id="sns-header-name">ゲスト</a>さん
+                            <button id="sns-header-stats" class="btn-header-icon" title="統計">📊</button>
+                            <button id="sns-header-history" class="btn-header-icon" title="ハンド履歴">📜</button>
+                            <button id="sns-header-logout" class="btn-header-icon" title="ログアウト">🚪</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- CTA Row: "今すぐプレイ" prominent button -->
+                <div class="sns-cta-row">
+                    <div class="sns-cta-inner">
+                        <button id="btn-open-rooms" class="sns-cta-primary">
+                            🎰 参加できる卓 <span id="sns-cta-room-count">0</span>
+                        </button>
+                        <button id="btn-open-online" class="sns-cta-secondary">
+                            👥 オンライン <span id="sns-cta-online-count">0</span>
+                        </button>
+                        <button id="btn-open-chat" class="sns-cta-secondary">
+                            💬 ロビーチャット
+                        </button>
                     </div>
                 </div>
 
@@ -121,7 +140,7 @@
                     <div class="m-nav-inner">
                         <div class="m-nav-item active" data-sns-tab="home">ホーム</div>
                         <div class="m-nav-item" data-sns-tab="profile">プロフィール</div>
-                        <div class="m-nav-item" data-sns-tab="diary">日記</div>
+                        <div class="m-nav-item" data-sns-tab="chat">チャット</div>
                         <div class="m-nav-item" data-sns-tab="friends">ポーカー仲間</div>
                         <div class="m-nav-item" data-sns-tab="community">コミュニティ</div>
                         <div class="m-nav-item" data-sns-tab="messages">メッセージ</div>
@@ -177,21 +196,13 @@
                             <div class="m-welcome-badge" id="btn-sns-to-lobby">プレイする ▶</div>
                         </div>
 
-                        <!-- Composer (hidden by default) -->
-                        <div class="m-panel sns-composer hidden" id="sns-composer">
-                            <div class="m-panel-title">日記を書く <span class="m-panel-more" id="btn-composer-close">閉じる</span></div>
+                        <!-- Chat composer (always visible at top) -->
+                        <div class="m-panel sns-composer" id="sns-composer">
+                            <div class="m-panel-title">チャット投稿（タイムラインに流れます）</div>
                             <div class="m-panel-body">
-                                <input type="text" id="composer-title" class="composer-input" placeholder="タイトル（任意）" maxlength="100">
-                                <textarea id="composer-body" class="composer-textarea" placeholder="今日のプレイ、学び、一言…" maxlength="2000"></textarea>
-                                <div class="composer-actions">
-                                    <span class="composer-mood">気分:
-                                        <select id="composer-mood">
-                                            <option value="">--</option>
-                                            <option>最高</option><option>好調</option><option>普通</option>
-                                            <option>悔しい</option><option>学び中</option>
-                                        </select>
-                                    </span>
-                                    <button id="btn-composer-submit" class="btn-mixi">投稿する</button>
+                                <div class="composer-chat-row">
+                                    <input type="text" id="composer-body" class="composer-input" placeholder="いまどうしてる？ 一言チャット…" maxlength="280" autocomplete="off">
+                                    <button id="btn-composer-submit" class="btn-mixi">投稿</button>
                                 </div>
                             </div>
                         </div>
@@ -247,6 +258,57 @@
                             <div class="m-panel-title">おすすめ仲間</div>
                             <div class="m-panel-body" id="sns-suggested"></div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room picker modal (opens from SNS CTA) -->
+        <div id="room-picker-modal" class="rp-modal hidden">
+            <div class="rp-backdrop"></div>
+            <div class="rp-content">
+                <div class="rp-header">
+                    <div class="rp-title">🎰 卓一覧</div>
+                    <button class="rp-close" id="btn-rp-close">✕</button>
+                </div>
+                <div class="rp-actions">
+                    <button id="btn-rp-create" class="btn-mixi">➕ ルーム作成</button>
+                    <button id="btn-rp-zoom" class="btn-mixi">⚡ Zoom卓に参加<span id="rp-zoom-count"></span></button>
+                    <div class="rp-join-by-id">
+                        <input type="text" id="rp-room-id-input" placeholder="ルームID" maxlength="4" style="text-transform:uppercase">
+                        <button id="btn-rp-join-by-id" class="btn-small">参加</button>
+                    </div>
+                    <button id="btn-rp-refresh" class="btn-small">🔄 更新</button>
+                </div>
+                <div id="rp-room-list" class="rp-room-list"></div>
+            </div>
+        </div>
+
+        <!-- Online users modal -->
+        <div id="online-picker-modal" class="rp-modal hidden">
+            <div class="rp-backdrop"></div>
+            <div class="rp-content">
+                <div class="rp-header">
+                    <div class="rp-title">👥 オンラインユーザー</div>
+                    <button class="rp-close" id="btn-op-close">✕</button>
+                </div>
+                <div id="op-user-list" class="online-user-list"></div>
+            </div>
+        </div>
+
+        <!-- Lobby chat modal -->
+        <div id="chat-picker-modal" class="rp-modal hidden">
+            <div class="rp-backdrop"></div>
+            <div class="rp-content">
+                <div class="rp-header">
+                    <div class="rp-title">💬 ロビーチャット</div>
+                    <button class="rp-close" id="btn-cp-close">✕</button>
+                </div>
+                <div class="cp-chat-wrap">
+                    <div id="cp-chat-log" class="room-chat-log"></div>
+                    <div class="chat-bar">
+                        <input type="text" id="cp-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
+                        <button id="btn-cp-chat-send" class="btn-small">送信</button>
                     </div>
                 </div>
             </div>
