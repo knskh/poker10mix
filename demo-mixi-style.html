@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>案② mixi風 — poker10mix デザイン案</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --mixi-orange: #ff8500;
+    --mixi-orange-dark: #e67300;
+    --mixi-orange-light: #ffecd1;
+    --mixi-bg: #fff6e8;
+    --mixi-panel: #ffffff;
+    --mixi-border: #e8dcc4;
+    --mixi-text: #333333;
+    --mixi-text-dim: #888888;
+    --mixi-link: #ff6600;
+    --mixi-section-bg: #fff3dd;
+}
+
+body {
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--mixi-text);
+    background: var(--mixi-bg);
+    min-height: 100vh;
+}
+
+/* Header bar */
+.m-header {
+    background: linear-gradient(to bottom, #ffa534, #ff8500);
+    border-bottom: 2px solid #cc6a00;
+    padding: 6px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.m-header-inner {
+    max-width: 960px; margin: 0 auto; padding: 0 12px;
+    display: flex; align-items: center; gap: 16px;
+}
+.m-logo {
+    color: white; font-size: 22px; font-weight: 700;
+    letter-spacing: -1px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.15);
+}
+.m-logo::before { content: "♣ "; }
+.m-search {
+    flex: 1; max-width: 320px;
+    display: flex; background: white;
+    border-radius: 3px; padding: 3px;
+}
+.m-search input {
+    flex: 1; border: none; padding: 3px 6px;
+    font-size: 12px; outline: none;
+}
+.m-search button {
+    background: #666; color: white; border: none;
+    padding: 3px 10px; font-size: 11px; cursor: pointer;
+    border-radius: 2px;
+}
+.m-header-user {
+    color: white; font-size: 11px; display: flex;
+    gap: 10px; align-items: center;
+}
+.m-header-user a { color: white; text-decoration: underline; }
+
+/* Secondary nav (orange tabs) */
+.m-nav-bar {
+    background: white; border-bottom: 1px solid var(--mixi-border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.m-nav-inner {
+    max-width: 960px; margin: 0 auto; display: flex;
+}
+.m-nav-item {
+    padding: 8px 14px; font-size: 12px;
+    color: #555; cursor: pointer; border-right: 1px solid #f0e4ca;
+    transition: background 0.15s;
+}
+.m-nav-item:hover { background: var(--mixi-orange-light); color: var(--mixi-orange-dark); }
+.m-nav-item.active {
+    background: var(--mixi-orange); color: white; font-weight: 500;
+}
+
+/* Main layout */
+.m-container {
+    max-width: 960px; margin: 12px auto; padding: 0 12px;
+    display: grid; grid-template-columns: 200px 1fr 200px; gap: 10px;
+}
+
+/* Panels */
+.m-panel {
+    background: white; border: 1px solid var(--mixi-border);
+    border-radius: 4px; margin-bottom: 10px;
+    overflow: hidden;
+}
+.m-panel-title {
+    background: var(--mixi-section-bg);
+    border-bottom: 1px solid var(--mixi-border);
+    padding: 5px 10px; font-size: 11px; font-weight: 700;
+    color: var(--mixi-orange-dark);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.m-panel-title::before {
+    content: "●"; color: var(--mixi-orange);
+    margin-right: 5px; font-size: 8px;
+}
+.m-panel-more {
+    font-size: 10px; color: var(--mixi-link); text-decoration: underline;
+    font-weight: normal; cursor: pointer;
+}
+.m-panel-body { padding: 10px; }
+
+/* Left sidebar — profile card */
+.m-profile {
+    text-align: center;
+}
+.m-profile-avatar {
+    width: 80px; height: 80px; margin: 0 auto 8px;
+    background: linear-gradient(135deg, #ffcc80, #ff9933);
+    border-radius: 4px;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px var(--mixi-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; color: white; font-weight: 700;
+}
+.m-profile-name {
+    font-size: 13px; font-weight: 700; color: var(--mixi-link);
+    margin-bottom: 2px;
+}
+.m-profile-meta { font-size: 10px; color: var(--mixi-text-dim); }
+.m-profile-stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px dashed var(--mixi-border);
+    font-size: 10px;
+}
+.m-profile-stats > div { padding: 3px; }
+.m-profile-stats strong { color: var(--mixi-orange-dark); font-size: 14px; display: block; }
+
+/* Menu list */
+.m-menu-list { list-style: none; }
+.m-menu-list li {
+    padding: 4px 0; border-bottom: 1px dotted #eee;
+    font-size: 11px;
+}
+.m-menu-list li:last-child { border-bottom: none; }
+.m-menu-list a {
+    color: var(--mixi-link); text-decoration: none;
+    display: block; padding-left: 14px; position: relative;
+}
+.m-menu-list a::before {
+    content: "▸"; position: absolute; left: 3px;
+    color: var(--mixi-orange); font-size: 9px;
+}
+.m-menu-list a:hover { text-decoration: underline; }
+.m-menu-badge {
+    background: #ff3333; color: white; border-radius: 8px;
+    padding: 0 5px; font-size: 9px; font-weight: 700;
+    margin-left: 4px;
+}
+
+/* Footprints */
+.m-footprints { font-size: 10px; }
+.m-footprint-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 0; border-bottom: 1px dotted #eee;
+}
+.m-footprint-item:last-child { border-bottom: none; }
+.m-footprint-avatar {
+    width: 24px; height: 24px; border-radius: 3px;
+    background: linear-gradient(135deg, #b3d9ff, #66a3ff);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+}
+.m-footprint-info { flex: 1; min-width: 0; }
+.m-footprint-name { color: var(--mixi-link); font-weight: 500; }
+.m-footprint-time { color: var(--mixi-text-dim); font-size: 9px; }
+
+/* Center feed */
+.m-welcome {
+    background: linear-gradient(to bottom, #fff, #fffaf0);
+    border: 1px solid var(--mixi-border);
+    border-radius: 4px; padding: 14px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 12px;
+}
+.m-welcome-msg { flex: 1; }
+.m-welcome-msg h2 {
+    font-size: 14px; color: var(--mixi-orange-dark); margin-bottom: 4px;
+}
+.m-welcome-msg p { font-size: 11px; color: #666; }
+.m-welcome-badge {
+    background: var(--mixi-orange); color: white;
+    padding: 6px 10px; border-radius: 3px; font-size: 11px;
+    font-weight: 700; white-space: nowrap;
+}
+
+/* Diary / hand entry */
+.m-entry {
+    padding: 12px;
+    border-bottom: 1px solid var(--mixi-border);
+}
+.m-entry:last-child { border-bottom: none; }
+.m-entry-head {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 8px;
+}
+.m-entry-avatar {
+    width: 48px; height: 48px; border-radius: 3px;
+    border: 1px solid var(--mixi-border);
+    background: linear-gradient(135deg, #ffd699, #ff9933);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 24px; font-weight: 700;
+    flex-shrink: 0;
+}
+.m-entry-meta { flex: 1; }
+.m-entry-name {
+    font-size: 12px; font-weight: 700; color: var(--mixi-link);
+    text-decoration: none;
+}
+.m-entry-name:hover { text-decoration: underline; }
+.m-entry-date { font-size: 10px; color: var(--mixi-text-dim); }
+.m-entry-title {
+    font-size: 13px; font-weight: 700; color: var(--mixi-orange-dark);
+    margin: 4px 0 6px;
+}
+.m-entry-body {
+    font-size: 11px; line-height: 1.8;
+    color: #444;
+    padding: 8px 10px;
+    background: #fffaf2;
+    border: 1px dashed var(--mixi-border);
+    border-radius: 3px;
+}
+.m-entry-body .poker-cards {
+    display: inline-flex; gap: 3px; margin: 4px 0;
+}
+.m-card {
+    display: inline-block; width: 22px; height: 30px;
+    background: white; border: 1px solid #999;
+    border-radius: 3px; text-align: center;
+    font-size: 11px; font-weight: 700; line-height: 30px;
+    box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+.m-card.red { color: #d32f2f; }
+.m-card.black { color: #222; }
+.m-entry-actions {
+    margin-top: 8px; padding-top: 6px;
+    border-top: 1px dotted var(--mixi-border);
+    display: flex; gap: 12px; font-size: 10px;
+}
+.m-entry-actions a { color: var(--mixi-link); text-decoration: none; }
+.m-entry-actions a:hover { text-decoration: underline; }
+.m-entry-actions .icon { font-size: 11px; }
+
+/* Right sidebar */
+.m-community {
+    font-size: 11px;
+}
+.m-community-item {
+    display: flex; gap: 8px; padding: 5px 0;
+    border-bottom: 1px dotted #eee;
+}
+.m-community-item:last-child { border-bottom: none; }
+.m-community-icon {
+    width: 32px; height: 32px; border-radius: 3px;
+    border: 1px solid var(--mixi-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+    background: #fffaf2;
+}
+.m-community-info { flex: 1; min-width: 0; }
+.m-community-name {
+    font-size: 11px; color: var(--mixi-link);
+    font-weight: 500; display: block; line-height: 1.3;
+}
+.m-community-count {
+    font-size: 9px; color: var(--mixi-text-dim);
+}
+
+.m-ranking-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 0; border-bottom: 1px dotted #eee;
+    font-size: 10px;
+}
+.m-ranking-item:last-child { border-bottom: none; }
+.m-ranking-num {
+    width: 18px; height: 18px; border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: white;
+    flex-shrink: 0;
+}
+.m-ranking-num.r1 { background: #ffb300; }
+.m-ranking-num.r2 { background: #aaa; }
+.m-ranking-num.r3 { background: #c68e55; }
+.m-ranking-num.r4, .m-ranking-num.r5 { background: #999; }
+.m-ranking-name { color: var(--mixi-link); flex: 1; }
+.m-ranking-val { color: var(--mixi-orange-dark); font-weight: 700; }
+
+/* Ad-style banner */
+.m-banner {
+    background: linear-gradient(to right, #fff3dd, #ffe4b3);
+    border: 1px solid var(--mixi-orange);
+    padding: 8px; border-radius: 3px;
+    font-size: 10px; text-align: center;
+    color: var(--mixi-orange-dark);
+    margin-bottom: 10px;
+}
+.m-banner strong { font-size: 11px; display: block; margin-bottom: 2px; }
+
+/* Footer */
+.m-footer {
+    max-width: 960px; margin: 20px auto 10px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--mixi-border);
+    text-align: center; font-size: 10px;
+    color: var(--mixi-text-dim);
+}
+
+.demo-label {
+    position: fixed; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.75); color: #ffcc80;
+    padding: 5px 10px; border-radius: 3px;
+    font-size: 11px; z-index: 100;
+    font-family: monospace;
+}
+</style>
+</head>
+<body>
+<div class="demo-label">案② mixi風 デモ</div>
+
+<!-- Header -->
+<div class="m-header">
+    <div class="m-header-inner">
+        <div class="m-logo">poker10mix</div>
+        <div class="m-search">
+            <input type="text" placeholder="仲間・コミュニティを検索">
+            <button>検索</button>
+        </div>
+        <div class="m-header-user">
+            こんにちは、<a href="#">山田ハナ</a>さん ｜ <a href="#">設定</a> ｜ <a href="#">ログアウト</a>
+        </div>
+    </div>
+</div>
+
+<!-- Nav -->
+<div class="m-nav-bar">
+    <div class="m-nav-inner">
+        <div class="m-nav-item active">ホーム</div>
+        <div class="m-nav-item">プロフィール</div>
+        <div class="m-nav-item">日記</div>
+        <div class="m-nav-item">ポーカー仲間</div>
+        <div class="m-nav-item">コミュニティ</div>
+        <div class="m-nav-item">メッセージ</div>
+        <div class="m-nav-item">あしあと</div>
+        <div class="m-nav-item">ランキング</div>
+    </div>
+</div>
+
+<!-- Main -->
+<div class="m-container">
+
+    <!-- Left Sidebar -->
+    <div>
+        <div class="m-panel">
+            <div class="m-panel-body">
+                <div class="m-profile">
+                    <div class="m-profile-avatar">ハ</div>
+                    <a href="#" class="m-entry-name">山田ハナ</a>
+                    <div class="m-profile-meta">レギュラー会員 ｜ 東京</div>
+                    <div class="m-profile-stats">
+                        <div><strong>142</strong>仲間</div>
+                        <div><strong>38</strong>コミュ</div>
+                        <div><strong>523</strong>日記</div>
+                        <div><strong>68%</strong>勝率</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-title">メニュー</div>
+            <div class="m-panel-body">
+                <ul class="m-menu-list">
+                    <li><a href="#">日記を書く</a></li>
+                    <li><a href="#">仲間を招待する</a></li>
+                    <li><a href="#">メッセージ<span class="m-menu-badge">3</span></a></li>
+                    <li><a href="#">あしあと<span class="m-menu-badge">12</span></a></li>
+                    <li><a href="#">お気に入り</a></li>
+                    <li><a href="#">フォト</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-title">最新あしあと <span class="m-panel-more">もっと見る</span></div>
+            <div class="m-panel-body m-footprints">
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#b3d9ff,#66a3ff)">健</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">健太</div>
+                        <div class="m-footprint-time">3分前</div>
+                    </div>
+                </div>
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#ffb3d9,#ff66a3)">サ</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">サクラ</div>
+                        <div class="m-footprint-time">15分前</div>
+                    </div>
+                </div>
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#b3e6b3,#66c266)">マ</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">マサル</div>
+                        <div class="m-footprint-time">1時間前</div>
+                    </div>
+                </div>
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#e6ccb3,#cc9966)">テ</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">テスター</div>
+                        <div class="m-footprint-time">3時間前</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Center -->
+    <div>
+        <div class="m-welcome">
+            <div class="m-welcome-msg">
+                <h2>こんにちは、ハナさん！</h2>
+                <p>新着メッセージが3件、あしあとが12件あります。</p>
+            </div>
+            <div class="m-welcome-badge">プレイする ▶</div>
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-title">ポーカー仲間の最新日記 <span class="m-panel-more">全て見る</span></div>
+
+            <div class="m-entry">
+                <div class="m-entry-head">
+                    <div class="m-entry-avatar">健</div>
+                    <div class="m-entry-meta">
+                        <a href="#" class="m-entry-name">健太</a>
+                        <div class="m-entry-date">2026年4月15日 18:32 ｜ 気分：最高！</div>
+                    </div>
+                </div>
+                <div class="m-entry-title">🎉 ついにロイヤルストレートフラッシュ出た！</div>
+                <div class="m-entry-body">
+                    みなさんこんばんは、健太です(^-^)／<br>
+                    さっきの$2/$5テーブルで、人生初のロイヤル引きました！<br>
+                    <div class="poker-cards">
+                        <span class="m-card red">A♥</span>
+                        <span class="m-card red">K♥</span>
+                        <span class="m-card red">Q♥</span>
+                        <span class="m-card red">J♥</span>
+                        <span class="m-card red">10♥</span>
+                    </div>
+                    ポットは$480。興奮しすぎて手が震えました(笑)<br>
+                    コメント・メッセージお待ちしてます！
+                </div>
+                <div class="m-entry-actions">
+                    <a href="#"><span class="icon">👍</span> イイネ！(24)</a>
+                    <a href="#"><span class="icon">💬</span> コメント(8)</a>
+                    <a href="#"><span class="icon">📤</span> 仲間に教える</a>
+                </div>
+            </div>
+
+            <div class="m-entry">
+                <div class="m-entry-head">
+                    <div class="m-entry-avatar" style="background:linear-gradient(135deg,#ffb3d9,#ff66a3)">サ</div>
+                    <div class="m-entry-meta">
+                        <a href="#" class="m-entry-name">サクラ</a>
+                        <div class="m-entry-date">2026年4月15日 17:05 ｜ 気分：悔しい…</div>
+                    </div>
+                </div>
+                <div class="m-entry-title">今日のセッションを振り返って</div>
+                <div class="m-entry-body">
+                    4時間プレイして +$180 でフィニッシュ。<br>
+                    序盤はJJでAKにオールイン食らって負けたけど、後半で取り返せた◎<br>
+                    明日のトーナメントに向けて早めに寝ます｡+.ﾟo(´▽｀*)oﾟ.+｡
+                </div>
+                <div class="m-entry-actions">
+                    <a href="#"><span class="icon">👍</span> イイネ！(7)</a>
+                    <a href="#"><span class="icon">💬</span> コメント(2)</a>
+                    <a href="#"><span class="icon">📤</span> 仲間に教える</a>
+                </div>
+            </div>
+
+            <div class="m-entry">
+                <div class="m-entry-head">
+                    <div class="m-entry-avatar" style="background:linear-gradient(135deg,#b3e6b3,#66c266)">マ</div>
+                    <div class="m-entry-meta">
+                        <a href="#" class="m-entry-name">マサル</a>
+                        <div class="m-entry-date">2026年4月15日 15:48 ｜ 気分：普通</div>
+                    </div>
+                </div>
+                <div class="m-entry-title">新しいコミュニティ作りました！</div>
+                <div class="m-entry-body">
+                    「関東ポーカー初心者の会」というコミュを立ち上げました。<br>
+                    初心者歓迎、気軽に参加してください〜<br>
+                    毎週金曜の夜にオンライン対戦会もやります(＞▽＜)
+                </div>
+                <div class="m-entry-actions">
+                    <a href="#"><span class="icon">👍</span> イイネ！(15)</a>
+                    <a href="#"><span class="icon">💬</span> コメント(6)</a>
+                    <a href="#"><span class="icon">📤</span> 仲間に教える</a>
+                </div>
+            </div>
+
+            <div class="m-entry">
+                <div class="m-entry-head">
+                    <div class="m-entry-avatar" style="background:linear-gradient(135deg,#e6ccb3,#cc9966)">リ</div>
+                    <div class="m-entry-meta">
+                        <a href="#" class="m-entry-name">リョウ</a>
+                        <div class="m-entry-date">2026年4月15日 12:20 ｜ 気分：学習中</div>
+                    </div>
+                </div>
+                <div class="m-entry-title">GTO戦略の勉強メモ</div>
+                <div class="m-entry-body">
+                    最近GTO勉強してます。<br>
+                    ポジションごとのレンジ表を作成中…細かいけど大事ですね。<br>
+                    勉強仲間募集中です〜＼(^o^)／
+                </div>
+                <div class="m-entry-actions">
+                    <a href="#"><span class="icon">👍</span> イイネ！(11)</a>
+                    <a href="#"><span class="icon">💬</span> コメント(4)</a>
+                    <a href="#"><span class="icon">📤</span> 仲間に教える</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div>
+        <div class="m-banner">
+            <strong>🎰 新着テーブル</strong>
+            今すぐ参加できる卓が12卓
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-title">参加コミュニティ <span class="m-panel-more">全て</span></div>
+            <div class="m-panel-body m-community">
+                <div class="m-community-item">
+                    <div class="m-community-icon">♠</div>
+                    <div class="m-community-info">
+                        <a href="#" class="m-community-name">ホールデム研究会</a>
+                        <div class="m-community-count">1,243人</div>
+                    </div>
+                </div>
+                <div class="m-community-item">
+                    <div class="m-community-icon">♥</div>
+                    <div class="m-community-info">
+                        <a href="#" class="m-community-name">Badugi同好会</a>
+                        <div class="m-community-count">182人</div>
+                    </div>
+                </div>
+                <div class="m-community-item">
+                    <div class="m-community-icon">♦</div>
+                    <div class="m-community-info">
+                        <a href="#" class="m-community-name">関東ポーカー初心者の会</a>
+                        <div class="m-community-count">67人</div>
+                    </div>
+                </div>
+                <div class="m-community-item">
+                    <div class="m-community-icon">♣</div>
+                    <div class="m-community-info">
+                        <a href="#" class="m-community-name">OFCの楽しみ方</a>
+                        <div class="m-community-count">94人</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-title">今日の勝者ランキング</div>
+            <div class="m-panel-body">
+                <div class="m-ranking-item">
+                    <div class="m-ranking-num r1">1</div>
+                    <span class="m-ranking-name">健太</span>
+                    <span class="m-ranking-val">+$1,240</span>
+                </div>
+                <div class="m-ranking-item">
+                    <div class="m-ranking-num r2">2</div>
+                    <span class="m-ranking-name">ヒロシ</span>
+                    <span class="m-ranking-val">+$890</span>
+                </div>
+                <div class="m-ranking-item">
+                    <div class="m-ranking-num r3">3</div>
+                    <span class="m-ranking-name">ミカ</span>
+                    <span class="m-ranking-val">+$670</span>
+                </div>
+                <div class="m-ranking-item">
+                    <div class="m-ranking-num r4">4</div>
+                    <span class="m-ranking-name">マサル</span>
+                    <span class="m-ranking-val">+$520</span>
+                </div>
+                <div class="m-ranking-item">
+                    <div class="m-ranking-num r5">5</div>
+                    <span class="m-ranking-name">山田ハナ</span>
+                    <span class="m-ranking-val">+$380</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-title">おすすめ仲間</div>
+            <div class="m-panel-body">
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#ffcc99,#ff9966)">ユ</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">ユウコ</div>
+                        <div class="m-footprint-time">共通の仲間: 8人</div>
+                    </div>
+                </div>
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#ccb3ff,#9966ff)">タ</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">タケシ</div>
+                        <div class="m-footprint-time">共通の仲間: 5人</div>
+                    </div>
+                </div>
+                <div class="m-footprint-item">
+                    <div class="m-footprint-avatar" style="background:linear-gradient(135deg,#ffe6b3,#ffcc66)">ア</div>
+                    <div class="m-footprint-info">
+                        <div class="m-footprint-name">アキラ</div>
+                        <div class="m-footprint-time">共通の仲間: 3人</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="m-footer">
+    © 2026 poker10mix ｜ <a href="#" style="color:var(--mixi-link)">利用規約</a> ｜ <a href="#" style="color:var(--mixi-link)">ヘルプ</a>
+</div>
+
+</body>
+</html>

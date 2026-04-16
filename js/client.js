@@ -112,6 +112,30 @@ class PokerClient {
             case 'followed_by':
                 this.emit('followed_by', msg);
                 break;
+            case 'timeline':
+                this.emit('timeline', msg.posts || []);
+                break;
+            case 'timeline_post':
+                this.emit('timeline_post', msg.post);
+                break;
+            case 'timeline_comment':
+                this.emit('timeline_comment', msg);
+                break;
+            case 'post_created':
+                this.emit('post_created', msg.post);
+                break;
+            case 'auto_shared':
+                this.emit('auto_shared', msg.post);
+                break;
+            case 'profile_data':
+                this.emit('profile_data', msg.profile);
+                break;
+            case 'footprints':
+                this.emit('footprints', msg.footprints || []);
+                break;
+            case 'new_footprint':
+                this.emit('new_footprint', msg);
+                break;
             case 'dm':
                 this.emit('dm', msg);
                 break;
@@ -209,4 +233,9 @@ class PokerClient {
     follow(target) { this.send({ type: 'follow', target }); }
     unfollow(target) { this.send({ type: 'unfollow', target }); }
     getFollows() { this.send({ type: 'get_follows' }); }
+    getTimeline() { this.send({ type: 'get_timeline' }); }
+    createPost(title, body, mood) { this.send({ type: 'create_post', title, body, mood }); }
+    addComment(postId, body) { this.send({ type: 'add_comment', postId, body }); }
+    viewProfile(target) { this.send({ type: 'view_profile', target }); }
+    getFootprints() { this.send({ type: 'get_footprints' }); }
 }

@@ -72,6 +72,231 @@ function getFollowers(name) {
 loadFollows();
 
 // ============================================
+// Timeline / Posts / Comments (SNS feed)
+// ============================================
+const TIMELINE_FILE = path.join(FOLLOWS_DIR, 'timeline.json');
+const timelineList = []; // array of posts, newest first, capped at 200
+// post = { id, authorName, authorAvatar, type, title, body, handData?, createdAt, comments: [] }
+// comment = { id, authorName, authorAvatar, body, createdAt }
+let nextPostId = 1;
+let nextCommentId = 1;
+
+function loadTimeline() {
+    try {
+        if (!fs.existsSync(TIMELINE_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(TIMELINE_FILE, 'utf8'));
+        if (Array.isArray(data.posts)) {
+            timelineList.push(...data.posts);
+            nextPostId = (data.nextPostId || 1);
+            nextCommentId = (data.nextCommentId || 1);
+        }
+        console.log(`Loaded ${timelineList.length} timeline posts`);
+    } catch (e) {
+        console.warn('Failed to load timeline.json:', e.message);
+    }
+}
+
+let saveTimelineTimer = null;
+function saveTimelineDebounced() {
+    if (saveTimelineTimer) return;
+    saveTimelineTimer = setTimeout(() => {
+        saveTimelineTimer = null;
+        try {
+            if (!fs.existsSync(FOLLOWS_DIR)) fs.mkdirSync(FOLLOWS_DIR, { recursive: true });
+            const obj = { posts: timelineList, nextPostId, nextCommentId };
+            fs.writeFileSync(TIMELINE_FILE, JSON.stringify(obj, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Failed to save timeline.json:', e.message);
+        }
+    }, 800);
+}
+
+function createPost(post) {
+    const p = {
+        id: nextPostId++,
+        authorName: post.authorName || '',
+        authorAvatar: post.authorAvatar || null,
+        type: post.type || 'diary', // 'hand' | 'diary' | 'community'
+        title: (post.title || '').slice(0, 100),
+        body: (post.body || '').slice(0, 2000),
+        handData: post.handData || null,
+        mood: post.mood || null,
+        autoShared: !!post.autoShared,
+        createdAt: Date.now(),
+        comments: []
+    };
+    timelineList.unshift(p);
+    if (timelineList.length > 200) timelineList.length = 200;
+    saveTimelineDebounced();
+    return p;
+}
+
+function addCommentToPost(postId, comment) {
+    const post = timelineList.find(p => p.id === postId);
+    if (!post) return null;
+    const c = {
+        id: nextCommentId++,
+        authorName: comment.authorName || '',
+        authorAvatar: comment.authorAvatar || null,
+        body: (comment.body || '').slice(0, 500),
+        createdAt: Date.now()
+    };
+    post.comments.push(c);
+    saveTimelineDebounced();
+    return { post, comment: c };
+}
+
+function getTimelineForUser(name) {
+    // Return recent posts from self + followed users (limit 50)
+    const following = getFollowing(name);
+    const allowed = new Set([name, ...following]);
+    return timelineList.filter(p => allowed.has(p.authorName)).slice(0, 50);
+}
+
+function broadcastTimelineUpdate(post) {
+    // Push new post to connected clients who follow the author (or are the author)
+    for (const [ws, c] of clients) {
+        if (!c.name) continue;
+        if (c.name === post.authorName || getFollowing(c.name).includes(post.authorName)) {
+            send(ws, { type: 'timeline_post', post });
+        }
+    }
+}
+
+function broadcastCommentUpdate(postId, comment, postAuthor) {
+    for (const [ws, c] of clients) {
+        if (!c.name) continue;
+        if (c.name === postAuthor || c.name === comment.authorName || getFollowing(c.name).includes(postAuthor)) {
+            send(ws, { type: 'timeline_comment', postId, comment });
+        }
+    }
+}
+
+// ============================================
+// Footprints (profile view tracking)
+// ============================================
+const FOOTPRINTS_FILE = path.join(FOLLOWS_DIR, 'footprints.json');
+const footprintsMap = new Map(); // viewedName -> [{viewer, viewerAvatar, timestamp}]
+
+function loadFootprints() {
+    try {
+        if (!fs.existsSync(FOOTPRINTS_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(FOOTPRINTS_FILE, 'utf8'));
+        for (const [viewed, list] of Object.entries(data)) {
+            footprintsMap.set(viewed, Array.isArray(list) ? list : []);
+        }
+        console.log(`Loaded footprints for ${footprintsMap.size} users`);
+    } catch (e) {
+        console.warn('Failed to load footprints.json:', e.message);
+    }
+}
+
+let saveFootprintsTimer = null;
+function saveFootprintsDebounced() {
+    if (saveFootprintsTimer) return;
+    saveFootprintsTimer = setTimeout(() => {
+        saveFootprintsTimer = null;
+        try {
+            if (!fs.existsSync(FOLLOWS_DIR)) fs.mkdirSync(FOLLOWS_DIR, { recursive: true });
+            const obj = {};
+            for (const [k, v] of footprintsMap) obj[k] = v;
+            fs.writeFileSync(FOOTPRINTS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Failed to save footprints.json:', e.message);
+        }
+    }, 1000);
+}
+
+function addFootprint(viewedName, viewerName, viewerAvatar) {
+    if (!viewedName || !viewerName || viewedName === viewerName) return;
+    let list = footprintsMap.get(viewedName);
+    if (!list) { list = []; footprintsMap.set(viewedName, list); }
+    // Remove previous entry from same viewer (dedupe to latest)
+    for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i].viewer === viewerName) list.splice(i, 1);
+    }
+    list.unshift({ viewer: viewerName, viewerAvatar: viewerAvatar || null, timestamp: Date.now() });
+    if (list.length > 30) list.length = 30;
+    saveFootprintsDebounced();
+}
+
+function getFootprints(name) {
+    return footprintsMap.get(name) || [];
+}
+
+loadTimeline();
+loadFootprints();
+
+// ============================================
+// Notable Hand Detection (for auto-share)
+// ============================================
+function isNotableHand(handResult, winnerName, totalPot, bigBlind) {
+    // Trigger 1: pot >= 100 BB
+    const bigPot = totalPot >= bigBlind * 100;
+    // Trigger 2: strong hand rank (royal flush, straight flush, 4 of a kind)
+    let strongHand = false;
+    let handRank = '';
+    try {
+        const winner = (handResult.players || []).find(p => p.name === winnerName);
+        if (winner && winner.cards && winner.cards.length > 0) {
+            const evalCards = winner.cards.map(c => ({ rank: c.rank, suit: c.suit }));
+            const cc = (handResult.communityCards || []).map(c => ({ rank: c.rank, suit: c.suit }));
+            const allCards = [...evalCards, ...cc];
+            if (allCards.length >= 5) {
+                const result = bestHighHand(allCards);
+                if (result && result.desc) {
+                    handRank = result.desc;
+                    const rankStr = handRank.toLowerCase();
+                    if (rankStr.includes('royal') || rankStr.includes('straight flush') ||
+                        rankStr.includes('four of a kind') || rankStr.includes('quads')) {
+                        strongHand = true;
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+    return { notable: bigPot || strongHand, handRank, reason: strongHand ? 'strong' : (bigPot ? 'bigpot' : '') };
+}
+
+function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, gameName) {
+    // Find winner's avatar
+    let authorAvatar = null;
+    for (const [, c] of clients) {
+        if (c.name === winnerName) { authorAvatar = c.avatar || null; break; }
+    }
+    const winnerP = (handResult.players || []).find(p => p.name === winnerName);
+    const reasonLabel = reason === 'strong' ? '🎉 強力なハンド達成' : '💰 大きなポット獲得';
+    const title = `${reasonLabel}: ${handRank || 'ポットを獲得'}`;
+    const bodyLines = [
+        `${gameName || 'ポーカー'} にて ${handRank || '勝利'}！`,
+        `ポット: ${totalPot.toLocaleString()} チップ`,
+        ''
+    ];
+    const post = createPost({
+        authorName: winnerName,
+        authorAvatar,
+        type: 'hand',
+        title,
+        body: bodyLines.join('\n'),
+        handData: {
+            gameName,
+            handRank,
+            pot: totalPot,
+            winnerCards: winnerP ? winnerP.cards : [],
+            communityCards: handResult.communityCards || []
+        },
+        autoShared: true
+    });
+    broadcastTimelineUpdate(post);
+    // Notify the winner with auto-share alert (so they can add a comment)
+    for (const [ws, c] of clients) {
+        if (c.name === winnerName) {
+            send(ws, { type: 'auto_shared', post });
+        }
+    }
+}
+
+// ============================================
 // Account System (Supabase + password hashing)
 // ============================================
 const crypto = require('crypto');
@@ -1037,6 +1262,90 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'get_timeline': {
+            if (!client.name) break;
+            const posts = getTimelineForUser(client.name);
+            send(ws, { type: 'timeline', posts });
+            break;
+        }
+
+        case 'create_post': {
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントでは投稿できません' }); break; }
+            if (!client.name) break;
+            const title = (msg.title || '').trim();
+            const body = (msg.body || '').trim();
+            const mood = (msg.mood || '').trim();
+            if (!body && !title) break;
+            const post = createPost({
+                authorName: client.name,
+                authorAvatar: client.avatar,
+                type: 'diary',
+                title, body, mood,
+                autoShared: false
+            });
+            broadcastTimelineUpdate(post);
+            send(ws, { type: 'post_created', post });
+            break;
+        }
+
+        case 'add_comment': {
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではコメントできません' }); break; }
+            if (!client.name) break;
+            const postId = Number(msg.postId);
+            const body = (msg.body || '').trim();
+            if (!postId || !body) break;
+            const result = addCommentToPost(postId, {
+                authorName: client.name,
+                authorAvatar: client.avatar,
+                body
+            });
+            if (result) {
+                broadcastCommentUpdate(postId, result.comment, result.post.authorName);
+            }
+            break;
+        }
+
+        case 'view_profile': {
+            if (!client.name) break;
+            const target = (msg.target || '').trim();
+            if (!target) break;
+            addFootprint(target, client.name, client.avatar);
+            // Gather profile info
+            const profile = {
+                name: target,
+                isOnline: false,
+                avatar: null,
+                status: 'offline',
+                following: getFollowing(target),
+                followers: getFollowers(target),
+                posts: timelineList.filter(p => p.authorName === target).slice(0, 20)
+            };
+            for (const [, c] of clients) {
+                if (c.name === target) {
+                    profile.isOnline = true;
+                    profile.avatar = c.avatar || null;
+                    if (c.inZoom) profile.status = 'zoom';
+                    else if (c.roomIds.length > 0) profile.status = 'playing';
+                    else profile.status = 'lobby';
+                    break;
+                }
+            }
+            send(ws, { type: 'profile_data', profile });
+            // Notify target of footprint (if online)
+            for (const [tws, tc] of clients) {
+                if (tc.name === target) {
+                    send(tws, { type: 'new_footprint', viewer: client.name, viewerAvatar: client.avatar });
+                }
+            }
+            break;
+        }
+
+        case 'get_footprints': {
+            if (!client.name) break;
+            send(ws, { type: 'footprints', footprints: getFootprints(client.name) });
+            break;
+        }
+
         case 'dm': {
             if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではDMを送信できません' }); break; }
             const toName = (msg.to || '').trim();
@@ -1432,6 +1741,14 @@ function startGame(room) {
                 }
             }
         }
+
+        // Auto-share notable hand to SNS timeline
+        if (winnerName) {
+            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind);
+            if (notable.notable) {
+                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name);
+            }
+        }
     };
 
     room.game = game;
@@ -1734,6 +2051,14 @@ function createZoomTable(members) {
                 if (!c2.roomId && !c2.inZoom) {
                     send(ws2, { type: 'big_hand', roomId: 'ZOOM', winner: winnerName, pot: totalPot, handRank, gameName: gc.name });
                 }
+            }
+        }
+
+        // Auto-share notable hand to SNS timeline (Zoom)
+        if (winnerName) {
+            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind);
+            if (notable.notable) {
+                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name);
             }
         }
     };
