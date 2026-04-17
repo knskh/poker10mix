@@ -1636,15 +1636,20 @@ function buildSessionSummary(room) {
     const players = [];
     for (const name of Object.keys(participants)) {
         const rebuyAmount = rebuys[name] || 0;
-        const invested = startingChips + rebuyAmount;
+        const invested = startingChips + rebuyAmount;      // 10,000 + 補充総額
         const endChips = (name in finalByName) ? finalByName[name] : 0;
+        // diff は「プレイ中の純損益」= 最終チップ − 投入総額
+        // 補充分は「投資」として差し引かれるので、表示される損益は純粋に
+        // ゲーム内での勝ち負けを表します。
         const diff = endChips - invested;
         players.push({
             name,
             avatar: (participants[name] && participants[name].avatar) || null,
-            invested,
-            endChips,
-            diff,
+            startingChips,                                  // 10,000
+            rebuyAmount,                                    // 補充総額
+            invested,                                       // 投入総額 = startingChips + rebuyAmount
+            endChips,                                       // 最終チップ
+            diff,                                           // 純損益
             leftEarly: !(name in finalByName),
         });
     }

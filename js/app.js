@@ -5105,12 +5105,23 @@ function renderSessionPostEntry(post) {
             ? `<img src="avatars/${p.avatar}.svg" alt="">`
             : escapeHtml((p.name || '?').charAt(0).toUpperCase());
         const tag = p.leftEarly ? '<span class="sess-tag">途中退室</span>' : '';
+        // Show breakdown of investment (initial 10k + rebuys → final) so players
+        // can see that rebuys are subtracted from the displayed P/L.
+        const rebuy = Number(p.rebuyAmount || 0);
+        const invested = Number(p.invested != null ? p.invested : 10000);
+        const end = Number(p.endChips != null ? p.endChips : 0);
+        const breakdownHtml = (rebuy > 0)
+            ? `<div class="sess-breakdown">投入 ${invested.toLocaleString()}（補充 +${rebuy.toLocaleString()}）→ 最終 ${end.toLocaleString()}</div>`
+            : `<div class="sess-breakdown">投入 ${invested.toLocaleString()} → 最終 ${end.toLocaleString()}</div>`;
         return `
             <div class="sess-row ${diffCls}">
-                <span class="sess-rank">${rankLabelStr}</span>
-                <span class="sess-avatar">${avatarHtml}</span>
-                <span class="sess-name">${escapeHtml(p.name)}${tag}</span>
-                <span class="sess-diff">${sign}${Number(p.diff || 0).toLocaleString()}</span>
+                <div class="sess-row-top">
+                    <span class="sess-rank">${rankLabelStr}</span>
+                    <span class="sess-avatar">${avatarHtml}</span>
+                    <span class="sess-name">${escapeHtml(p.name)}${tag}</span>
+                    <span class="sess-diff" title="ゲーム純損益（補充額を差し引き）">${sign}${Number(p.diff || 0).toLocaleString()}</span>
+                </div>
+                ${breakdownHtml}
             </div>
         `;
     }).join('');
@@ -5143,6 +5154,7 @@ function renderSessionPostEntry(post) {
                 <span><b>${players.length}</b> 人参加</span>
             </div>
             <div class="sess-rows">${playerRowsHtml}</div>
+            <div class="sess-footnote">※ 損益は「最終チップ − 投入総額（初期+補充）」の純損益です</div>
         </div>
         <div class="mx-post-actions">
             <button type="button" class="act-like ${likedByMe ? 'liked' : ''}">
