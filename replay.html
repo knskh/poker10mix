@@ -217,6 +217,52 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
 #loading-screen p { color: #888; font-size: 13px; }
 #loading-screen.hidden { display: none; }
 .error-msg { color: #ef4444; }
+
+/* ==========================================
+   Mobile overrides: the table is 680px wide (fixed) which overflows phones.
+   We scale the whole table proportionally so all 6 seats stay on-screen.
+   PC layout is untouched.
+   ========================================== */
+@media (max-width: 760px) {
+    /* Fit the 680px table into the viewport via transform scaling */
+    #table {
+        transform: translate(-50%, -56%) scale(calc((100vw - 10px) / 680));
+        transform-origin: center center;
+    }
+    /* Fallback for browsers that don't support calc() inside transform scale */
+    @supports not (transform: scale(calc(1 / 1))) {
+        #table { transform: translate(-50%, -56%) scale(0.55); }
+    }
+    /* Action log: fit width */
+    #action-log {
+        width: calc(100vw - 12px);
+        max-height: 78px;
+        padding: 5px 8px;
+        font-size: 10px;
+    }
+    .log-street { padding: 2px 5px; }
+    .log-street-name { font-size: 8px; padding: 1px 5px; }
+    .log-action { font-size: 9px; padding: 0; }
+    /* Controls: compact */
+    #controls { padding: 3px 8px; gap: 4px; }
+    .ctrl-btn { width: 28px; height: 28px; font-size: 11px; }
+    .ctrl-btn.play { width: 32px; height: 32px; font-size: 13px; }
+    #progress-wrap { width: 80px; height: 5px; }
+    #step-label { font-size: 9px; min-width: 48px; }
+    /* Title + share */
+    #title { top: 6px; left: 8px; gap: 5px; }
+    #title img { height: 22px; }
+    #title .sub { font-size: 8px; }
+    #share-bar { top: 6px; right: 8px; }
+    #btn-share { font-size: 10px; padding: 4px 10px; }
+}
+
+/* Very small phones: scale a touch more */
+@media (max-width: 380px) {
+    #table {
+        transform: translate(-50%, -56%) scale(calc((100vw - 8px) / 680));
+    }
+}
 </style>
 </head>
 <body>
