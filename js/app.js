@@ -5276,6 +5276,14 @@ function renderPostEntry(post) {
         </div>
     `;
 
+    const replayCtaHtml = post.replayHash
+        ? `<button class="mx-replay-cta" type="button">
+               <span class="mx-replay-cta-icon">▶</span>
+               <span class="mx-replay-cta-label">リプレイを見る</span>
+               <span class="mx-replay-cta-hint">ハンドをもう一度</span>
+           </button>`
+        : '';
+
     wrap.innerHTML = `
         <div class="mx-post-head">
             <div class="mx-post-avatar">${avatarHtml}</div>
@@ -5295,10 +5303,10 @@ function renderPostEntry(post) {
             <div class="mx-hand-label">${escapeHtml(labelText)}</div>
             ${ccHtml ? `<div class="mx-cc-row">コミュニティ: <span class="mx-cards" style="display:inline-flex">${ccHtml}</span></div>` : ''}
         </div>
+        ${replayCtaHtml}
         <div class="mx-post-actions">
             <span class="act-comments">💬 ${commentCount}</span>
-            ${post.replayHash ? `<span class="act-replay">▶ リプレイ</span>` : ''}
-            ${post.replayHash ? `<span class="act-share">🔗 共有</span>` : ''}
+            ${post.replayHash ? `<span class="act-share">🔗 リプレイを共有</span>` : ''}
         </div>
         ${commentsHtml}
     `;
@@ -5318,7 +5326,7 @@ function renderPostEntry(post) {
     });
 
     // Replay button: open replay.html in a new tab with the post's compressed hash.
-    const replayBtn = wrap.querySelector('.act-replay');
+    const replayBtn = wrap.querySelector('.mx-replay-cta');
     if (replayBtn && post.replayHash) {
         replayBtn.addEventListener('click', () => {
             const url = buildReplayUrlFromHash(post.replayHash);
@@ -5368,11 +5376,18 @@ function renderHandPostBody(post) {
 }
 
 function renderMiniCard(c) {
-    if (!c || !c.rank) return '';
+    if (!c) return '';
+    // Accept both {rank,suit} (server/timeline) and {r,s} (stored history) formats
+    const rawRank = c.rank != null ? c.rank : c.r;
+    const rawSuit = c.suit != null ? c.suit : c.s;
+    if (rawRank == null || rawSuit == null) return '';
+    // Translate numeric ranks to letters (11=J, 12=Q, 13=K, 14=A)
+    const rankMap = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+    const rank = rankMap[rawRank] || String(rawRank);
     const suitMap = { h: '♥', d: '♦', s: '♠', c: '♣' };
-    const suit = suitMap[c.suit] || c.suit || '?';
-    const isRed = c.suit === 'h' || c.suit === 'd';
-    return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(c.rank)}${suit}</span>`;
+    const suit = suitMap[rawSuit] || rawSuit || '?';
+    const isRed = rawSuit === 'h' || rawSuit === 'd';
+    return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(rank)}${suit}</span>`;
 }
 
 function renderCommentHtml(c) {
