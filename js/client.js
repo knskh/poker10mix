@@ -79,6 +79,9 @@ class PokerClient {
                 this.emit('room_left', msg);
                 break;
             }
+            case 'leave_reserved':
+                this.emit('leave_reserved', msg);
+                break;
             case 'game_started':
                 this.emit('game_started', msg);
                 break;

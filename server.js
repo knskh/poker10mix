@@ -1028,8 +1028,34 @@ function handleMessage(ws, client, msg) {
 
         case 'leave_room': {
             const targetRoomId = msg.roomId || client.roomId;
-            leaveRoom(client, targetRoomId);
-            send(ws, { type: 'room_left', roomId: targetRoomId });
+            const room = rooms.get(targetRoomId);
+            if (!room) {
+                send(ws, { type: 'room_left', roomId: targetRoomId });
+                break;
+            }
+            // Defer leave only when the player is actively in the current hand.
+            const seat = room.seatMap[client.id];
+            const player = (seat !== undefined && room.game) ? room.game.players[seat] : null;
+            const canLeaveNow = !room.playing
+                || seat === undefined
+                || !player
+                || player.folded
+                || (room.sitout && room.sitout[seat]);
+            if (canLeaveNow) {
+                leaveRoom(client, targetRoomId);
+                send(ws, { type: 'room_left', roomId: targetRoomId });
+            } else {
+                // Reserve for after the current hand ends.
+                if (room.pendingLeaveRequest && room.pendingLeaveRequest[client.id]) {
+                    // Already reserved
+                } else {
+                    if (!room.pendingLeaveRequest) room.pendingLeaveRequest = {};
+                    room.pendingLeaveRequest[client.id] = true;
+                    broadcastLog(room, `${client.name} が退出予約しました（ハンド終了後に適用）`, 'important');
+                }
+                send(ws, { type: 'leave_reserved', roomId: targetRoomId });
+                broadcastGameState(room);
+            }
             broadcastRoomList();
             broadcastOnlineUsers();
             break;
@@ -1308,32 +1334,27 @@ function handleMessage(ws, client, msg) {
             const seat = room.seatMap[client.id];
             if (seat === undefined) break;
             if (room.sitout && room.sitout[seat]) break; // already sitting out
+            if (room.pendingSitoutRequest && room.pendingSitoutRequest[seat]) break; // already reserved
 
-            // Mark as sitout
-            if (!room.sitout) room.sitout = {};
-            room.sitout[seat] = true;
-            if (!room.sitoutTime) room.sitoutTime = {};
-            room.sitoutTime[seat] = Date.now();
+            const player = room.game.players[seat];
+            const alreadyFolded = player && player.folded;
 
-            // If it's currently this player's turn, auto-fold immediately
-            if (room.pending && room.pending.playerId === seat) {
-                clearTimeout(room.pending.timer);
-                const p = room.pending;
-                room.pending = null;
-                if (p.type === 'action') {
-                    broadcastLog(room, `${client.name} が離席しました（フォールド）`, 'important');
-                    const foldAction = { type: 'fold' };
-                    p.resolve(foldAction);
-                } else if (p.type === 'draw') {
-                    broadcastLog(room, `${client.name} が離席しました（スタンドパット）`, 'important');
-                    p.resolve([]);
-                }
-            } else {
+            if (alreadyFolded) {
+                // Player is already out of the hand — apply sitout immediately.
+                if (!room.sitout) room.sitout = {};
+                if (!room.sitoutTime) room.sitoutTime = {};
+                room.sitout[seat] = true;
+                room.sitoutTime[seat] = Date.now();
                 broadcastLog(room, `${client.name} が離席しました`, 'important');
+            } else {
+                // Reserve sitout for after the current hand ends.
+                if (!room.pendingSitoutRequest) room.pendingSitoutRequest = {};
+                room.pendingSitoutRequest[seat] = true;
+                broadcastLog(room, `${client.name} が離席予約しました（ハンド終了後に適用）`, 'important');
             }
             broadcastGameState(room);
-            // If every seated member is now on sitout, the table will be closed
-            // once the current hand ends (or immediately if no hand is active).
+            // Auto-close only applies when sitout is actually set (not pending),
+            // so this is a no-op during reservation but useful for the folded case.
             maybeAutoCloseRoom(room);
             break;
         }
@@ -1703,6 +1724,49 @@ function deleteRoomAndEvict(room, reason) {
     room.members = [];
     rooms.delete(room.id);
     broadcastRoomList();
+}
+
+// Apply any pending sitout/leave reservations. Called from onHandEnd hooks,
+// so deferred actions take effect right before the next hand starts.
+function applyPendingReservations(room) {
+    if (!room || !rooms.has(room.id)) return;
+
+    // Pending sitouts: flip the sitout flag for each reserved seat.
+    if (room.pendingSitoutRequest) {
+        for (const key of Object.keys(room.pendingSitoutRequest)) {
+            const seat = Number(key);
+            if (!room.pendingSitoutRequest[key]) continue;
+            if (!room.sitout) room.sitout = {};
+            if (!room.sitoutTime) room.sitoutTime = {};
+            if (!room.sitout[seat]) {
+                room.sitout[seat] = true;
+                room.sitoutTime[seat] = Date.now();
+                const member = room.getClientBySeat(seat);
+                if (member) broadcastLog(room, `${member.name} が離席しました`, 'important');
+            }
+        }
+        room.pendingSitoutRequest = {};
+    }
+
+    // Pending leaves: resolve clientIds → client objects and call leaveRoom.
+    if (room.pendingLeaveRequest) {
+        const clientIds = Object.keys(room.pendingLeaveRequest).map(Number);
+        for (const cid of clientIds) {
+            if (!room.pendingLeaveRequest[cid]) continue;
+            let targetClient = null;
+            for (const [, c] of clients) {
+                if (c.id === cid) { targetClient = c; break; }
+            }
+            if (!targetClient) continue;
+            const member = room.members.find(m => m.clientId === cid);
+            broadcastLog(room, `${targetClient.name} が退出しました`, 'important');
+            leaveRoom(targetClient, room.id);
+            if (member && member.ws) {
+                try { send(member.ws, { type: 'room_left', roomId: room.id }); } catch {}
+            }
+        }
+        room.pendingLeaveRequest = {};
+    }
 }
 
 // Auto-close a room if nobody is actively playing (all members gone or all on sitout).
@@ -2106,7 +2170,12 @@ function startGame(room) {
 
         // Close the table if every remaining member is on sitout (checked on next
         // tick so the hand's result broadcast settles first).
-        setTimeout(() => maybeAutoCloseRoom(room), 50);
+        // After the hand's result broadcast settles, apply any pending
+        // sitout/leave reservations, then evaluate auto-close.
+        setTimeout(() => {
+            applyPendingReservations(room);
+            maybeAutoCloseRoom(room);
+        }, 50);
     };
 
     room.game = game;

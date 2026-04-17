@@ -656,6 +656,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showScreen('sns');
         }
     });
+    client.on('leave_reserved', (msg) => {
+        // Server has deferred the leave to the end of the current hand.
+        showToast('退出予約しました（ハンド終了後に適用）');
+    });
     client.on('game_started', (msg) => {
         const rid = msg.roomId;
         if (rid && rid !== activeTableId) {
@@ -1374,12 +1378,14 @@ function setupGameScreen() {
         document.getElementById('stats-modal').classList.remove('hidden');
     });
 
-    // Back to room button
+    // Back to room button — sends leave request. Server decides whether to
+    // apply immediately or defer until hand end (leave_reserved response).
     document.getElementById('btn-back-room').addEventListener('click', () => {
-        if (confirm('ルームに戻りますか？（ゲームを離脱します）')) {
+        if (confirm('退出予約しますか？（プレイ中のハンド終了後に退出します）')) {
             client.leaveRoom(activeTableId);
-            if (activeTableId) removeTable(activeTableId);
-            else showScreen('sns');
+            // Don't call removeTable() here — wait for room_left event.
+            // If the leave is deferred, the table stays visible until the hand ends.
+            if (!activeTableId) showScreen('sns');
         }
     });
 
@@ -1564,7 +1570,7 @@ function onGameState(state) {
         if (state.mySitout) {
             sitoutBtn.textContent = '🔄 復帰する';
         } else {
-            sitoutBtn.textContent = '💤 離席';
+            sitoutBtn.textContent = '💤 離席予約';
             // No longer sitout — stop countdown
             if (sitoutCountdownInterval) stopSitoutCountdown();
         }
