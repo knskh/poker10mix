@@ -4138,3 +4138,30 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     #hand-post-modal .hp-cards-row { flex-wrap: wrap; }
     #hand-post-modal .hp-cards-label { min-width: 0; }
 }
+
+/* Replay / Share buttons in post actions */
+#sns-screen .mx-post-actions .act-replay,
+#sns-screen .mx-post-actions .act-share {
+    color: #2A6BC9;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #F5FAFF;
+    border: 1px solid #DBE9FA;
+    transition: background .15s, color .15s, border-color .15s;
+}
+#sns-screen .mx-post-actions .act-replay {
+    color: #1E52A3;
+    background: linear-gradient(180deg, #EEF5FF, #DBE9FA);
+    border-color: #C5DFFA;
+}
+#sns-screen .mx-post-actions .act-replay:hover {
+    background: linear-gradient(180deg, #DBE9FA, #B1D1FC);
+    color: #0E2238;
+    border-color: #5B9BF0;
+}
+#sns-screen .mx-post-actions .act-share:hover {
+    background: #DBE9FA;
+    color: #1E52A3;
+    border-color: #5B9BF0;
+}

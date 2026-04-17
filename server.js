@@ -260,7 +260,41 @@ function isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBet) {
     return { notable: bigPot || strongHand, handRank, reason: strongHand ? 'strong' : (bigPot ? 'bigpot' : '') };
 }
 
-function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, gameName) {
+// Build a compact replay object matching buildReplayURL in app.js, then
+// compress with deflate-raw and base64url-encode so replay.html can consume it.
+const zlib = require('zlib');
+function buildReplayHash(handResult, handLogs) {
+    try {
+        if (!handResult) return '';
+        const data = {
+            g: handResult.gameName || '',
+            t: handResult.gameType || '',
+            c: handResult.communityCards || [],
+            d: handResult.dealerSeat,
+            p: (handResult.players || []).map(p => ({
+                n: p.name, o: p.position,
+                f: p.folded ? 1 : 0,
+                c: p.chips, s: p.startChips,
+                h: p.cards || [],
+                u: p.upCards || [],
+                w: p.downCards || [],
+            })),
+            l: Array.isArray(handLogs) ? handLogs : [],
+            ds: handResult.drawSnapshots || [],
+        };
+        const json = JSON.stringify(data);
+        // deflate-raw (no zlib wrapper) to match client CompressionStream('deflate-raw')
+        const buf = zlib.deflateRawSync(Buffer.from(json, 'utf8'));
+        // base64url
+        return buf.toString('base64')
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (e) {
+        console.warn('buildReplayHash failed:', e && e.message);
+        return '';
+    }
+}
+
+function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, gameName, handLogs) {
     // Find winner's avatar
     let authorAvatar = null;
     for (const [, c] of clients) {
@@ -274,6 +308,7 @@ function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, 
         `ポット: ${totalPot.toLocaleString()} チップ`,
         ''
     ];
+    const replayHash = buildReplayHash(handResult, handLogs);
     const post = createPost({
         authorName: winnerName,
         authorAvatar,
@@ -287,6 +322,7 @@ function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, 
             winnerCards: winnerP ? winnerP.cards : [],
             communityCards: handResult.communityCards || []
         },
+        replayHash,
         autoShared: true
     });
     broadcastTimelineUpdate(post);
@@ -1294,6 +1330,10 @@ function handleMessage(ws, client, msg) {
             // Manual post of a hand from user's hand history (win or loss)
             if (!client.name) break;
             const caption = typeof msg.caption === 'string' ? msg.caption.trim().slice(0, 500) : '';
+            // replayHash is a pre-compressed base64url string produced by the client.
+            // Size cap: ~8 KB (generous for compressed JSON ~500b–1.5KB typical).
+            const rawReplayHash = typeof msg.replayHash === 'string' ? msg.replayHash.slice(0, 8192) : '';
+            const replayHash = /^[A-Za-z0-9\-_]*$/.test(rawReplayHash) ? rawReplayHash : '';
             const raw = msg.handData || {};
             // Basic validation/sanitization
             const sanitizeCard = (c) => {
@@ -1325,6 +1365,7 @@ function handleMessage(ws, client, msg) {
                 title,
                 body: caption,
                 handData,
+                replayHash,
                 autoShared: false,
                 manualShared: true
             });
@@ -1569,7 +1610,12 @@ function startGame(room) {
 
     // Callbacks
     game.onUpdate = () => broadcastGameState(room);
-    game.onLog = (msg, cls) => broadcastLog(room, msg, cls);
+    // Accumulate logs for the current hand so we can embed them in auto-share replay.
+    room.currentHandLogs = [];
+    game.onLog = (msg, cls) => {
+        if (typeof msg === 'string') room.currentHandLogs.push(msg);
+        broadcastLog(room, msg, cls);
+    };
 
     game.onGetPlayerAction = (actions, player) => {
         return new Promise((resolve) => {
@@ -1668,6 +1714,8 @@ function startGame(room) {
 
     // Stats hooks
     game.onHandStart = () => {
+        // Reset per-hand log buffer (for auto-share replay embedding)
+        room.currentHandLogs = [];
         // Clear pending rejoin flags
         room.pendingRejoin = {};
 
@@ -1792,7 +1840,7 @@ function startGame(room) {
             const bigBetVal = (gc && gc.bigBet) || bigBlind * 2;
             const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBetVal);
             if (notable.notable) {
-                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name);
+                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name, room.currentHandLogs || []);
             }
         }
     };
@@ -2014,13 +2062,17 @@ function createZoomTable(members) {
 
     // --- Callbacks ---
     game.onUpdate = () => broadcastZoomTableState(table);
+    // Accumulate per-hand logs for replay embedding
+    table.currentHandLogs = [];
     game.onLog = (msg, cls) => {
+        if (typeof msg === 'string') table.currentHandLogs.push(msg);
         for (const m of table.members) {
             if (table.activeMemberIds.has(m.clientId))
                 send(m.ws, { type: 'log', message: msg, cls });
         }
     };
     game.onHandStart = () => {
+        table.currentHandLogs = [];
         stats.beginHand(game.players, game.gameConfig, game.dealerSeat);
         for (const m of table.members) {
             if (table.activeMemberIds.has(m.clientId))
@@ -2105,7 +2157,7 @@ function createZoomTable(members) {
             const bigBetVal = (gc && gc.bigBet) || bigBlind * 2;
             const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBetVal);
             if (notable.notable) {
-                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name);
+                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name, table.currentHandLogs || []);
             }
         }
     };

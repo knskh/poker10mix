@@ -235,7 +235,7 @@ class PokerClient {
     getFollows() { this.send({ type: 'get_follows' }); }
     getTimeline() { this.send({ type: 'get_timeline' }); }
     createPost(title, body, mood) { this.send({ type: 'create_post', title, body, mood }); }
-    postHand(handData, caption) { this.send({ type: 'post_hand', handData, caption: caption || '' }); }
+    postHand(handData, caption, replayHash) { this.send({ type: 'post_hand', handData, caption: caption || '', replayHash: replayHash || '' }); }
     addComment(postId, body) { this.send({ type: 'add_comment', postId, body }); }
     viewProfile(target) { this.send({ type: 'view_profile', target }); }
     getFootprints() { this.send({ type: 'get_footprints' }); }

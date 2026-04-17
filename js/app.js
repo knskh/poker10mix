@@ -1891,13 +1891,39 @@ function closeHandPostModal() {
     pendingHandPostIdx = -1;
 }
 
-function submitHandPost() {
+async function buildReplayHashFromHistory(idx) {
+    // Mirror buildReplayURL but return just the compressed hash (no URL).
+    const h = handHistory[idx];
+    if (!h || !h.handResult) return '';
+    try {
+        const hr = h.handResult;
+        const data = {
+            g: hr.gameName, t: hr.gameType,
+            c: hr.communityCards, d: hr.dealerSeat,
+            p: hr.players.map(p => ({
+                n: p.name, o: p.position, f: p.folded ? 1 : 0,
+                c: p.chips, s: p.startChips,
+                h: p.cards, u: p.upCards, w: p.downCards,
+            })),
+            l: h.logs || [],
+            ds: hr.drawSnapshots,
+        };
+        return await compressForReplay(JSON.stringify(data));
+    } catch (e) {
+        console.warn('buildReplayHashFromHistory failed:', e);
+        return '';
+    }
+}
+
+async function submitHandPost() {
     if (pendingHandPostIdx < 0) return;
     const h = handHistory[pendingHandPostIdx];
     if (!h) return;
     const caption = (document.getElementById('hp-caption').value || '').trim();
     const handData = buildHandDataFromHistory(h, client.name);
-    client.postHand(handData, caption);
+    // Also build replay hash so viewers can replay the hand
+    const replayHash = await buildReplayHashFromHistory(pendingHandPostIdx);
+    client.postHand(handData, caption, replayHash);
     showToast('タイムラインに投稿しました');
     closeHandPostModal();
     // Close history modal too so user sees the feed
@@ -5202,6 +5228,8 @@ function renderPostEntry(post) {
         </div>
         <div class="mx-post-actions">
             <span class="act-comments">💬 ${commentCount}</span>
+            ${post.replayHash ? `<span class="act-replay">▶ リプレイ</span>` : ''}
+            ${post.replayHash ? `<span class="act-share">🔗 共有</span>` : ''}
         </div>
         ${commentsHtml}
     `;
@@ -5220,7 +5248,37 @@ function renderPostEntry(post) {
         if (e.key === 'Enter') sendBtn.click();
     });
 
+    // Replay button: open replay.html in a new tab with the post's compressed hash.
+    const replayBtn = wrap.querySelector('.act-replay');
+    if (replayBtn && post.replayHash) {
+        replayBtn.addEventListener('click', () => {
+            const url = buildReplayUrlFromHash(post.replayHash);
+            if (url) window.open(url, '_blank', 'noopener');
+        });
+    }
+    // Share button: copy the replay URL to clipboard
+    const shareBtn = wrap.querySelector('.act-share');
+    if (shareBtn && post.replayHash) {
+        shareBtn.addEventListener('click', async () => {
+            const url = buildReplayUrlFromHash(post.replayHash);
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast('リプレイURLをコピーしました');
+            } catch (e) {
+                // Fallback: open a prompt
+                window.prompt('リプレイURL（Ctrl+C でコピー）', url);
+            }
+        });
+    }
+
     return wrap;
+}
+
+function buildReplayUrlFromHash(hash) {
+    if (!hash) return '';
+    const base = window.location.href.replace(/\/[^/]*$/, '/');
+    return base + 'replay.html#' + hash;
 }
 
 function pickBadge(handRank, bbNum) {
