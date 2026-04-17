@@ -196,17 +196,8 @@ class PokerUI {
         // Heads-up layout: relax pot / community card positions to avoid seat-top overlap
         felt.classList.toggle('is-heads-up', s.players.length === 2);
 
-        // Top bar with game type + category badges
-        const gameType = getGameType(s.gameId);
-        const typeBadge = GAME_TYPE_LABELS[gameType];
-        const catBadge = GAME_CATEGORY_LABELS[getGameCategory(s.gameId)];
-        const gameNameEl = document.getElementById('game-name');
-        const betBadge = BETTING_TYPE_LABELS[getBettingType(s.gameId)];
-        const badgesHtml = ` <span class="game-type-badge" style="background:${typeBadge.color}">${typeBadge.label}</span>`
-            + ` <span class="game-type-badge" style="background:${catBadge.color};color:${catBadge.textColor};border:1px solid #555">${catBadge.label}</span>`
-            + ` <span class="game-type-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
-        gameNameEl.innerHTML = s.gameName + badgesHtml;
-
+        // Game name pill is removed from the layout — only the game-change-overlay
+        // flash uses the game name (via `.gc-name` rendered separately).
         const rotationEl = document.getElementById('game-rotation');
         if (rotationEl) {
             rotationEl.textContent =

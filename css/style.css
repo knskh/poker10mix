@@ -579,28 +579,6 @@ body {
     overflow: hidden;
 }
 
-/* Game name pill — floats on the top-left of the felt */
-.game-name-pill {
-    position: absolute;
-    top: 52px;    /* below table-tabs bar */
-    left: 10px;
-    z-index: 90;
-    display: inline-flex; align-items: center; gap: 5px;
-    background: rgba(0,0,0,0.55);
-    border: 1px solid rgba(255,215,0,0.2);
-    color: var(--text);
-    font-size: 12px; font-weight: 700;
-    padding: 4px 10px; border-radius: 14px;
-    white-space: nowrap;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    pointer-events: none;
-    max-width: calc(100vw - 20px);
-    overflow: hidden; text-overflow: ellipsis;
-}
-.game-name-pill .game-type-badge {
-    font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700;
-}
-
 /* Hamburger menu */
 #top-bar-menu-wrap { position: relative; }
 #btn-hamburger { font-size: 16px; padding: 4px 10px; }
@@ -785,10 +763,10 @@ body {
 
 #table-felt {
     position: relative;
-    width: min(700px, 92vw); height: min(300px, 40vw);
+    width: min(760px, 94vw); height: min(330px, 44vw);
     background:
         radial-gradient(ellipse at 50% 40%, var(--felt-light) 0%, var(--felt) 50%, #072e4a 80%, #051e33 100%);
-    border-radius: min(160px, 22vw);
+    border-radius: min(170px, 24vw);
     border: 8px solid var(--rail);
     box-shadow:
         0 0 0 4px #0f172a,
@@ -796,7 +774,7 @@ body {
         0 0 0 14px #0f172a,
         inset 0 0 40px rgba(0,0,0,0.5),
         0 8px 32px rgba(14, 165, 233, 0.2);
-    margin: 50px 0 10px; flex-shrink: 0;
+    margin: 30px 0 10px; flex-shrink: 0;
 }
 
 /* Game category felt themes */
@@ -966,17 +944,20 @@ body {
 
 /* Position badges */
 .pos-badge {
-    display: inline-block; border-radius: 3px;
-    padding: 1px 5px; font-size: 9px; font-weight: 700;
-    color: #fff; margin-top: 1px; letter-spacing: 0.3px;
+    display: inline-block; border-radius: 4px;
+    padding: 2px 7px; font-size: 11px; font-weight: 800;
+    color: #fff; margin-top: 1px; letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12) inset;
+    line-height: 1.3;
 }
-.pos-btn   { background: #e65100; }
-.pos-sbtn  { background: #e65100; } /* Heads-up: SB/BTN same as BTN color */
-.pos-sb    { background: #37474f; }
-.pos-bb    { background: #37474f; }
-.pos-utg   { background: #b71c1c; }
-.pos-hj    { background: #1565c0; }
-.pos-co    { background: #4a148c; }
+.pos-btn   { background: #ff6d00; }  /* brighter orange */
+.pos-sbtn  { background: #ff6d00; }
+.pos-sb    { background: #607d8b; }  /* lighter blue-gray (was #37474f) */
+.pos-bb    { background: #607d8b; }
+.pos-utg   { background: #d32f2f; }
+.pos-hj    { background: #1976d2; }
+.pos-co    { background: #7b1fa2; }
 
 #community-cards {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -1035,7 +1016,11 @@ body {
 .seat.active-turn {
     background: var(--seat-active);
     border-color: var(--accent);
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 4px 16px rgba(0,0,0,0.3);
+    border-width: 2px;
+    box-shadow:
+        0 0 0 2px rgba(56, 189, 248, 0.35),
+        0 0 28px rgba(56, 189, 248, 0.7),
+        0 4px 16px rgba(0,0,0,0.35);
     transform: translateY(-4px);
 }
 .seat.folded { opacity: 0.35; }
@@ -1985,13 +1970,13 @@ body {
    RESPONSIVE - Tablet (max-width: 860px)
    ============================================================ */
 @media (max-width: 860px) {
-    #table-felt { width: 96vw; height: 52vw; border-radius: 26vw; }
+    #table-felt { width: 96vw; height: 56vw; border-radius: 28vw; }
     .card { width: 30px; height: 42px; }
     .card-rank { font-size: 12px; }
     .card-suit { font-size: 10px; }
     #player-cards .card { width: 44px; height: 60px; }
-    .seat { width: 90px; padding: 4px 6px; }
-    .seat-name { font-size: 11px; }
+    .seat { width: 96px; padding: 5px 7px; }
+    .seat-name { font-size: 12px; }
     .room-body { flex-direction: column; }
     #room-game-checkboxes { grid-template-columns: 1fr; }
     #community-cards .card { width: 38px; height: 52px; }
@@ -2026,8 +2011,6 @@ body {
 
     /* --- Game Screen --- */
     #table-tabs { height: 36px; gap: 6px; padding: 4px 8px; }
-    .game-name-pill { top: 42px; font-size: 11px; padding: 3px 8px; }
-    .game-name-pill .game-type-badge { font-size: 8px; padding: 1px 4px; }
     .game-type-badge { font-size: 8px; padding: 1px 4px; margin-left: 4px; }
     #btn-hamburger { padding: 6px 10px; font-size: 14px; }
 
@@ -2039,8 +2022,8 @@ body {
     /* Table */
     #table-area { padding: 0 4px; }
     #table-felt {
-        width: 96vw; height: 52vw; border-radius: 26vw;
-        border-width: 5px; margin: 30px 0 4px;
+        width: 98vw; height: 58vw; border-radius: 29vw;
+        border-width: 5px; margin: 14px 0 4px;
         box-shadow:
             0 0 0 2px #1a1d24,
             0 0 0 6px #333640,
@@ -2075,15 +2058,15 @@ body {
     .hand-rank-label { font-size: 10px; }
 
     /* Seats */
-    .seat { width: 75px; padding: 3px 5px; border-radius: 8px; border-width: 1.5px; }
-    .seat-cards-2 .card { width: 22px; height: 30px; }
-    .seat-cards-3 .card, .seat-cards-4 .card { width: 17px; height: 24px; }
-    .seat-cards-5 .card { width: 13px; height: 19px; }
-    .seat-cards-6 .card, .seat-cards-7 .card { width: 11px; height: 16px; }
+    .seat { width: 84px; padding: 4px 6px; border-radius: 10px; border-width: 1.5px; }
+    .seat-cards-2 .card { width: 24px; height: 33px; }
+    .seat-cards-3 .card, .seat-cards-4 .card { width: 19px; height: 26px; }
+    .seat-cards-5 .card { width: 14px; height: 20px; }
+    .seat-cards-6 .card, .seat-cards-7 .card { width: 12px; height: 17px; }
 
-    .seat-name { font-size: 11px; }
-    .seat-chips { font-size: 11px; margin-bottom: 1px; }
-    .seat-bet { font-size: 10px; }
+    .seat-name { font-size: 12px; }
+    .seat-chips { font-size: 12px; margin-bottom: 1px; }
+    .seat-bet { font-size: 11px; }
     .seat-action-label { font-size: 8px; padding: 1px 4px; }
     .seat-dealer-btn { width: 16px; height: 16px; font-size: 8px; top: -4px; right: -4px; }
     .seat-bottom { bottom: -12%; }
@@ -2162,17 +2145,17 @@ body {
 @media (max-width: 380px) {
     #login-screen h1 { font-size: 22px; }
     .login-box { padding: 16px 12px; }
-    .seat { width: 65px; padding: 2px 4px; }
-    .seat-cards-2 .card { width: 20px; height: 28px; }
-    .seat-cards-3 .card, .seat-cards-4 .card { width: 15px; height: 21px; }
-    .seat-cards-5 .card { width: 12px; height: 17px; }
-    .seat-cards-6 .card, .seat-cards-7 .card { width: 10px; height: 14px; }
+    .seat { width: 74px; padding: 3px 5px; }
+    .seat-cards-2 .card { width: 22px; height: 30px; }
+    .seat-cards-3 .card, .seat-cards-4 .card { width: 17px; height: 23px; }
+    .seat-cards-5 .card { width: 13px; height: 18px; }
+    .seat-cards-6 .card, .seat-cards-7 .card { width: 11px; height: 15px; }
 
-    .seat-name { font-size: 10px; }
-    .seat-chips { font-size: 10px; }
-    .seat-bet { font-size: 9px; }
-    .table-bet-chip { font-size: 10px; padding: 2px 7px 2px 5px; }
-    .chip-icon { width: 9px; height: 9px; }
+    .seat-name { font-size: 11px; }
+    .seat-chips { font-size: 11px; }
+    .seat-bet { font-size: 10px; }
+    .table-bet-chip { font-size: 11px; padding: 2px 8px 2px 6px; }
+    .chip-icon { width: 10px; height: 10px; }
     .btn-action { padding: 12px 10px; font-size: 14px; min-width: 60px; }
     #player-cards .card { width: 36px; height: 48px; }
     #player-cards .card-rank { font-size: 14px; }
@@ -2187,7 +2170,6 @@ body {
    ============================================================ */
 @media (max-height: 500px) and (orientation: landscape) {
     #table-tabs { height: 28px; padding: 2px 8px; }
-    .game-name-pill { top: 34px; font-size: 10px; padding: 2px 7px; }
     #player-hand { height: 60px; padding: 1px 0; margin-top: 28px; }
     #player-cards .card { width: 34px; height: 46px; }
     .btn-action { padding: 8px 10px; font-size: 12px; }
