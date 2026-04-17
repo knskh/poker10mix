@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=44">
+    <link rel="stylesheet" href="css/style.css?v=45">
 </head>
 <body>
     <div id="app">
@@ -13,7 +13,7 @@
 
         <!-- Login Screen -->
         <div id="login-screen">
-            <img class="site-logo" src="logos/logo.png" alt="mix-1">
+            <img class="site-logo" src="logos/mix_1_logo_minimalist_1775651849102.png" alt="mix-1">
             <div class="login-box">
                 <!-- Tab Switcher -->
                 <div class="login-tabs">
@@ -52,10 +52,10 @@
             </div>
         </div>
 
-        <!-- Lobby Screen -->
+        <!-- Lobby Screen (hidden, kept for backward compatibility / internal proxy) -->
         <div id="lobby-screen" class="hidden">
             <div class="lobby-header">
-                <img class="site-logo-lobby" src="logos/logo.png" alt="mix-1">
+                <img class="site-logo-lobby" src="logos/mix_1_logo_minimalist_1775651849102.png" alt="mix-1">
                 <div class="lobby-user">
                     <span id="lobby-username"></span>
                     <button id="btn-lobby-stats" class="btn-small">Stats</button>
@@ -99,168 +99,53 @@
         <!-- Big hand feed (global overlay, not tied to lobby) -->
         <div id="big-hand-feed" class="big-hand-feed hidden"></div>
 
-        <!-- SNS (mixi-style) Screen -->
+        <!-- Main Screen (unified lobby + notable-hand timeline) -->
         <div id="sns-screen" class="hidden">
-            <div class="sns-root">
-                <!-- Header -->
-                <div class="m-header">
-                    <div class="m-header-inner">
-                        <div class="m-logo">poker10mix</div>
-                        <div class="m-search">
-                            <input type="text" id="sns-search-input" placeholder="仲間・コミュニティを検索">
-                            <button>検索</button>
-                        </div>
-                        <div class="m-header-user">
-                            <span id="sns-header-avatar-wrap"></span>
-                            こんにちは、<a href="#" id="sns-header-name">ゲスト</a>さん
-                            <button id="sns-header-stats" class="btn-header-icon" title="統計">📊</button>
-                            <button id="sns-header-history" class="btn-header-icon" title="ハンド履歴">📜</button>
-                            <button id="sns-header-logout" class="btn-header-icon" title="ログアウト">🚪</button>
-                        </div>
-                    </div>
+            <!-- Top bar -->
+            <div class="mx-topbar">
+                <div class="mx-brand">
+                    <img class="mx-brand-icon" src="logos/mix_1_logo_minimalist_1775651849102.png" alt="mix-1">
+                    <span class="mx-brand-name">mix-1</span>
                 </div>
-
-                <!-- CTA Row: "今すぐプレイ" prominent button -->
-                <div class="sns-cta-row">
-                    <div class="sns-cta-inner">
-                        <button id="btn-open-rooms" class="sns-cta-primary">
-                            🎰 参加できる卓 <span id="sns-cta-room-count">0</span>
-                        </button>
-                        <button id="btn-open-online" class="sns-cta-secondary">
-                            👥 オンライン <span id="sns-cta-online-count">0</span>
-                        </button>
-                        <button id="btn-open-chat" class="sns-cta-secondary">
-                            💬 ロビーチャット
-                        </button>
-                    </div>
+                <div class="mx-top-spacer"></div>
+                <div class="mx-top-user" id="mx-top-user">
+                    <span class="mx-av" id="mx-top-av">?</span>
+                    <span id="mx-top-name">ゲスト</span>
                 </div>
-
-                <!-- Tab nav -->
-                <div class="m-nav-bar">
-                    <div class="m-nav-inner">
-                        <div class="m-nav-item active" data-sns-tab="home">ホーム</div>
-                        <div class="m-nav-item" data-sns-tab="profile">プロフィール</div>
-                        <div class="m-nav-item" data-sns-tab="chat">チャット</div>
-                        <div class="m-nav-item" data-sns-tab="friends">ポーカー仲間</div>
-                        <div class="m-nav-item" data-sns-tab="community">コミュニティ</div>
-                        <div class="m-nav-item" data-sns-tab="messages">メッセージ</div>
-                        <div class="m-nav-item" data-sns-tab="footprints">あしあと</div>
-                    </div>
-                </div>
-
-                <!-- Main content -->
-                <div class="m-container">
-                    <!-- Left sidebar -->
-                    <div class="m-col-left">
-                        <div class="m-panel">
-                            <div class="m-panel-body">
-                                <div class="m-profile">
-                                    <div class="m-profile-avatar" id="sns-self-avatar">?</div>
-                                    <a href="#" class="m-profile-name" id="sns-self-name">ゲスト</a>
-                                    <div class="m-profile-meta" id="sns-self-meta">レギュラー会員</div>
-                                    <div class="m-profile-stats" id="sns-self-stats">
-                                        <div><strong id="sns-stat-following">0</strong>仲間</div>
-                                        <div><strong id="sns-stat-followers">0</strong>フォロワー</div>
-                                        <div><strong id="sns-stat-posts">0</strong>日記</div>
-                                        <div><strong id="sns-stat-footprints">0</strong>あしあと</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="m-panel">
-                            <div class="m-panel-title">メニュー</div>
-                            <div class="m-panel-body">
-                                <ul class="m-menu-list">
-                                    <li><a href="#" id="menu-new-diary">日記を書く</a></li>
-                                    <li><a href="#" data-sns-tab="footprints">あしあと</a></li>
-                                    <li><a href="#" data-sns-tab="friends">仲間一覧</a></li>
-                                    <li><a href="#" data-sns-tab="community">コミュニティ</a></li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="m-panel">
-                            <div class="m-panel-title">最新あしあと <span class="m-panel-more" data-sns-tab="footprints">もっと見る</span></div>
-                            <div class="m-panel-body m-footprints" id="sns-footprints-mini"></div>
-                        </div>
-                    </div>
-
-                    <!-- Center -->
-                    <div class="m-col-center">
-                        <div class="m-welcome">
-                            <div class="m-welcome-msg">
-                                <h2 id="sns-welcome-title">こんにちは！</h2>
-                                <p id="sns-welcome-sub">仲間の最新タイムラインをチェックしましょう。</p>
-                            </div>
-                            <div class="m-welcome-badge" id="btn-sns-to-lobby">プレイする ▶</div>
-                        </div>
-
-                        <!-- Chat composer (always visible at top) -->
-                        <div class="m-panel sns-composer" id="sns-composer">
-                            <div class="m-panel-title">チャット投稿（タイムラインに流れます）</div>
-                            <div class="m-panel-body">
-                                <div class="composer-chat-row">
-                                    <input type="text" id="composer-body" class="composer-input" placeholder="いまどうしてる？ 一言チャット…" maxlength="280" autocomplete="off">
-                                    <button id="btn-composer-submit" class="btn-mixi">投稿</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="m-panel">
-                            <div class="m-panel-title" id="sns-feed-title">仲間の最新タイムライン <span class="m-panel-more" id="btn-sns-refresh">更新</span></div>
-                            <div id="sns-timeline"></div>
-                        </div>
-                    </div>
-
-                    <!-- Right sidebar -->
-                    <div class="m-col-right">
-                        <div class="m-banner">
-                            <strong>🎰 新着テーブル</strong>
-                            <span id="sns-room-count">0</span>卓が参加待ち中
-                        </div>
-
-                        <div class="m-panel">
-                            <div class="m-panel-title">参加コミュニティ <span class="m-panel-more">全て</span></div>
-                            <div class="m-panel-body m-community">
-                                <div class="m-community-item">
-                                    <div class="m-community-icon">♠</div>
-                                    <div class="m-community-info">
-                                        <a href="#" class="m-community-name">ホールデム研究会</a>
-                                        <div class="m-community-count">1,243人</div>
-                                    </div>
-                                </div>
-                                <div class="m-community-item">
-                                    <div class="m-community-icon">♥</div>
-                                    <div class="m-community-info">
-                                        <a href="#" class="m-community-name">Badugi同好会</a>
-                                        <div class="m-community-count">182人</div>
-                                    </div>
-                                </div>
-                                <div class="m-community-item">
-                                    <div class="m-community-icon">♦</div>
-                                    <div class="m-community-info">
-                                        <a href="#" class="m-community-name">初心者の会</a>
-                                        <div class="m-community-count">67人</div>
-                                    </div>
-                                </div>
-                                <div class="m-community-item">
-                                    <div class="m-community-icon">♣</div>
-                                    <div class="m-community-info">
-                                        <a href="#" class="m-community-name">OFCの楽しみ方</a>
-                                        <div class="m-community-count">94人</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="m-panel">
-                            <div class="m-panel-title">おすすめ仲間</div>
-                            <div class="m-panel-body" id="sns-suggested"></div>
-                        </div>
-                    </div>
-                </div>
+                <button id="sns-header-stats" class="mx-icon-btn" title="統計">📊</button>
+                <button id="sns-header-history" class="mx-icon-btn" title="ハンド履歴">📜</button>
+                <button id="sns-header-logout" class="mx-icon-btn" title="ログアウト">🚪</button>
             </div>
+
+            <!-- Play rail: horizontal room list + quick actions -->
+            <div class="mx-play-rail">
+                <div class="mx-play-rail-head">
+                    <h2>🎰 プレイ可能な卓 <span class="mx-play-sub" id="mx-play-sub">0卓 / オンライン 0名</span></h2>
+                    <div class="mx-play-actions">
+                        <button id="mx-btn-create" class="mx-action-btn">＋ 作成</button>
+                        <button id="mx-btn-zoom" class="mx-action-btn mx-zoom">⚡ Zoom<span id="mx-zoom-count"></span></button>
+                        <div class="mx-join-inline">
+                            <input type="text" id="mx-room-id-input" placeholder="ID" maxlength="4">
+                            <button id="mx-btn-join-id" class="mx-action-btn mx-secondary">参加</button>
+                        </div>
+                        <button id="mx-btn-refresh" class="mx-action-btn mx-secondary" title="更新">🔄</button>
+                    </div>
+                </div>
+                <div class="mx-rail" id="mx-rail"></div>
+            </div>
+
+            <!-- Feed -->
+            <div class="mx-feed-wrap">
+                <div class="mx-feed-head">
+                    <h2>注目ハンド</h2>
+                    <span class="mx-feed-sub">50BB以上 / 25big bets以上 / ストレートフラッシュ以上を自動投稿</span>
+                    <span class="mx-feed-live">LIVE</span>
+                </div>
+                <div id="sns-timeline"></div>
+            </div>
+
+            <!-- Floating lobby chat button -->
+            <button id="mx-fab-chat" class="mx-fab" title="ロビーチャット">💬<span id="mx-fab-badge" class="mx-fab-badge hidden"></span></button>
         </div>
 
         <!-- Room picker modal (opens from SNS CTA) -->
@@ -638,6 +523,6 @@
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
     <script src="js/ui.js?v=37"></script>
-    <script src="js/app.js?v=39"></script>
+    <script src="js/app.js?v=40"></script>
 </body>
 </html>

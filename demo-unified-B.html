@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 / 統合ページ 案B：カード型タイル</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue-50:#F0F7FF;
+    --blue-100:#D8E9FF;
+    --blue-200:#B1D1FC;
+    --blue-300:#7FB3F8;
+    --blue-400:#5B9BF0;
+    --blue-500:#3E84E4;
+    --blue-600:#2A6BC9;
+    --blue-700:#1E52A3;
+    --navy:#0E2238;
+    --ink:#1F2A3C;
+    --ink-2:#566579;
+    --line:#E6EDF7;
+    --bg:#EFF5FD;
+    --red:#D93A3A;
+    --gold:#D8A72A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:'Noto Sans JP','Inter',sans-serif;color:var(--ink);font-size:14px;line-height:1.5}
+  a{color:var(--blue-600);text-decoration:none}
+
+  /* Header (dark navy with light blue accents, like the mix-1 logo itself) */
+  .header{
+    background:linear-gradient(90deg,#0E2238 0%,#1A3558 100%);
+    color:#fff;
+    padding:10px 22px;
+    display:flex;align-items:center;gap:16px;
+    position:sticky;top:0;z-index:10;
+    box-shadow:0 2px 10px rgba(14,34,56,0.2);
+  }
+  .header .brand-row{display:flex;align-items:center;gap:12px}
+  .chip-logo{
+    width:42px;height:42px;position:relative;
+  }
+  .chip-logo svg{width:100%;height:100%}
+  .brand{
+    font-family:'Inter',sans-serif;font-weight:800;font-size:22px;letter-spacing:1px;
+    color:#7FB3F8;text-shadow:0 0 8px rgba(127,179,248,0.5);
+  }
+  .brand-sub{font-size:10px;color:#B1D1FC;letter-spacing:2px;margin-top:-2px}
+  .spacer{flex:1}
+  .user-row{display:flex;align-items:center;gap:10px}
+  .user{display:flex;align-items:center;gap:8px;font-weight:500}
+  .user .avatar{
+    width:32px;height:32px;border-radius:50%;
+    background:linear-gradient(135deg,#5B9BF0,#2A6BC9);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;
+  }
+  .icon-btn{
+    background:rgba(255,255,255,0.08);border:1px solid rgba(127,179,248,0.3);
+    width:36px;height:36px;border-radius:10px;cursor:pointer;
+    font-size:16px;color:#B1D1FC;display:flex;align-items:center;justify-content:center;
+    transition:.15s;
+  }
+  .icon-btn:hover{background:rgba(127,179,248,0.15);color:#fff;border-color:#7FB3F8}
+
+  /* Hero / Play Section — top */
+  .play-hero{
+    background:linear-gradient(180deg,#fff 0%,var(--blue-50) 100%);
+    border-bottom:1px solid var(--line);
+    padding:18px 22px 14px;
+  }
+  .play-hero-inner{max-width:1240px;margin:0 auto}
+  .play-title{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;
+  }
+  .play-title h2{
+    font-size:15px;margin:0;color:var(--ink);display:flex;align-items:center;gap:8px;
+  }
+  .play-title .count{
+    font-size:11px;color:var(--ink-2);
+  }
+  .play-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn-create{
+    background:linear-gradient(180deg,#5B9BF0,#2A6BC9);
+    color:#fff;border:none;border-radius:10px;
+    padding:10px 18px;font-weight:700;font-size:14px;cursor:pointer;
+    box-shadow:0 3px 8px rgba(42,107,201,0.25);
+  }
+  .btn-create:hover{filter:brightness(1.05);transform:translateY(-1px)}
+  .btn-zoom{
+    background:linear-gradient(180deg,#7FCFE8,#3993C4);
+    color:#fff;border:none;border-radius:10px;
+    padding:10px 18px;font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .btn-ghost{
+    background:#fff;color:var(--blue-600);border:1px solid var(--blue-200);
+    border-radius:10px;padding:9px 14px;font-weight:600;font-size:13px;cursor:pointer;
+  }
+  .btn-ghost:hover{background:var(--blue-50)}
+  .join-inline{display:flex;gap:4px;align-items:center}
+  .join-inline input{
+    border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;text-transform:uppercase;width:100px;
+  }
+
+  /* Room card tiles */
+  .room-grid{
+    margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;
+  }
+  .tile{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:12px;cursor:pointer;transition:.15s;
+    position:relative;overflow:hidden;
+  }
+  .tile:hover{border-color:var(--blue-400);transform:translateY(-2px);box-shadow:0 4px 12px rgba(42,107,201,0.12)}
+  .tile::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+    background:linear-gradient(180deg,var(--blue-400),var(--blue-600));
+  }
+  .tile-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .tile-id{
+    font-size:10px;font-family:'Inter',monospace;font-weight:700;
+    color:var(--blue-700);background:var(--blue-100);padding:2px 7px;border-radius:10px;
+  }
+  .tile-status{font-size:10px;color:#2aa76a;font-weight:700}
+  .tile-status.playing{color:#d88a2a}
+  .tile-name{font-weight:700;color:var(--ink);margin:4px 0 2px;font-size:14px}
+  .tile-meta{font-size:11px;color:var(--ink-2)}
+  .tile-foot{
+    margin-top:8px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .tile-seats{display:flex;gap:2px}
+  .seat-dot{width:8px;height:8px;border-radius:50%;background:var(--blue-200)}
+  .seat-dot.filled{background:var(--blue-500)}
+  .tile-join{
+    background:var(--blue-500);color:#fff;border:none;border-radius:8px;
+    padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;
+  }
+
+  /* Timeline area */
+  .feed-section{
+    max-width:960px;margin:0 auto;padding:18px 22px 40px;
+  }
+  .feed-head{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    margin-bottom:14px;padding:0 4px;
+  }
+  .feed-head h2{
+    font-size:16px;margin:0;display:flex;align-items:center;gap:8px;color:var(--ink);
+  }
+  .feed-head h2 .dot{
+    width:8px;height:8px;border-radius:50%;background:#ff5a5a;animation:pulse 1.5s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:.6;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+  .feed-head .filter{display:flex;gap:4px;font-size:12px}
+  .pill{
+    padding:4px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink-2);cursor:pointer;
+  }
+  .pill.active{background:var(--blue-600);color:#fff;border-color:var(--blue-600)}
+
+  .post{
+    background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;
+    border:1px solid var(--line);
+    box-shadow:0 1px 3px rgba(14,34,56,0.04);
+  }
+  .post-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .post-avatar{
+    width:44px;height:44px;border-radius:50%;background:var(--blue-100);
+    display:flex;align-items:center;justify-content:center;color:var(--blue-700);font-weight:700;font-size:18px;
+    border:2px solid var(--blue-200);
+  }
+  .post-name{font-weight:700;font-size:14px;color:var(--ink)}
+  .post-date{font-size:11px;color:var(--ink-2)}
+  .post-trophy{
+    margin-left:auto;display:flex;align-items:center;gap:6px;
+    background:linear-gradient(180deg,#FFE68A,#E8B22E);
+    color:#5A4210;padding:5px 12px;border-radius:14px;
+    font-size:11px;font-weight:700;
+    border:1px solid #d8a72a;
+  }
+  .post-trophy.big{
+    background:linear-gradient(180deg,#D8E9FF,#5B9BF0);color:#fff;border-color:#2A6BC9;
+  }
+  .hand-showcase{
+    background:linear-gradient(135deg,#F0F7FF 0%,#E3EEFA 100%);
+    border:1px solid var(--blue-100);
+    border-radius:12px;padding:14px;margin:4px 0 10px;
+    display:flex;gap:14px;align-items:center;
+  }
+  .winnings{
+    font-size:24px;font-weight:800;color:var(--blue-700);
+    font-family:'Inter',sans-serif;
+  }
+  .winnings .unit{font-size:12px;color:var(--ink-2);font-weight:500;margin-left:2px}
+  .hand-info{flex:1}
+  .hand-name{font-weight:700;color:var(--ink);font-size:13px;margin-bottom:4px}
+  .cards{display:flex;gap:3px}
+  .card{
+    width:28px;height:40px;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    background:#fff;border:1px solid #c5d0df;font-weight:700;font-size:12px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.08);
+  }
+  .card.red{color:#D93A3A}
+  .card.black{color:var(--ink)}
+  .post-actions{
+    display:flex;gap:16px;padding-top:8px;border-top:1px solid var(--line);margin-top:8px;
+    font-size:12px;color:var(--ink-2);
+  }
+  .post-actions span{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+  .post-actions span:hover{color:var(--blue-600)}
+  .comments{margin-top:12px}
+  .comment{display:flex;gap:8px;margin-bottom:8px}
+  .c-avatar{
+    width:28px;height:28px;border-radius:50%;background:var(--blue-100);
+    display:flex;align-items:center;justify-content:center;color:var(--blue-700);font-weight:700;font-size:11px;flex-shrink:0;
+  }
+  .c-body{flex:1;background:var(--bg);border-radius:12px;padding:7px 12px;font-size:12px;line-height:1.5}
+  .c-body b{color:var(--blue-700);margin-right:4px}
+  .comment-input{
+    display:flex;gap:6px;margin-top:10px;
+  }
+  .comment-input input{
+    flex:1;border:1px solid var(--line);background:var(--bg);
+    border-radius:18px;padding:8px 14px;font-size:12px;
+  }
+  .comment-input input:focus{border-color:var(--blue-400);background:#fff;outline:none}
+  .comment-input button{
+    background:var(--blue-500);color:#fff;border:none;border-radius:18px;padding:8px 16px;font-size:12px;cursor:pointer;font-weight:700;
+  }
+
+  @media(max-width:720px){
+    .play-actions{flex-direction:column;align-items:stretch}
+    .join-inline{display:flex}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand-row">
+    <div class="chip-logo">
+      <svg viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7FB3F8"/><stop offset="100%" stop-color="#2A6BC9"/>
+          </linearGradient>
+        </defs>
+        <circle cx="50" cy="50" r="46" fill="url(#bg)" stroke="#fff" stroke-width="2"/>
+        <circle cx="50" cy="50" r="32" fill="none" stroke="#0E2238" stroke-width="3" stroke-dasharray="8 4"/>
+        <path d="M50 24 L68 56 Q50 74 50 74 Q50 74 32 56 Z" fill="#0E2238" opacity="0.4"/>
+        <path d="M50 28 L64 54 Q50 70 50 70 Q50 70 36 54 Z" fill="#0E2238"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand">mix-1</div>
+      <div class="brand-sub">POKER LOUNGE</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="user-row">
+    <div class="user">
+      <div class="avatar">K</div>
+      <span style="color:#B1D1FC">Kensuke</span>
+    </div>
+    <button class="icon-btn" title="統計">📊</button>
+    <button class="icon-btn" title="ハンド履歴">📜</button>
+    <button class="icon-btn" title="ログアウト">🚪</button>
+  </div>
+</div>
+
+<!-- Hero: Play actions + tiles -->
+<div class="play-hero">
+  <div class="play-hero-inner">
+    <div class="play-title">
+      <h2>🎰 プレイ</h2>
+      <span class="count">公開ルーム 3卓 / オンライン 7名</span>
+    </div>
+    <div class="play-actions">
+      <button class="btn-create">＋ ルーム作成</button>
+      <button class="btn-zoom">⚡ Zoom卓に参加</button>
+      <div class="join-inline">
+        <input placeholder="ルームID">
+        <button class="btn-ghost">参加</button>
+      </div>
+      <button class="btn-ghost">🔄 更新</button>
+    </div>
+
+    <div class="room-grid">
+      <div class="tile">
+        <div class="tile-head">
+          <span class="tile-id">ABCD</span>
+          <span class="tile-status">● 待機中</span>
+        </div>
+        <div class="tile-name">Kensukeのテーブル</div>
+        <div class="tile-meta">Hold'em Mix</div>
+        <div class="tile-foot">
+          <div class="tile-seats">
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot"></span>
+            <span class="seat-dot"></span>
+            <span class="seat-dot"></span>
+          </div>
+          <button class="tile-join">参加</button>
+        </div>
+      </div>
+      <div class="tile">
+        <div class="tile-head">
+          <span class="tile-id">XYZ9</span>
+          <span class="tile-status">● 待機中</span>
+        </div>
+        <div class="tile-name">Alice's Badugi</div>
+        <div class="tile-meta">Badugi / 2-7TD</div>
+        <div class="tile-foot">
+          <div class="tile-seats">
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot"></span>
+            <span class="seat-dot"></span>
+            <span class="seat-dot"></span>
+            <span class="seat-dot"></span>
+          </div>
+          <button class="tile-join">参加</button>
+        </div>
+      </div>
+      <div class="tile">
+        <div class="tile-head">
+          <span class="tile-id">PQ12</span>
+          <span class="tile-status playing">● プレイ中</span>
+        </div>
+        <div class="tile-name">Late Night OFC</div>
+        <div class="tile-meta">OFC Pineapple</div>
+        <div class="tile-foot">
+          <div class="tile-seats">
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot filled"></span>
+            <span class="seat-dot"></span>
+            <span class="seat-dot"></span>
+          </div>
+          <button class="tile-join" style="background:#a4b5ce">観戦</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feed -->
+<div class="feed-section">
+  <div class="feed-head">
+    <h2><span class="dot"></span>📢 注目ハンドタイムライン</h2>
+    <div class="filter">
+      <span class="pill active">すべて</span>
+      <span class="pill">🏆 強ハンド</span>
+      <span class="pill">💰 ビッグポット</span>
+    </div>
+  </div>
+
+  <div class="post">
+    <div class="post-head">
+      <div class="post-avatar">A</div>
+      <div>
+        <div class="post-name">Alice</div>
+        <div class="post-date">5分前 / Kensukeのテーブル</div>
+      </div>
+      <div class="post-trophy">🏆 ロイヤルフラッシュ</div>
+    </div>
+    <div class="hand-showcase">
+      <div class="winnings">12,500<span class="unit">chips</span></div>
+      <div class="hand-info">
+        <div class="hand-name">Hold'em ／ 125BB の大勝利</div>
+        <div class="cards">
+          <div class="card black">A♠</div>
+          <div class="card black">K♠</div>
+          <div class="card black">Q♠</div>
+          <div class="card black">J♠</div>
+          <div class="card black">T♠</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <span>💬 3件のコメント</span>
+      <span>✨ ナイスハンド</span>
+    </div>
+    <div class="comments">
+      <div class="comment">
+        <div class="c-avatar">B</div>
+        <div class="c-body"><b>Bob</b>えぐい勝ち方…ナイスハンド！🎉</div>
+      </div>
+      <div class="comment">
+        <div class="c-avatar">K</div>
+        <div class="c-body"><b>Kensuke</b>ブロッカー完璧でしたね。</div>
+      </div>
+      <div class="comment-input">
+        <input placeholder="コメントする...">
+        <button>送信</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="post">
+    <div class="post-head">
+      <div class="post-avatar">B</div>
+      <div>
+        <div class="post-name">Bob</div>
+        <div class="post-date">22分前 / Late Night OFC</div>
+      </div>
+      <div class="post-trophy">♣ クワッズ</div>
+    </div>
+    <div class="hand-showcase">
+      <div class="winnings">8,200<span class="unit">chips</span></div>
+      <div class="hand-info">
+        <div class="hand-name">OFC Pineapple ／ 82BB</div>
+        <div class="cards">
+          <div class="card black">K♣</div>
+          <div class="card black">K♠</div>
+          <div class="card red">K♥</div>
+          <div class="card red">K♦</div>
+          <div class="card red">3♥</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <span>💬 1件のコメント</span>
+    </div>
+    <div class="comments">
+      <div class="comment">
+        <div class="c-avatar">A</div>
+        <div class="c-body"><b>Alice</b>Kで刺したのはシブい！</div>
+      </div>
+      <div class="comment-input">
+        <input placeholder="コメントする...">
+        <button>送信</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="post">
+    <div class="post-head">
+      <div class="post-avatar">C</div>
+      <div>
+        <div class="post-name">Charlie</div>
+        <div class="post-date">1時間前 / Alice's Badugi</div>
+      </div>
+      <div class="post-trophy big">💰 ビッグポット</div>
+    </div>
+    <div class="hand-showcase">
+      <div class="winnings">6,400<span class="unit">chips</span></div>
+      <div class="hand-info">
+        <div class="hand-name">Badugi ／ 64BB（32 big bets）</div>
+        <div class="cards">
+          <div class="card red">A♥</div>
+          <div class="card black">2♠</div>
+          <div class="card red">3♦</div>
+          <div class="card black">4♣</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <span>💬 0件のコメント</span>
+    </div>
+    <div class="comments">
+      <div class="comment-input">
+        <input placeholder="最初のコメントをどうぞ…">
+        <button>送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

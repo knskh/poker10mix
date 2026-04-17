@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 / 統合ページ 案C：ミニマル単カラム</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue-50:#F5FAFF;
+    --blue-100:#E4F0FF;
+    --blue-200:#C5DFFA;
+    --blue-400:#6AA8F0;
+    --blue-500:#3E84E4;
+    --blue-600:#2A6BC9;
+    --blue-700:#1E52A3;
+    --ink:#17202E;
+    --ink-2:#5B6B80;
+    --ink-3:#8A99AE;
+    --line:#EAF0F9;
+    --bg:#FBFCFE;
+    --red:#D93A3A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:'Noto Sans JP','Inter',sans-serif;color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--blue-600);text-decoration:none}
+
+  /* Fixed narrow top bar */
+  .topbar{
+    background:rgba(255,255,255,0.92);
+    backdrop-filter:saturate(180%) blur(10px);
+    border-bottom:1px solid var(--line);
+    padding:8px 16px;
+    display:flex;align-items:center;gap:10px;
+    position:sticky;top:0;z-index:20;
+  }
+  .brand{
+    display:flex;align-items:center;gap:8px;
+  }
+  .brand-icon{
+    width:28px;height:28px;border-radius:50%;
+    background:linear-gradient(135deg,#6AA8F0,#1E52A3);
+    color:#fff;font-weight:800;font-size:14px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 5px rgba(30,82,163,0.25);
+  }
+  .brand-name{
+    font-family:'Inter',sans-serif;font-weight:700;font-size:17px;letter-spacing:.3px;
+    color:var(--blue-700);
+  }
+  .top-spacer{flex:1}
+  .top-user{
+    font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px;
+  }
+  .top-user .av{
+    width:24px;height:24px;border-radius:50%;background:var(--blue-100);
+    display:flex;align-items:center;justify-content:center;color:var(--blue-700);font-weight:700;font-size:11px;
+  }
+  .icon-btn{
+    background:transparent;border:none;cursor:pointer;
+    width:30px;height:30px;border-radius:6px;font-size:14px;color:var(--ink-2);
+  }
+  .icon-btn:hover{background:var(--blue-50);color:var(--blue-600)}
+
+  /* Quick Play strip — horizontal scrollable rail */
+  .play-rail{
+    background:#fff;
+    border-bottom:1px solid var(--line);
+    padding:10px 16px 12px;
+    position:sticky;top:45px;z-index:10;
+  }
+  .play-rail-head{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;
+  }
+  .play-rail-head h2{
+    margin:0;font-size:12px;color:var(--ink-2);font-weight:600;text-transform:uppercase;letter-spacing:1px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .play-rail-head .actions{display:flex;gap:6px}
+  .action-btn{
+    background:var(--blue-600);color:#fff;border:none;border-radius:6px;
+    padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;
+  }
+  .action-btn.secondary{background:#fff;color:var(--blue-600);border:1px solid var(--blue-200)}
+  .action-btn.zoom{background:linear-gradient(135deg,#7FCFE8,#3993C4)}
+
+  .rail{
+    display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
+    scrollbar-width:thin;scrollbar-color:var(--blue-200) transparent;
+  }
+  .rail::-webkit-scrollbar{height:6px}
+  .rail::-webkit-scrollbar-thumb{background:var(--blue-200);border-radius:3px}
+
+  .rail-card{
+    flex:0 0 auto;min-width:190px;
+    background:linear-gradient(180deg,#fff,var(--blue-50));
+    border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;cursor:pointer;transition:.15s;
+    position:relative;
+  }
+  .rail-card:hover{border-color:var(--blue-400);box-shadow:0 2px 8px rgba(42,107,201,0.12);transform:translateY(-1px)}
+  .rail-card .id{
+    font-size:10px;font-family:'Inter',monospace;font-weight:700;color:var(--blue-700);
+  }
+  .rail-card .nm{font-weight:700;font-size:13px;color:var(--ink);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+  .rail-card .info{font-size:10px;color:var(--ink-2);display:flex;justify-content:space-between;gap:6px}
+  .rail-card .status{font-size:10px;color:#2aa76a;font-weight:700}
+  .rail-card .status.playing{color:#d88a2a}
+
+  .rail-add{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    min-width:140px;flex:0 0 auto;
+    background:rgba(62,132,228,0.06);
+    border:1px dashed var(--blue-200);border-radius:10px;
+    color:var(--blue-600);font-weight:700;font-size:13px;cursor:pointer;
+  }
+  .rail-add:hover{background:rgba(62,132,228,0.12);border-color:var(--blue-400)}
+
+  /* Feed */
+  .feed-wrap{
+    max-width:620px;margin:0 auto;padding:12px 16px 40px;
+  }
+  .feed-head{
+    display:flex;align-items:baseline;gap:8px;margin:6px 2px 10px;
+  }
+  .feed-head h2{
+    margin:0;font-size:16px;color:var(--ink);font-weight:700;
+  }
+  .feed-head .sub{font-size:11px;color:var(--ink-3)}
+  .feed-head .live{
+    margin-left:auto;font-size:11px;color:#d33a3a;display:flex;align-items:center;gap:4px;
+  }
+  .feed-head .live::before{
+    content:"";width:7px;height:7px;border-radius:50%;background:#d33a3a;
+    animation:pulse 1.5s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+  .post{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:10px;transition:.15s;
+  }
+  .post:hover{border-color:var(--blue-200)}
+  .post-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .post-avatar{
+    width:38px;height:38px;border-radius:50%;
+    background:linear-gradient(135deg,var(--blue-100),var(--blue-200));
+    color:var(--blue-700);font-weight:700;font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .post-meta{flex:1;min-width:0}
+  .post-name{font-weight:700;color:var(--ink);font-size:14px}
+  .post-name::after{content:" · ";color:var(--ink-3);font-weight:400}
+  .post-name span{color:var(--ink-3);font-weight:400;font-size:11px}
+  .post-date{font-size:11px;color:var(--ink-3);margin-top:1px}
+
+  .post-badge{
+    font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;
+    background:linear-gradient(135deg,#FFE68A,#E8B22E);color:#5A4210;border:1px solid #d8a72a;
+  }
+  .post-badge.pot{
+    background:linear-gradient(135deg,#D8E9FF,#5B9BF0);color:#fff;border-color:#2A6BC9;
+  }
+
+  .hand-body{
+    background:linear-gradient(135deg,#F2F7FD,#E5EEFA);
+    border-radius:10px;padding:12px;margin:8px 0 10px;
+    border:1px solid var(--blue-100);
+    position:relative;overflow:hidden;
+  }
+  .hand-top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
+  .win-amount{
+    font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:var(--blue-700);letter-spacing:.5px;
+  }
+  .win-amount .u{font-size:11px;color:var(--ink-2);font-weight:500;margin-left:3px}
+  .game-tag{
+    font-size:10px;color:var(--blue-700);background:#fff;
+    padding:2px 8px;border-radius:10px;border:1px solid var(--blue-200);font-weight:700;
+  }
+  .cards{display:flex;gap:3px}
+  .card{
+    width:26px;height:36px;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    background:#fff;border:1px solid #c5d0df;font-weight:700;font-size:11px;
+    box-shadow:0 1px 1px rgba(0,0,0,0.05);
+  }
+  .card.red{color:#D93A3A}
+  .card.black{color:var(--ink)}
+  .hand-label{font-size:11px;color:var(--ink-2);margin-top:6px}
+
+  .post-actions{
+    display:flex;gap:18px;color:var(--ink-2);font-size:12px;
+    padding:4px 0 0;
+  }
+  .post-actions span{cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .post-actions span:hover{color:var(--blue-600)}
+
+  .comments{
+    border-top:1px solid var(--line);margin-top:10px;padding-top:10px;
+  }
+  .comment{display:flex;gap:8px;margin-bottom:6px;align-items:flex-start}
+  .c-avatar{
+    width:24px;height:24px;border-radius:50%;
+    background:var(--blue-100);color:var(--blue-700);font-weight:700;font-size:10px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .c-body{font-size:12px;line-height:1.5;flex:1}
+  .c-body b{color:var(--blue-700);margin-right:5px}
+  .c-time{font-size:10px;color:var(--ink-3);margin-left:6px}
+  .comment-input{
+    display:flex;gap:6px;margin-top:8px;
+  }
+  .comment-input input{
+    flex:1;border:1px solid var(--line);background:var(--blue-50);
+    border-radius:16px;padding:7px 12px;font-size:12px;outline:none;
+  }
+  .comment-input input:focus{border-color:var(--blue-400);background:#fff}
+  .comment-input button{
+    background:var(--blue-500);color:#fff;border:none;border-radius:16px;padding:7px 14px;font-size:12px;cursor:pointer;font-weight:700;
+  }
+
+  /* Floating Lobby chat button */
+  .fab{
+    position:fixed;right:16px;bottom:16px;
+    background:linear-gradient(135deg,#5B9BF0,#1E52A3);
+    color:#fff;border:none;border-radius:50%;
+    width:52px;height:52px;font-size:22px;cursor:pointer;
+    box-shadow:0 4px 14px rgba(30,82,163,0.35);
+    z-index:30;
+  }
+  .fab:hover{transform:scale(1.05)}
+
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">♠</div>
+    <div class="brand-name">mix-1</div>
+  </div>
+  <div class="top-spacer"></div>
+  <div class="top-user">
+    <div class="av">K</div>
+    <span>Kensuke</span>
+  </div>
+  <button class="icon-btn" title="統計">📊</button>
+  <button class="icon-btn" title="ハンド履歴">📜</button>
+  <button class="icon-btn" title="ログアウト">🚪</button>
+</div>
+
+<!-- Play rail -->
+<div class="play-rail">
+  <div class="play-rail-head">
+    <h2>🎰 プレイ可能な卓 <span style="color:var(--ink-3);text-transform:none;letter-spacing:0;margin-left:6px">3卓待機中 / オンライン 7名</span></h2>
+    <div class="actions">
+      <button class="action-btn">＋ 作成</button>
+      <button class="action-btn zoom">⚡ Zoom</button>
+      <button class="action-btn secondary">🔄</button>
+    </div>
+  </div>
+  <div class="rail">
+    <div class="rail-card">
+      <div class="id">ABCD</div>
+      <div class="nm">Kensukeのテーブル</div>
+      <div class="info"><span>Hold'em 3/6</span><span class="status">● 待機</span></div>
+    </div>
+    <div class="rail-card">
+      <div class="id">XYZ9</div>
+      <div class="nm">Alice's Badugi</div>
+      <div class="info"><span>Badugi 2/6</span><span class="status">● 待機</span></div>
+    </div>
+    <div class="rail-card">
+      <div class="id">PQ12</div>
+      <div class="nm">Late Night OFC</div>
+      <div class="info"><span>OFC 4/6</span><span class="status playing">● プレイ中</span></div>
+    </div>
+    <div class="rail-add">＋ 新規ルーム</div>
+  </div>
+</div>
+
+<!-- Feed -->
+<div class="feed-wrap">
+  <div class="feed-head">
+    <h2>注目ハンド</h2>
+    <span class="sub">自動で流れます</span>
+    <span class="live">LIVE</span>
+  </div>
+
+  <div class="post">
+    <div class="post-head">
+      <div class="post-avatar">A</div>
+      <div class="post-meta">
+        <div class="post-name">Alice <span>@alice</span></div>
+        <div class="post-date">5分前 / Kensukeのテーブル</div>
+      </div>
+      <div class="post-badge">🏆 ロイヤル</div>
+    </div>
+    <div class="hand-body">
+      <div class="hand-top">
+        <div class="win-amount">+12,500<span class="u">chips</span></div>
+        <span class="game-tag">Hold'em</span>
+      </div>
+      <div class="cards">
+        <div class="card black">A♠</div>
+        <div class="card black">K♠</div>
+        <div class="card black">Q♠</div>
+        <div class="card black">J♠</div>
+        <div class="card black">T♠</div>
+      </div>
+      <div class="hand-label">Royal Flush · 125BB 獲得</div>
+    </div>
+    <div class="post-actions">
+      <span>💬 3</span>
+      <span>✨ ナイスハンド</span>
+    </div>
+    <div class="comments">
+      <div class="comment">
+        <div class="c-avatar">B</div>
+        <div class="c-body"><b>Bob</b>えぐい勝ち方…！<span class="c-time">3分前</span></div>
+      </div>
+      <div class="comment">
+        <div class="c-avatar">K</div>
+        <div class="c-body"><b>Kensuke</b>ブロッカー完璧でした<span class="c-time">2分前</span></div>
+      </div>
+      <div class="comment-input">
+        <input placeholder="コメントする…">
+        <button>送信</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="post">
+    <div class="post-head">
+      <div class="post-avatar">B</div>
+      <div class="post-meta">
+        <div class="post-name">Bob <span>@bob</span></div>
+        <div class="post-date">22分前 / Late Night OFC</div>
+      </div>
+      <div class="post-badge">♣ クワッズ</div>
+    </div>
+    <div class="hand-body">
+      <div class="hand-top">
+        <div class="win-amount">+8,200<span class="u">chips</span></div>
+        <span class="game-tag">OFC</span>
+      </div>
+      <div class="cards">
+        <div class="card black">K♣</div>
+        <div class="card black">K♠</div>
+        <div class="card red">K♥</div>
+        <div class="card red">K♦</div>
+        <div class="card red">3♥</div>
+      </div>
+      <div class="hand-label">Four of a Kind · 82BB 獲得</div>
+    </div>
+    <div class="post-actions">
+      <span>💬 1</span>
+    </div>
+    <div class="comments">
+      <div class="comment">
+        <div class="c-avatar">A</div>
+        <div class="c-body"><b>Alice</b>Kで刺したのシブい<span class="c-time">15分前</span></div>
+      </div>
+      <div class="comment-input">
+        <input placeholder="コメントする…">
+        <button>送信</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="post">
+    <div class="post-head">
+      <div class="post-avatar">C</div>
+      <div class="post-meta">
+        <div class="post-name">Charlie <span>@charlie</span></div>
+        <div class="post-date">1時間前 / Alice's Badugi</div>
+      </div>
+      <div class="post-badge pot">💰 ビッグポット</div>
+    </div>
+    <div class="hand-body">
+      <div class="hand-top">
+        <div class="win-amount">+6,400<span class="u">chips</span></div>
+        <span class="game-tag">Badugi</span>
+      </div>
+      <div class="cards">
+        <div class="card red">A♥</div>
+        <div class="card black">2♠</div>
+        <div class="card red">3♦</div>
+        <div class="card black">4♣</div>
+      </div>
+      <div class="hand-label">Badugi made hand · 64BB 獲得（32 big bets）</div>
+    </div>
+    <div class="post-actions">
+      <span>💬 0</span>
+    </div>
+    <div class="comments">
+      <div class="comment-input">
+        <input placeholder="最初のコメントをどうぞ…">
+        <button>送信</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Floating lobby chat button -->
+<button class="fab" title="ロビーチャット">💬</button>
+
+</body>
+</html>

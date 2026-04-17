@@ -608,11 +608,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     client.on('room_list', (data) => {
         renderRoomList(data);
-        // Cache for SNS screen and add-table modal
+        // Cache for main screen rail and add-table modal
         window.lastRoomList = data.rooms || [];
         window.lastZoomCount = data.zoomCount || 0;
         addTableRoomListCache = data.rooms || [];
         if (typeof updateSNSCTACounts === 'function') updateSNSCTACounts();
+        if (typeof renderRailRooms === 'function') renderRailRooms(window.lastRoomList);
         const roomPickerModal = document.getElementById('room-picker-modal');
         if (roomPickerModal && !roomPickerModal.classList.contains('hidden')) {
             renderRoomModalList();
@@ -903,13 +904,15 @@ function setupLoginScreen() {
 }
 
 function enterLobby(displayName) {
-    // Unified: go to SNS as the main landing
+    // Unified landing: main screen (sns-screen id is kept for compat)
     const userEl = document.getElementById('lobby-username');
-    const avatarSrc = getAvatarSrc(selectedAvatar);
-    userEl.innerHTML = (avatarSrc ? `<img class="lobby-avatar" src="${avatarSrc}" alt="">` : '') +
-        document.createTextNode(displayName).textContent;
+    if (userEl) {
+        const avatarSrc = getAvatarSrc(selectedAvatar);
+        userEl.innerHTML = (avatarSrc ? `<img class="lobby-avatar" src="${avatarSrc}" alt="">` : '') +
+            escapeHtml(displayName);
+    }
     showScreen('sns');
-    client.getRooms(); // fetch rooms so CTA count populates
+    client.getRooms();
 }
 
 // ==========================================
@@ -4673,35 +4676,93 @@ let snsLastAutoShare = null;
 let snsInitialized = false;
 
 function initSNSScreen() {
-    renderSNSSelf();
-    renderSNSFootprintsMini();
-    renderSNSSuggested();
     if (!snsInitialized) {
         setupSNSEvents();
         snsInitialized = true;
     }
+    // Update user display in topbar
+    updateMainTopbarUser();
+    client.getRooms();
     client.getTimeline();
-    client.getFootprints();
     updateSNSCTACounts();
-    // Re-render lobby-chat room modal if open
-    if (document.getElementById('room-picker-modal') && !document.getElementById('room-picker-modal').classList.contains('hidden')) {
-        renderRoomModalList();
+    renderRailRooms(window.lastRoomList || []);
+}
+
+function updateMainTopbarUser() {
+    const nameEl = document.getElementById('mx-top-name');
+    const avEl = document.getElementById('mx-top-av');
+    const name = client.name || 'ゲスト';
+    if (nameEl) nameEl.textContent = name;
+    if (avEl) {
+        const avatarSrc = getAvatarSrc(selectedAvatar);
+        if (avatarSrc) {
+            avEl.innerHTML = `<img src="${avatarSrc}" alt="">`;
+        } else {
+            avEl.textContent = (name || '?').charAt(0).toUpperCase();
+        }
     }
 }
 
 function updateSNSCTACounts() {
-    const roomCountEl = document.getElementById('sns-cta-room-count');
-    const onlineCountEl = document.getElementById('sns-cta-online-count');
-    const roomSideEl = document.getElementById('sns-room-count');
+    const subEl = document.getElementById('mx-play-sub');
+    const zoomCountEl = document.getElementById('mx-zoom-count');
     const rooms = window.lastRoomList || [];
-    const availableRooms = rooms.filter(r => r.playerCount < 6).length;
-    if (roomCountEl) roomCountEl.textContent = availableRooms;
-    if (roomSideEl) roomSideEl.textContent = rooms.length;
-    if (onlineCountEl) onlineCountEl.textContent = (lastOnlineUsers || []).length;
+    const onlineCount = (lastOnlineUsers || []).length;
+    if (subEl) subEl.textContent = `${rooms.length}卓 / オンライン ${onlineCount}名`;
+    if (zoomCountEl) {
+        const zc = window.lastZoomCount || 0;
+        zoomCountEl.textContent = zc > 0 ? ` ${zc}` : '';
+    }
+}
+
+function renderRailRooms(rooms) {
+    const rail = document.getElementById('mx-rail');
+    if (!rail) return;
+    rail.innerHTML = '';
+    if (!rooms || rooms.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'mx-rail-empty';
+        empty.textContent = '参加できる卓がありません。作成しましょう！';
+        rail.appendChild(empty);
+        // Add button
+        const addBtn = document.createElement('div');
+        addBtn.className = 'mx-rail-add';
+        addBtn.textContent = '＋ 新規ルーム';
+        addBtn.addEventListener('click', () => client.createRoom());
+        rail.appendChild(addBtn);
+        return;
+    }
+    for (const r of rooms) {
+        const canJoin = r.playerCount < 6;
+        const card = document.createElement('div');
+        card.className = 'mx-rail-card' + (canJoin ? '' : ' is-full');
+        let statusCls = 'waiting', statusText = '● 待機中';
+        if (r.playing) { statusCls = 'playing'; statusText = '● プレイ中'; }
+        const lockPrefix = r.locked ? '🔒 ' : '';
+        const gameName = r.gameName || (r.mergedGames && r.mergedGames[0] != null && GAME_LIST && GAME_LIST[r.mergedGames[0]] ? GAME_LIST[r.mergedGames[0]].shortName : '') || '—';
+        card.innerHTML = `
+            <div class="mx-rail-id">${lockPrefix}${escapeHtml(r.id)}</div>
+            <div class="mx-rail-name">${escapeHtml(r.hostName || '')}</div>
+            <div class="mx-rail-info">
+                <span>${escapeHtml(gameName)} ${r.playerCount}/6</span>
+                <span class="mx-rail-status ${statusCls}">${statusText}</span>
+            </div>
+        `;
+        if (canJoin) {
+            card.addEventListener('click', () => client.joinRoom(r.id));
+        }
+        rail.appendChild(card);
+    }
+    // Add "+ create" button at the end
+    const addBtn = document.createElement('div');
+    addBtn.className = 'mx-rail-add';
+    addBtn.textContent = '＋ 新規ルーム';
+    addBtn.addEventListener('click', () => client.createRoom());
+    rail.appendChild(addBtn);
 }
 
 function setupSNSEvents() {
-    // Header action buttons
+    // Header action buttons (proxy to hidden lobby buttons)
     const statsBtn = document.getElementById('sns-header-stats');
     if (statsBtn) statsBtn.addEventListener('click', () => {
         const lobbyStatsBtn = document.getElementById('btn-lobby-stats');
@@ -4717,78 +4778,86 @@ function setupSNSEvents() {
         const lobbyLogoutBtn = document.getElementById('btn-logout');
         if (lobbyLogoutBtn) lobbyLogoutBtn.click();
     });
-    document.getElementById('btn-sns-to-lobby').addEventListener('click', () => openRoomModal());
 
-    // Tab navigation
-    document.querySelectorAll('#sns-screen [data-sns-tab]').forEach(el => {
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            switchSNSTab(el.dataset.snsTab);
+    // Play rail actions
+    const btnCreate = document.getElementById('mx-btn-create');
+    if (btnCreate) btnCreate.addEventListener('click', () => client.createRoom());
+    const btnZoom = document.getElementById('mx-btn-zoom');
+    if (btnZoom) btnZoom.addEventListener('click', () => client.joinZoom());
+    const btnRefresh = document.getElementById('mx-btn-refresh');
+    if (btnRefresh) btnRefresh.addEventListener('click', () => client.getRooms());
+    const btnJoinId = document.getElementById('mx-btn-join-id');
+    const joinIdInput = document.getElementById('mx-room-id-input');
+    if (btnJoinId && joinIdInput) {
+        btnJoinId.addEventListener('click', () => {
+            const id = joinIdInput.value.trim().toUpperCase();
+            if (!id) return;
+            client.joinRoom(id);
+            joinIdInput.value = '';
         });
-    });
+        joinIdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') btnJoinId.click();
+        });
+    }
 
-    // Chat composer
-    const menuNewDiary = document.getElementById('menu-new-diary');
-    if (menuNewDiary) menuNewDiary.addEventListener('click', (e) => { e.preventDefault(); openComposer(); });
-    document.getElementById('btn-composer-submit').addEventListener('click', submitComposer);
-    const composerBody = document.getElementById('composer-body');
-    if (composerBody) composerBody.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComposer(); }
-    });
+    // Floating chat button
+    const fab = document.getElementById('mx-fab-chat');
+    if (fab) fab.addEventListener('click', openChatModal);
 
-    // Refresh timeline
-    const refreshBtn = document.getElementById('btn-sns-refresh');
-    if (refreshBtn) refreshBtn.addEventListener('click', (e) => { e.preventDefault(); client.getTimeline(); });
-
-    // CTA buttons
-    document.getElementById('btn-open-rooms').addEventListener('click', openRoomModal);
-    document.getElementById('btn-open-online').addEventListener('click', openOnlineModal);
-    document.getElementById('btn-open-chat').addEventListener('click', openChatModal);
-
-    // Room picker modal
-    document.getElementById('btn-rp-close').addEventListener('click', closeRoomModal);
-    document.querySelector('#room-picker-modal .rp-backdrop').addEventListener('click', closeRoomModal);
-    document.getElementById('btn-rp-create').addEventListener('click', () => {
-        closeRoomModal();
-        client.createRoom();
-    });
-    document.getElementById('btn-rp-zoom').addEventListener('click', () => {
-        closeRoomModal();
-        client.joinZoom();
-    });
-    document.getElementById('btn-rp-refresh').addEventListener('click', () => client.getRooms());
-    document.getElementById('btn-rp-join-by-id').addEventListener('click', () => {
+    // Room picker modal (legacy, still available via direct call)
+    const btnRpClose = document.getElementById('btn-rp-close');
+    if (btnRpClose) btnRpClose.addEventListener('click', closeRoomModal);
+    const rpBd = document.querySelector('#room-picker-modal .rp-backdrop');
+    if (rpBd) rpBd.addEventListener('click', closeRoomModal);
+    const btnRpCreate = document.getElementById('btn-rp-create');
+    if (btnRpCreate) btnRpCreate.addEventListener('click', () => { closeRoomModal(); client.createRoom(); });
+    const btnRpZoom = document.getElementById('btn-rp-zoom');
+    if (btnRpZoom) btnRpZoom.addEventListener('click', () => { closeRoomModal(); client.joinZoom(); });
+    const btnRpRefresh = document.getElementById('btn-rp-refresh');
+    if (btnRpRefresh) btnRpRefresh.addEventListener('click', () => client.getRooms());
+    const btnRpJoinById = document.getElementById('btn-rp-join-by-id');
+    if (btnRpJoinById) btnRpJoinById.addEventListener('click', () => {
         const id = document.getElementById('rp-room-id-input').value.trim().toUpperCase();
         if (!id) return;
         client.joinRoom(id);
         closeRoomModal();
     });
-    document.getElementById('rp-room-id-input').addEventListener('keydown', (e) => {
+    const rpIdInput = document.getElementById('rp-room-id-input');
+    if (rpIdInput) rpIdInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('btn-rp-join-by-id').click();
     });
 
-    // Online picker modal
-    document.getElementById('btn-op-close').addEventListener('click', closeOnlineModal);
-    document.querySelector('#online-picker-modal .rp-backdrop').addEventListener('click', closeOnlineModal);
+    // Online picker modal (kept for legacy; not surfaced in main UI anymore)
+    const btnOpClose = document.getElementById('btn-op-close');
+    if (btnOpClose) btnOpClose.addEventListener('click', closeOnlineModal);
+    const opBd = document.querySelector('#online-picker-modal .rp-backdrop');
+    if (opBd) opBd.addEventListener('click', closeOnlineModal);
 
     // Chat picker modal (lobby chat)
-    document.getElementById('btn-cp-close').addEventListener('click', closeChatModal);
-    document.querySelector('#chat-picker-modal .rp-backdrop').addEventListener('click', closeChatModal);
-    document.getElementById('btn-cp-chat-send').addEventListener('click', sendChatModalMsg);
-    document.getElementById('cp-chat-input').addEventListener('keydown', (e) => {
+    const btnCpClose = document.getElementById('btn-cp-close');
+    if (btnCpClose) btnCpClose.addEventListener('click', closeChatModal);
+    const cpBd = document.querySelector('#chat-picker-modal .rp-backdrop');
+    if (cpBd) cpBd.addEventListener('click', closeChatModal);
+    const btnCpSend = document.getElementById('btn-cp-chat-send');
+    if (btnCpSend) btnCpSend.addEventListener('click', sendChatModalMsg);
+    const cpInput = document.getElementById('cp-chat-input');
+    if (cpInput) cpInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') sendChatModalMsg();
     });
 
     // Auto-share modal handlers
-    document.getElementById('btn-auto-share-comment').addEventListener('click', () => {
+    const btnAsComment = document.getElementById('btn-auto-share-comment');
+    if (btnAsComment) btnAsComment.addEventListener('click', () => {
         const txt = document.getElementById('auto-share-comment').value.trim();
         if (txt && snsLastAutoShare) {
             client.addComment(snsLastAutoShare.id, txt);
         }
         hideAutoShareModal();
     });
-    document.getElementById('btn-auto-share-skip').addEventListener('click', hideAutoShareModal);
-    document.getElementById('btn-auto-share-view').addEventListener('click', () => {
+    const btnAsSkip = document.getElementById('btn-auto-share-skip');
+    if (btnAsSkip) btnAsSkip.addEventListener('click', hideAutoShareModal);
+    const btnAsView = document.getElementById('btn-auto-share-view');
+    if (btnAsView) btnAsView.addEventListener('click', () => {
         hideAutoShareModal();
         showScreen('sns');
     });
@@ -4951,210 +5020,128 @@ function sendChatModalMsg() {
 }
 
 function switchSNSTab(tab) {
-    snsActiveTab = tab;
-    document.querySelectorAll('#sns-screen .m-nav-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.snsTab === tab);
-    });
+    // Tabs removed in the unified layout; kept as no-op for backward compat.
+    snsActiveTab = 'home';
+    renderTimeline(snsTimeline);
+    return;
+    // Dead code below (kept to minimize churn)
+    // eslint-disable-next-line
     const titleEl = document.getElementById('sns-feed-title');
     if (tab === 'home') {
-        titleEl.innerHTML = '仲間の最新タイムライン <span class="m-panel-more" id="btn-sns-refresh">更新</span>';
-        document.getElementById('btn-sns-refresh').addEventListener('click', (e) => { e.preventDefault(); client.getTimeline(); });
-        renderTimeline(snsTimeline);
-    } else if (tab === 'profile') {
-        titleEl.innerHTML = 'あなたのプロフィール';
-        renderOwnProfile();
-    } else if (tab === 'chat' || tab === 'diary') {
-        titleEl.innerHTML = 'あなたのチャット投稿';
-        renderOwnDiary();
-    } else if (tab === 'friends') {
-        titleEl.innerHTML = 'ポーカー仲間';
-        renderFriendsTab();
-    } else if (tab === 'community') {
-        titleEl.innerHTML = 'コミュニティ';
-        renderCommunityTab();
-    } else if (tab === 'messages') {
-        titleEl.innerHTML = 'メッセージ';
-        document.getElementById('sns-timeline').innerHTML = '<div class="m-entry" style="text-align:center;color:#888">メッセージ機能は DM モーダルをご利用ください</div>';
-    } else if (tab === 'footprints') {
-        titleEl.innerHTML = 'あしあと（あなたのプロフィールを見た人）';
+        titleEl.innerHTML = '';
         renderFootprintsTab();
     }
 }
 
 function renderSNSSelf() {
-    const name = client.name || 'ゲスト';
-    document.getElementById('sns-header-name').textContent = name;
-    const avatarWrap = document.getElementById('sns-header-avatar-wrap');
-    if (avatarWrap) {
-        const avatarSrc = getAvatarSrc(selectedAvatar || (client.avatar || ''));
-        avatarWrap.innerHTML = avatarSrc ? `<img src="${avatarSrc}" class="sns-header-avatar" alt="">` : '';
-    }
-    document.getElementById('sns-welcome-title').textContent = `こんにちは、${name}さん！`;
-    document.getElementById('sns-self-name').textContent = name;
-    // Left sidebar avatar: prefer real avatar image, fallback to initial
-    const selfAvatarEl = document.getElementById('sns-self-avatar');
-    if (selfAvatarEl) {
-        const avatarSrc = getAvatarSrc(selectedAvatar || (client.avatar || ''));
-        if (avatarSrc) {
-            selfAvatarEl.innerHTML = `<img src="${avatarSrc}" alt="" style="width:100%;height:100%;border-radius:4px;object-fit:cover">`;
-        } else {
-            selfAvatarEl.textContent = (name.charAt(0) || '?').toUpperCase();
-        }
-    }
-    document.getElementById('sns-self-meta').textContent = loggedInAccount ? 'レギュラー会員' : 'ゲスト';
-    document.getElementById('sns-stat-following').textContent = myFollowing.size;
-    document.getElementById('sns-stat-followers').textContent = myFollowers.size;
-    document.getElementById('sns-stat-posts').textContent = snsTimeline.filter(p => p.authorName === name).length;
-    document.getElementById('sns-stat-footprints').textContent = snsFootprints.length;
+    // Old 3-column mixi layout is gone. Simply refresh topbar user info.
+    updateMainTopbarUser();
 }
 
-function renderSNSFootprintsMini() {
-    const container = document.getElementById('sns-footprints-mini');
-    if (!container) return;
-    container.innerHTML = '';
-    if (snsFootprints.length === 0) {
-        container.innerHTML = '<div style="font-size:10px;color:#888">まだあしあとはありません</div>';
-        return;
-    }
-    for (const fp of snsFootprints.slice(0, 5)) {
-        const el = document.createElement('div');
-        el.className = 'm-footprint-item';
-        const initial = (fp.viewer || '?').charAt(0).toUpperCase();
-        el.innerHTML = `
-            <div class="m-footprint-avatar">${initial}</div>
-            <div class="m-footprint-info">
-                <div class="m-footprint-name">${escapeHtml(fp.viewer)}</div>
-                <div class="m-footprint-time">${timeAgo(fp.timestamp)}</div>
-            </div>
-        `;
-        container.appendChild(el);
-    }
-}
-
-function renderSNSSuggested() {
-    const container = document.getElementById('sns-suggested');
-    if (!container) return;
-    container.innerHTML = '';
-    const users = (lastOnlineUsers || []).filter(u => u.name !== client.name && !u.isGuest && !myFollowing.has(u.name)).slice(0, 5);
-    if (users.length === 0) {
-        container.innerHTML = '<div style="font-size:10px;color:#888;padding:6px">今はおすすめがありません</div>';
-        return;
-    }
-    for (const u of users) {
-        const el = document.createElement('div');
-        el.className = 'm-footprint-item';
-        const initial = (u.name || '?').charAt(0).toUpperCase();
-        el.innerHTML = `
-            <div class="m-footprint-avatar">${initial}</div>
-            <div class="m-footprint-info">
-                <div class="m-footprint-name">${escapeHtml(u.name)}</div>
-                <div class="m-footprint-time">${u.status === 'playing' ? 'ゲーム中' : 'オンライン'}</div>
-            </div>
-        `;
-        el.querySelector('.m-footprint-name').addEventListener('click', (e) => {
-            e.preventDefault();
-            client.viewProfile(u.name);
-        });
-        container.appendChild(el);
-    }
-}
+function renderSNSFootprintsMini() { /* removed in unified layout */ }
+function renderSNSSuggested() { /* removed in unified layout */ }
 
 function renderTimeline(posts) {
     const container = document.getElementById('sns-timeline');
     if (!container) return;
     container.innerHTML = '';
-    if (!posts || posts.length === 0) {
-        container.innerHTML = '<div class="m-entry" style="text-align:center;color:#888">タイムラインが空です。仲間をフォローしたり、日記を書いて始めましょう！</div>';
+    // Only show hand-type posts (notable hands)
+    const handPosts = (posts || []).filter(p => p.type === 'hand' && p.handData);
+    if (handPosts.length === 0) {
+        container.innerHTML = '<div class="mx-empty">まだ注目ハンドがありません。<br>ゲームに参加すると、50BB以上のポット獲得やストレートフラッシュ以上で自動投稿されます。</div>';
         return;
     }
-    for (const post of posts) {
+    for (const post of handPosts) {
         container.appendChild(renderPostEntry(post));
     }
 }
 
 function renderPostEntry(post) {
     const wrap = document.createElement('div');
-    wrap.className = 'm-entry';
+    wrap.className = 'mx-post';
     wrap.dataset.postId = post.id;
 
     const initial = (post.authorName || '?').charAt(0).toUpperCase();
     const avatarHtml = post.authorAvatar
-        ? `<img src="avatars/${post.authorAvatar}.svg" alt="" style="width:48px;height:48px;border-radius:3px;">`
-        : `<div class="m-entry-avatar">${initial}</div>`;
+        ? `<img src="avatars/${post.authorAvatar}.svg" alt="">`
+        : escapeHtml(initial);
 
-    const moodLabel = post.mood ? ` ｜ 気分：${escapeHtml(post.mood)}` : '';
-    const autoTag = post.autoShared ? '<span class="auto-share-tag">自動共有</span>' : '';
-    const title = post.title ? `<div class="m-entry-title">${autoTag}${escapeHtml(post.title)}</div>` : (autoTag ? `<div class="m-entry-title">${autoTag}</div>` : '');
-
-    let bodyHtml = '';
-    if (post.type === 'hand' && post.handData) {
-        bodyHtml = renderHandPostBody(post);
-    } else {
-        bodyHtml = `<div class="m-entry-body">${linkifyBody(post.body)}</div>`;
-    }
+    const h = post.handData || {};
+    const cardsHtml = (h.winnerCards || []).map(c => renderMiniCard(c)).join('');
+    const ccHtml = (h.communityCards || []).map(c => renderMiniCard(c)).join('');
+    const pot = h.pot || 0;
+    const bb = h.bigBlind || 100;
+    const bbNum = Math.round(pot / bb);
+    const handRank = h.handRank || '';
+    const badge = pickBadge(handRank, bbNum);
 
     const commentCount = (post.comments || []).length;
     const commentsHtml = `
-        <div class="m-entry-comments" data-post-id="${post.id}">
+        <div class="mx-comments" data-post-id="${post.id}">
             ${(post.comments || []).map(c => renderCommentHtml(c)).join('')}
-        </div>
-        <div class="m-entry-comment-compose">
-            <input type="text" class="comment-input" placeholder="コメントを書く…" maxlength="500" data-post-id="${post.id}">
-            <button class="btn-small btn-comment-send" data-post-id="${post.id}">送信</button>
+            <div class="mx-comment-input">
+                <input type="text" placeholder="コメントする…" maxlength="500">
+                <button>送信</button>
+            </div>
         </div>
     `;
 
     wrap.innerHTML = `
-        <div class="m-entry-head">
-            ${avatarHtml}
-            <div class="m-entry-meta">
-                <a href="#" class="m-entry-name" data-profile-name="${escapeHtml(post.authorName)}">${escapeHtml(post.authorName)}</a>
-                <div class="m-entry-date">${formatDateJP(post.createdAt)}${moodLabel}</div>
+        <div class="mx-post-head">
+            <div class="mx-post-avatar">${avatarHtml}</div>
+            <div class="mx-post-meta">
+                <div class="mx-post-name">${escapeHtml(post.authorName)}</div>
+                <div class="mx-post-date">${timeAgo(post.createdAt)}${h.gameName ? ' / ' + escapeHtml(h.gameName) : ''}</div>
             </div>
+            <div class="mx-post-badge ${badge.cls}">${badge.label}</div>
         </div>
-        ${title}
-        ${bodyHtml}
-        <div class="m-entry-actions">
-            <a href="#" class="action-like"><span class="icon">👍</span> イイネ！</a>
-            <a href="#" class="action-comment"><span class="icon">💬</span> コメント(${commentCount})</a>
-            <a href="#" class="action-share"><span class="icon">📤</span> 仲間に教える</a>
+        <div class="mx-hand-body">
+            <div class="mx-hand-top">
+                <div class="mx-win-amount">+${pot.toLocaleString()}<span class="u">chips</span></div>
+                <span class="mx-game-tag">${escapeHtml(h.gameName || 'Poker')}</span>
+            </div>
+            ${cardsHtml ? `<div class="mx-cards">${cardsHtml}</div>` : ''}
+            <div class="mx-hand-label">${handRank ? escapeHtml(handRank) + ' · ' : ''}${bbNum}BB 獲得</div>
+            ${ccHtml ? `<div class="mx-cc-row">コミュニティ: <span class="mx-cards" style="display:inline-flex">${ccHtml}</span></div>` : ''}
+        </div>
+        <div class="mx-post-actions">
+            <span class="act-comments">💬 ${commentCount}</span>
         </div>
         ${commentsHtml}
     `;
 
-    wrap.querySelector('.m-entry-name').addEventListener('click', (e) => {
-        e.preventDefault();
-        client.viewProfile(post.authorName);
-    });
-    wrap.querySelector('.btn-comment-send').addEventListener('click', (e) => {
-        const input = wrap.querySelector('.comment-input');
+    // Wire up comment send
+    const sendBtn = wrap.querySelector('.mx-comment-input button');
+    const input = wrap.querySelector('.mx-comment-input input');
+    sendBtn.addEventListener('click', () => {
         const body = input.value.trim();
         if (!body) return;
         if (!loggedInAccount) { showToast('ログインするとコメントできます'); return; }
         client.addComment(post.id, body);
         input.value = '';
     });
-    wrap.querySelector('.comment-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') wrap.querySelector('.btn-comment-send').click();
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendBtn.click();
     });
 
     return wrap;
 }
 
+function pickBadge(handRank, bbNum) {
+    const r = (handRank || '').toLowerCase();
+    if (r.includes('royal')) return { cls: '', label: '🏆 ロイヤル' };
+    if (r.includes('straight flush') || r.includes('straight-flush') || r.includes('ストレートフラッシュ')) return { cls: '', label: '🏆 ストフラ' };
+    if (r.includes('four') || r.includes('quads') || r.includes('クワッズ') || r.includes('フォーカード')) return { cls: 'quads', label: '♣ クワッズ' };
+    if (r.includes('full house') || r.includes('フルハウス')) return { cls: 'quads', label: '♥ フルハウス' };
+    if (bbNum >= 50) return { cls: 'pot', label: '💰 ビッグポット' };
+    return { cls: 'pot', label: '🎉 大勝' };
+}
+
 function renderHandPostBody(post) {
+    // Kept for backward-compat; unused by new renderPostEntry.
     const h = post.handData || {};
     const cardsHtml = (h.winnerCards || []).map(c => renderMiniCard(c)).join('');
-    const ccHtml = (h.communityCards || []).map(c => renderMiniCard(c)).join('');
-    return `
-        <div class="m-entry-body">
-            <div>${escapeHtml(h.gameName || 'ポーカー')} にて 🎉</div>
-            ${h.handRank ? `<div>ハンド: <b>${escapeHtml(h.handRank)}</b></div>` : ''}
-            <div>ポット: <b>${(h.pot || 0).toLocaleString()}</b> チップ</div>
-            ${cardsHtml ? `<div class="poker-cards" style="margin-top:6px">${cardsHtml}</div>` : ''}
-            ${ccHtml ? `<div style="font-size:10px;color:#888;margin-top:4px">コミュニティ: <span class="poker-cards">${ccHtml}</span></div>` : ''}
-            ${post.body ? `<div style="margin-top:6px">${linkifyBody(post.body)}</div>` : ''}
-        </div>
-    `;
+    return `<div class="mx-hand-body"><div class="mx-win-amount">${(h.pot || 0).toLocaleString()}</div>${cardsHtml ? '<div class="mx-cards">' + cardsHtml + '</div>' : ''}</div>`;
 }
 
 function renderMiniCard(c) {
@@ -5162,18 +5149,18 @@ function renderMiniCard(c) {
     const suitMap = { h: '♥', d: '♦', s: '♠', c: '♣' };
     const suit = suitMap[c.suit] || c.suit || '?';
     const isRed = c.suit === 'h' || c.suit === 'd';
-    return `<span class="m-card ${isRed ? 'red' : 'black'}">${escapeHtml(c.rank)}${suit}</span>`;
+    return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(c.rank)}${suit}</span>`;
 }
 
 function renderCommentHtml(c) {
     const initial = (c.authorName || '?').charAt(0).toUpperCase();
+    const avatarHtml = c.authorAvatar
+        ? `<img src="avatars/${c.authorAvatar}.svg" alt="">`
+        : escapeHtml(initial);
     return `
-        <div class="m-comment">
-            <div class="m-comment-avatar">${initial}</div>
-            <div class="m-comment-body">
-                <div class="m-comment-meta"><b>${escapeHtml(c.authorName)}</b> <span style="color:#888;font-size:10px">${timeAgo(c.createdAt)}</span></div>
-                <div class="m-comment-text">${linkifyBody(c.body)}</div>
-            </div>
+        <div class="mx-comment">
+            <div class="mx-c-avatar">${avatarHtml}</div>
+            <div class="mx-c-body"><b>${escapeHtml(c.authorName)}</b>${linkifyBody(c.body)}<span class="mx-c-time">${timeAgo(c.createdAt)}</span></div>
         </div>
     `;
 }
@@ -5345,7 +5332,7 @@ function timeAgo(ts) {
 client.on('timeline', (posts) => {
     snsTimeline = posts || [];
     if (document.getElementById('sns-screen') && !document.getElementById('sns-screen').classList.contains('hidden')) {
-        if (snsActiveTab === 'home') renderTimeline(snsTimeline);
+        renderTimeline(snsTimeline);
         renderSNSSelf();
     }
 });
@@ -5357,7 +5344,7 @@ client.on('timeline_post', (post) => {
         if (snsTimeline.length > 100) snsTimeline.length = 100;
     }
     if (document.getElementById('sns-screen') && !document.getElementById('sns-screen').classList.contains('hidden')) {
-        if (snsActiveTab === 'home') renderTimeline(snsTimeline);
+        renderTimeline(snsTimeline);
     }
 });
 client.on('timeline_comment', ({ postId, comment }) => {
@@ -5366,24 +5353,27 @@ client.on('timeline_comment', ({ postId, comment }) => {
         post.comments = post.comments || [];
         if (!post.comments.find(c => c.id === comment.id)) post.comments.push(comment);
     }
-    // Update the UI if the post is currently rendered
-    const wrap = document.querySelector(`.m-entry[data-post-id="${postId}"]`);
+    // Update the UI if the post is currently rendered (new case C markup)
+    const wrap = document.querySelector(`.mx-post[data-post-id="${postId}"]`);
     if (wrap) {
-        const cc = wrap.querySelector('.m-entry-comments');
-        if (cc && !cc.querySelector(`[data-comment-id="${comment.id}"]`)) {
-            const div = document.createElement('div');
-            div.innerHTML = renderCommentHtml(comment);
-            cc.appendChild(div.firstElementChild);
+        const cc = wrap.querySelector('.mx-comments');
+        if (cc) {
+            // Insert new comment before the input composer
+            const composer = cc.querySelector('.mx-comment-input');
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderCommentHtml(comment);
+            const newNode = tmp.firstElementChild;
+            if (composer) cc.insertBefore(newNode, composer);
+            else cc.appendChild(newNode);
         }
-        const actionCount = wrap.querySelector('.action-comment');
-        if (actionCount && post) actionCount.innerHTML = `<span class="icon">💬</span> コメント(${post.comments.length})`;
+        const actionCount = wrap.querySelector('.act-comments');
+        if (actionCount && post) actionCount.textContent = `💬 ${post.comments.length}`;
     }
 });
 client.on('post_created', (post) => {
     if (!post) return;
     if (!snsTimeline.find(p => p.id === post.id)) snsTimeline.unshift(post);
-    showToast('日記を投稿しました');
-    if (!document.getElementById('sns-screen').classList.contains('hidden') && snsActiveTab === 'home') {
+    if (!document.getElementById('sns-screen').classList.contains('hidden')) {
         renderTimeline(snsTimeline);
     }
 });
@@ -5394,11 +5384,7 @@ client.on('auto_shared', (post) => {
 });
 client.on('footprints', (list) => {
     snsFootprints = list || [];
-    renderSNSFootprintsMini();
-    renderSNSSelf();
-    if (!document.getElementById('sns-screen').classList.contains('hidden') && snsActiveTab === 'footprints') {
-        renderFootprintsTab();
-    }
+    // Footprints UI removed in unified layout
 });
 client.on('new_footprint', (data) => {
     // Just refresh our cached footprints
@@ -5406,37 +5392,12 @@ client.on('new_footprint', (data) => {
 });
 client.on('profile_data', (profile) => {
     if (!profile) return;
-    // Render profile in-place in timeline feed
-    showScreen('sns');
-    const titleEl = document.getElementById('sns-feed-title');
-    if (titleEl) titleEl.innerHTML = `${escapeHtml(profile.name)} さんのプロフィール`;
-    const container = document.getElementById('sns-timeline');
+    // Profile feature removed in unified layout — keep handler no-op to avoid errors
+    return;
+    // eslint-disable-next-line
     const isFollowing = myFollowing.has(profile.name);
     const initial = (profile.name || '?').charAt(0).toUpperCase();
     const statusLabel = profile.isOnline ? (profile.status === 'playing' ? '🎮 ゲーム中' : profile.status === 'zoom' ? '🎥 Zoom中' : '🟢 オンライン') : '⚫ オフライン';
-    container.innerHTML = `
-        <div class="m-entry">
-            <div class="m-entry-head">
-                <div class="m-entry-avatar">${initial}</div>
-                <div class="m-entry-meta">
-                    <div class="m-entry-name">${escapeHtml(profile.name)}</div>
-                    <div class="m-entry-date">${statusLabel}</div>
-                </div>
-                ${profile.name !== client.name && loggedInAccount ? `<button class="btn-mixi" id="profile-follow-btn">${isFollowing ? '★ フォロー解除' : '☆ フォローする'}</button>` : ''}
-            </div>
-            <div class="m-entry-body">
-                <div>フォロー中: <b>${(profile.following || []).length}</b> 人</div>
-                <div>フォロワー: <b>${(profile.followers || []).length}</b> 人</div>
-                <div>投稿数: <b>${(profile.posts || []).length}</b></div>
-            </div>
-        </div>
-        ${(profile.posts || []).length > 0 ? '<div class="m-panel-title" style="margin-top:10px">最近の投稿</div>' : ''}
-        <div id="sns-profile-posts"></div>
-    `;
-    const postsContainer = document.getElementById('sns-profile-posts');
-    for (const p of (profile.posts || [])) {
-        postsContainer.appendChild(renderPostEntry(p));
-    }
     const fbtn = document.getElementById('profile-follow-btn');
     if (fbtn) {
         fbtn.addEventListener('click', () => {

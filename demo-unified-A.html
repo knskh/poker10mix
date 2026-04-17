@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mix-1 / 統合ページ 案A：2カラム・シンプル</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue-50:#EEF5FF;
+    --blue-100:#DBE9FA;
+    --blue-200:#B9D3F4;
+    --blue-400:#5B9BF0;
+    --blue-500:#3E84E4;
+    --blue-600:#2A6BC9;
+    --blue-700:#1E52A3;
+    --ink:#1F2A3C;
+    --ink-2:#4A5A72;
+    --line:#E5ECF5;
+    --bg:#F6FAFF;
+    --card:#ffffff;
+    --red:#D93A3A;
+    --gold:#D8A72A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:'Noto Sans JP','Inter',sans-serif;color:var(--ink);font-size:14px;line-height:1.5}
+  a{color:var(--blue-600);text-decoration:none}
+
+  /* Header */
+  .header{
+    background:#fff;
+    border-bottom:1px solid var(--line);
+    padding:10px 20px;
+    display:flex;align-items:center;gap:16px;
+    position:sticky;top:0;z-index:10;
+  }
+  .header .logo{
+    display:flex;align-items:center;gap:10px;
+  }
+  .header .logo-chip{
+    width:34px;height:34px;border-radius:50%;
+    background:linear-gradient(135deg,#5B9BF0 0%,#2A6BC9 100%);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:20px;box-shadow:0 2px 6px rgba(42,107,201,0.25);
+  }
+  .header .brand{
+    font-weight:800;font-size:20px;letter-spacing:.5px;
+    background:linear-gradient(135deg,#3E84E4,#1E52A3);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .header .spacer{flex:1}
+  .header .user{
+    display:flex;align-items:center;gap:6px;color:var(--ink-2);font-weight:500;
+  }
+  .user .avatar{
+    width:30px;height:30px;border-radius:50%;background:var(--blue-100);
+    display:flex;align-items:center;justify-content:center;color:var(--blue-700);font-weight:700;
+  }
+  .header .icon-btn{
+    background:transparent;border:1px solid transparent;
+    width:34px;height:34px;border-radius:8px;cursor:pointer;
+    font-size:16px;color:var(--ink-2);
+  }
+  .header .icon-btn:hover{background:var(--blue-50);border-color:var(--blue-100);color:var(--blue-600)}
+
+  /* Layout */
+  .container{
+    max-width:1200px;margin:0 auto;padding:16px;
+    display:grid;grid-template-columns:340px 1fr;gap:16px;
+  }
+  .panel{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;
+  }
+  .panel-head{
+    padding:10px 14px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;
+    font-weight:700;font-size:13px;color:var(--ink);
+    background:linear-gradient(180deg,#fff,var(--blue-50));
+  }
+  .panel-body{padding:12px 14px}
+
+  /* LEFT: Rooms */
+  .room-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .btn-primary{
+    background:linear-gradient(180deg,#5B9BF0,#2A6BC9);
+    color:#fff;border:none;border-radius:8px;
+    padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;
+    box-shadow:0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(42,107,201,0.2);
+  }
+  .btn-primary:hover{filter:brightness(1.05)}
+  .btn-secondary{
+    background:#fff;color:var(--blue-600);border:1px solid var(--blue-200);
+    border-radius:8px;padding:7px 12px;font-weight:600;font-size:12px;cursor:pointer;
+  }
+  .btn-secondary:hover{background:var(--blue-50)}
+  .join-row{display:flex;gap:4px;width:100%;margin-top:4px}
+  .join-row input{
+    flex:1;border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:13px;text-transform:uppercase;
+  }
+  .room-card{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;
+    background:#fff;transition:.15s;
+  }
+  .room-card:hover{border-color:var(--blue-400);background:var(--blue-50)}
+  .room-info{min-width:0}
+  .room-name{font-weight:700;color:var(--ink);font-size:13px}
+  .room-meta{font-size:11px;color:var(--ink-2);margin-top:2px}
+  .room-chip{
+    font-size:10px;padding:2px 6px;border-radius:10px;background:var(--blue-100);color:var(--blue-700);margin-right:4px;
+  }
+  .room-join{
+    background:linear-gradient(180deg,#5B9BF0,#2A6BC9);color:#fff;
+    border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;
+  }
+
+  /* RIGHT: Timeline */
+  .timeline-head{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:12px 16px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#fff,var(--blue-50));
+  }
+  .timeline-head h2{margin:0;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .timeline-head .sub{color:var(--ink-2);font-size:11px}
+  .timeline-empty{
+    padding:40px 20px;text-align:center;color:var(--ink-2);font-size:13px;
+  }
+  .post{
+    padding:14px 16px;border-bottom:1px solid var(--line);
+  }
+  .post:last-child{border-bottom:none}
+  .post-head{
+    display:flex;align-items:center;gap:10px;margin-bottom:8px;
+  }
+  .post-avatar{
+    width:36px;height:36px;border-radius:50%;background:var(--blue-100);
+    display:flex;align-items:center;justify-content:center;color:var(--blue-700);font-weight:700;
+  }
+  .post-name{font-weight:700;color:var(--ink)}
+  .post-date{font-size:11px;color:var(--ink-2)}
+  .post-badge{
+    margin-left:auto;
+    font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;
+    background:linear-gradient(180deg,#FFD76A,#D8A72A);color:#5A4210;
+  }
+  .post-title{
+    font-weight:700;color:var(--ink);font-size:14px;margin:4px 0 6px;
+  }
+  .post-body{font-size:13px;color:var(--ink-2);line-height:1.6}
+  .cards{display:flex;gap:4px;margin:8px 0}
+  .card{
+    width:30px;height:40px;border-radius:5px;
+    display:flex;align-items:center;justify-content:center;
+    background:#fff;border:1px solid #c5d0df;font-weight:700;font-size:13px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.06);
+  }
+  .card.red{color:#D93A3A}
+  .card.black{color:#1F2A3C}
+  .post-stats{
+    display:flex;gap:12px;margin-top:8px;color:var(--blue-600);font-size:12px;
+  }
+  .post-stats span{display:inline-flex;align-items:center;gap:4px}
+  .comments{
+    border-top:1px solid var(--line);margin-top:10px;padding-top:10px;
+  }
+  .comment{display:flex;gap:8px;margin-bottom:8px}
+  .c-avatar{
+    width:26px;height:26px;border-radius:50%;background:var(--blue-100);
+    display:flex;align-items:center;justify-content:center;color:var(--blue-700);font-weight:700;font-size:11px;
+  }
+  .c-body{flex:1;background:var(--blue-50);border-radius:10px;padding:6px 10px;font-size:12px}
+  .c-body b{color:var(--blue-700);margin-right:4px}
+  .comment-input{
+    display:flex;gap:6px;margin-top:8px;
+  }
+  .comment-input input{
+    flex:1;border:1px solid var(--line);border-radius:18px;padding:7px 12px;font-size:12px;
+  }
+  .comment-input button{
+    background:var(--blue-500);color:#fff;border:none;border-radius:18px;padding:7px 14px;font-size:12px;cursor:pointer;font-weight:700;
+  }
+
+  /* Footer note */
+  .note{color:var(--ink-2);font-size:11px;padding:0 4px 8px}
+
+  @media(max-width:900px){
+    .container{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-chip">♠</div>
+    <div class="brand">mix-1</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="user">
+    <div class="avatar">K</div>
+    <span>Kensuke</span>
+  </div>
+  <button class="icon-btn" title="統計">📊</button>
+  <button class="icon-btn" title="ハンド履歴">📜</button>
+  <button class="icon-btn" title="ログアウト">🚪</button>
+</div>
+
+<div class="container">
+  <!-- LEFT: Rooms -->
+  <div>
+    <div class="panel">
+      <div class="panel-head">🎰 プレイ</div>
+      <div class="panel-body">
+        <div class="room-actions">
+          <button class="btn-primary">＋ ルーム作成</button>
+          <button class="btn-primary" style="background:linear-gradient(180deg,#7AC4E6,#3993C4)">⚡ Zoom卓</button>
+          <div class="join-row">
+            <input placeholder="ルームID">
+            <button class="btn-secondary">参加</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--ink-2);margin:8px 2px">
+          <span>公開ルーム 3卓</span>
+          <a href="#">更新</a>
+        </div>
+        <div class="room-card">
+          <div class="room-info">
+            <div class="room-name"><span class="room-chip">ABCD</span>Kensukeのテーブル</div>
+            <div class="room-meta">Hold'em / 3 / 6席 / 待機中</div>
+          </div>
+          <button class="room-join">参加</button>
+        </div>
+        <div class="room-card">
+          <div class="room-info">
+            <div class="room-name"><span class="room-chip">XYZ9</span>Alice's Badugi</div>
+            <div class="room-meta">Badugi / 2 / 6席 / 待機中</div>
+          </div>
+          <button class="room-join">参加</button>
+        </div>
+        <div class="room-card">
+          <div class="room-info">
+            <div class="room-name"><span class="room-chip">PQ12</span>Late Night OFC</div>
+            <div class="room-meta">OFC / 4 / 6席 / プレイ中</div>
+          </div>
+          <button class="btn-secondary" style="padding:6px 12px">観戦</button>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:8px">💡 ルーム参加後、ハンド終了時に注目ハンドが自動で右のタイムラインへ流れます。</div>
+  </div>
+
+  <!-- RIGHT: Timeline -->
+  <div class="panel">
+    <div class="timeline-head">
+      <h2>📢 注目ハンドタイムライン</h2>
+      <span class="sub">50BB以上 or ストレートフラッシュ以上</span>
+    </div>
+
+    <div class="post">
+      <div class="post-head">
+        <div class="post-avatar">A</div>
+        <div>
+          <div class="post-name">Alice</div>
+          <div class="post-date">5分前 / Kensukeのテーブル</div>
+        </div>
+        <div class="post-badge">🏆 ロイヤルフラッシュ</div>
+      </div>
+      <div class="post-title">12,500チップ獲得！</div>
+      <div class="cards">
+        <div class="card black">A♠</div>
+        <div class="card black">K♠</div>
+        <div class="card black">Q♠</div>
+        <div class="card black">J♠</div>
+        <div class="card black">T♠</div>
+      </div>
+      <div class="post-body">Hold'em / ポット: 12,500 / BB換算: 125BB</div>
+      <div class="post-stats">
+        <span>💬 3 コメント</span>
+        <span>👀 12 view</span>
+      </div>
+      <div class="comments">
+        <div class="comment">
+          <div class="c-avatar">B</div>
+          <div class="c-body"><b>Bob</b>ナイスハンド！🎉</div>
+        </div>
+        <div class="comment">
+          <div class="c-avatar">K</div>
+          <div class="c-body"><b>Kensuke</b>ブロッカー完璧でしたね</div>
+        </div>
+        <div class="comment-input">
+          <input placeholder="コメントする...">
+          <button>送信</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="post">
+      <div class="post-head">
+        <div class="post-avatar">B</div>
+        <div>
+          <div class="post-name">Bob</div>
+          <div class="post-date">22分前 / Late Night OFC</div>
+        </div>
+        <div class="post-badge">♣ クワッズ</div>
+      </div>
+      <div class="post-title">8,200チップ獲得</div>
+      <div class="cards">
+        <div class="card black">K♣</div>
+        <div class="card black">K♠</div>
+        <div class="card red">K♥</div>
+        <div class="card red">K♦</div>
+        <div class="card red">3♥</div>
+      </div>
+      <div class="post-body">OFC / ポット: 8,200 / BB換算: 82BB</div>
+      <div class="post-stats">
+        <span>💬 1 コメント</span>
+      </div>
+      <div class="comments">
+        <div class="comment">
+          <div class="c-avatar">A</div>
+          <div class="c-body"><b>Alice</b>えぐい…</div>
+        </div>
+        <div class="comment-input">
+          <input placeholder="コメントする...">
+          <button>送信</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="post" style="opacity:.95">
+      <div class="post-head">
+        <div class="post-avatar">C</div>
+        <div>
+          <div class="post-name">Charlie</div>
+          <div class="post-date">1時間前 / Alice's Badugi</div>
+        </div>
+        <div class="post-badge" style="background:linear-gradient(180deg,#A9D1FF,#5B9BF0);color:#fff">ビッグポット</div>
+      </div>
+      <div class="post-title">6,400チップ獲得（64BB）</div>
+      <div class="post-body">Badugi / ポット: 6,400</div>
+      <div class="post-stats">
+        <span>💬 0 コメント</span>
+      </div>
+      <div class="comments">
+        <div class="comment-input">
+          <input placeholder="最初のコメント...">
+          <button>送信</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
