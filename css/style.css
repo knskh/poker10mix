@@ -906,36 +906,22 @@ body {
 
 /* ==========================================
    Heads-up layout (playerCount === 2)
-   Avoids pot/seat overlap on small screens.
+   Seats move to corners (diagonal layout on mobile, slight offset on PC)
+   so the pot stays above the community cards at its default position.
    ========================================== */
-#table-felt.is-heads-up #pot-display {
-    /* Move pot lower so it clears the top seat. With community cards present,
-       the pot sits between the board and the player's seat; without community
-       cards (draw/stud) it becomes the central element. */
-    top: 58%;
-}
-#table-felt.is-heads-up #community-cards {
-    /* Pull board up so pot has room below */
-    top: 40%;
-}
 #table-felt.is-heads-up .seat-top {
-    /* Give the top seat more headroom above the felt edge */
-    top: -22%;
+    top: -22%;                   /* Lift opponent seat above felt */
 }
 #table-felt.is-heads-up .seat-bottom {
-    /* Keep bottom seat hugging the bottom, a touch lower to balance */
-    bottom: -18%;
+    bottom: -18%;                /* Drop self seat below felt */
 }
+/* Note: pot-display (top:32%) and community-cards (top:50%) use their
+   default positions — pot is above community regardless of player count. */
 
 @media (max-width: 600px) {
-    /* Heads-up on mobile uses a diagonal layout: opponent at top-left,
-       self at bottom-right. This frees the center column for pot + community. */
-    #table-felt.is-heads-up #pot-display {
-        top: 55%;
-    }
-    #table-felt.is-heads-up #community-cards {
-        top: 38%;
-    }
+    /* Heads-up on mobile: diagonal layout (opponent top-left, self bottom-right)
+       keeps the seats out of the central column so pot/community can use the
+       default center positions without overlap. */
     #table-felt.is-heads-up .seat-top {
         top: -16%;
         left: 10%;
