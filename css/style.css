@@ -928,14 +928,24 @@ body {
 }
 
 @media (max-width: 600px) {
+    /* Heads-up on mobile uses a diagonal layout: opponent at top-left,
+       self at bottom-right. This frees the center column for pot + community. */
     #table-felt.is-heads-up #pot-display {
-        top: 60%;
+        top: 55%;
     }
     #table-felt.is-heads-up #community-cards {
-        top: 42%;
+        top: 38%;
     }
     #table-felt.is-heads-up .seat-top {
-        top: -32%;   /* Lift opponent seat further so bet chip (at 32%) has clearance */
+        top: -16%;
+        left: 10%;
+        transform: none;         /* override default translateX(-50%) centering */
+    }
+    #table-felt.is-heads-up .seat-bottom {
+        bottom: -16%;
+        left: auto;
+        right: 10%;
+        transform: none;
     }
 }
 

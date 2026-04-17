@@ -256,13 +256,14 @@ class PokerUI {
         const playerCount = s.players.length;
         const isHeadsUp = playerCount === 2;
         const betPosByClass = isMobile ? {
-            // Heads-up: pot moves to 60% on mobile, so spread own/opponent chips further
-            'seat-bottom':       isHeadsUp ? [50, 82] : [50, 68],
+            // Heads-up on mobile uses a diagonal layout:
+            //   opponent (seat-top)    → top-left corner    → bet chip at [30%, 28%]
+            //   self     (seat-bottom) → bottom-right corner → bet chip at [70%, 72%]
+            // See #table-felt.is-heads-up rules in style.css
+            'seat-bottom':       isHeadsUp ? [70, 72] : [50, 68],
             'seat-bottom-left':  [30, 62],
             'seat-top-left':     [30, 36],
-            // Heads-up mobile: push bet chip below the opponent seat (avoids overlap
-            // with seat cards/avatar which occupy -32% … +11% range)
-            'seat-top':          isHeadsUp ? [50, 32] : [50, 28],
+            'seat-top':          isHeadsUp ? [30, 28] : [50, 28],
             'seat-top-right':    [70, 36],
             'seat-bottom-right': [70, 62],
         } : {
