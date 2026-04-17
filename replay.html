@@ -263,6 +263,86 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
         transform: translate(-50%, -56%) scale(calc((100vw - 8px) / 680));
     }
 }
+
+/* ==========================================
+   Hand Peek popup — click a seat to reveal that player's cards enlarged
+   ========================================== */
+.seat { cursor: pointer; }
+#hand-peek {
+    position: fixed;
+    z-index: 150;
+    background: rgba(15,20,35,0.97);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 2px solid rgba(56,189,248,0.55);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7), 0 0 22px rgba(56,189,248,0.28);
+    min-width: 200px; max-width: 300px;
+    animation: hp-in 0.18s ease-out;
+    pointer-events: auto;
+}
+#hand-peek.hidden { display: none; }
+@keyframes hp-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.hp-header {
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 8px; padding-right: 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    margin-bottom: 10px;
+}
+.hp-name  { font-size: 15px; font-weight: 700; color: #fff; }
+.hp-pos   {
+    font-size: 10px; font-weight: 700; color: #fff;
+    padding: 2px 7px; border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+.hp-chips { font-size: 13px; font-weight: 700; color: #ffd700; margin-left: auto; }
+.hp-cards {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    justify-content: center;
+    padding: 4px 0 2px;
+}
+.hp-card {
+    width: 56px; height: 78px; border-radius: 6px;
+    background: #fff;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    flex-shrink: 0;
+}
+.hp-card .rank { font-size: 22px; line-height: 1; }
+.hp-card .suit { font-size: 20px; line-height: 1; margin-top: 2px; }
+.hp-card.red   { color: #dc2626; }
+.hp-card.black { color: #1a1a1a; }
+.hp-card.dim   { opacity: 0.55; }
+.hp-meta {
+    font-size: 11px; color: #94a3b8;
+    margin-top: 8px; text-align: center;
+}
+.hp-meta.won   { color: #4ade80; font-weight: 700; }
+.hp-meta.fold  { color: #ef4444; }
+.hp-close {
+    position: absolute; top: 6px; right: 8px;
+    background: transparent; border: none;
+    color: rgba(255,255,255,0.6); font-size: 16px;
+    cursor: pointer; line-height: 1;
+    padding: 2px 6px;
+}
+.hp-close:hover { color: #fff; }
+
+/* Mobile: slightly tighter popup */
+@media (max-width: 600px) {
+    #hand-peek { min-width: 180px; max-width: 260px; padding: 10px 12px; }
+    .hp-card { width: 48px; height: 68px; }
+    .hp-card .rank { font-size: 19px; }
+    .hp-card .suit { font-size: 17px; }
+    .hp-name { font-size: 14px; }
+    .hp-chips { font-size: 12px; }
+}
 </style>
 </head>
 <body>
@@ -299,6 +379,18 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
 </div>
 
 <div id="action-log"><div id="log-entries"></div></div>
+
+<!-- Hand Peek popup: click a seat to enlarge that player's cards -->
+<div id="hand-peek" class="hidden" role="dialog" aria-label="プレイヤーのハンド">
+    <button class="hp-close" title="閉じる">✕</button>
+    <div class="hp-header">
+        <span class="hp-name"></span>
+        <span class="hp-pos"></span>
+        <span class="hp-chips"></span>
+    </div>
+    <div class="hp-cards"></div>
+    <div class="hp-meta"></div>
+</div>
 
 <div id="controls">
     <div class="ctrl-btn" id="btn-start" title="最初に戻る">⏮</div>
@@ -1046,6 +1138,130 @@ $('btn-share').addEventListener('click', async () => {
     }
 });
 
+// ==================== HAND PEEK POPUP ====================
+// Click a seat → show an enlarged panel with that player's cards + info.
+// Click outside / ✕ / the same seat again → close.
+function showHandPeek(seatIdx, anchorEl) {
+    if (!HAND || !HAND.players || !HAND.players[seatIdx]) return;
+    const p = HAND.players[seatIdx];
+    const peek = document.getElementById('hand-peek');
+    const nameEl  = peek.querySelector('.hp-name');
+    const posEl   = peek.querySelector('.hp-pos');
+    const chipsEl = peek.querySelector('.hp-chips');
+    const cardsEl = peek.querySelector('.hp-cards');
+    const metaEl  = peek.querySelector('.hp-meta');
+
+    nameEl.textContent = p.name;
+    posEl.textContent = p.pos;
+    posEl.style.background = p.posColor || '#37474f';
+    // Show current chip count (updated during playback) or fallback to starting stack
+    const currentChips = (typeof chips !== 'undefined' && chips[seatIdx] != null) ? chips[seatIdx] : p.chips;
+    chipsEl.textContent = fmt(currentChips) + ' chips';
+
+    // Render cards: for stud show all cards (3 down + 4 up), otherwise the hole cards.
+    const deck = (HAND.gameType === 'stud') ? (p.allCards || []) : (p.cards || []);
+    cardsEl.innerHTML = '';
+    if (deck.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'color:#94a3b8;font-size:12px;padding:8px';
+        empty.textContent = 'カード情報なし';
+        cardsEl.appendChild(empty);
+    } else {
+        deck.forEach(c => {
+            const cd = document.createElement('div');
+            cd.className = `hp-card ${c.c || 'black'}`;
+            if (p.folded) cd.classList.add('dim');
+            cd.innerHTML = `<span class="rank">${c.r}</span><span class="suit">${c.s}</span>`;
+            cardsEl.appendChild(cd);
+        });
+    }
+
+    // Meta line: winner / fold / diff
+    const diff = p.endChips - p.chips;
+    if (diff > 0) {
+        metaEl.className = 'hp-meta won';
+        metaEl.textContent = `🏆 勝利  +${fmt(diff)}`;
+    } else if (p.folded) {
+        metaEl.className = 'hp-meta fold';
+        metaEl.textContent = 'フォールド済み';
+    } else if (diff < 0) {
+        metaEl.className = 'hp-meta';
+        metaEl.textContent = `${fmt(diff)}`;
+    } else {
+        metaEl.className = 'hp-meta';
+        metaEl.textContent = '';
+    }
+
+    // Position the popup near the anchor seat, keeping it in-viewport.
+    peek.classList.remove('hidden');
+    peek.style.left = '0px';
+    peek.style.top  = '0px';
+    // Measure after display
+    const rect = anchorEl.getBoundingClientRect();
+    const peekRect = peek.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Try above the seat first
+    let cx = rect.left + rect.width / 2 - peekRect.width / 2;
+    let cy = rect.top - peekRect.height - 10;
+    if (cy < 8) cy = rect.bottom + 10;  // below instead
+    // Clamp horizontal
+    cx = Math.max(6, Math.min(cx, vw - peekRect.width - 6));
+    // If still doesn't fit below, center vertically
+    if (cy + peekRect.height > vh - 6) {
+        cy = Math.max(6, (vh - peekRect.height) / 2);
+    }
+    peek.style.left = cx + 'px';
+    peek.style.top  = cy + 'px';
+    peek.dataset.seat = String(seatIdx);
+}
+
+function hideHandPeek() {
+    const peek = document.getElementById('hand-peek');
+    peek.classList.add('hidden');
+    delete peek.dataset.seat;
+}
+
+function setupHandPeek() {
+    const peek = document.getElementById('hand-peek');
+    // ✕ close button
+    peek.querySelector('.hp-close').addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideHandPeek();
+    });
+    // Seat clicks (toggle)
+    for (let i = 0; i < 6; i++) {
+        const s = document.getElementById(`seat-${i}`);
+        if (!s) continue;
+        s.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!HAND || i >= HAND.players.length) return;
+            // Toggle if clicking same seat
+            if (peek.dataset.seat === String(i) && !peek.classList.contains('hidden')) {
+                hideHandPeek();
+                return;
+            }
+            showHandPeek(i, s);
+        });
+    }
+    // Dismiss on outside click
+    document.addEventListener('click', (e) => {
+        if (peek.classList.contains('hidden')) return;
+        if (peek.contains(e.target)) return;
+        hideHandPeek();
+    });
+    // Reposition on resize/scroll (keep aligned with the seat)
+    const keepAligned = () => {
+        if (peek.classList.contains('hidden')) return;
+        const idx = parseInt(peek.dataset.seat, 10);
+        if (isNaN(idx)) return;
+        const s = document.getElementById(`seat-${idx}`);
+        if (s) showHandPeek(idx, s);
+    };
+    window.addEventListener('resize', keepAligned);
+    window.addEventListener('orientationchange', keepAligned);
+}
+
 // ==================== INIT ====================
 async function init() {
     const hash = window.location.hash.substring(1);
@@ -1063,6 +1279,7 @@ async function init() {
         maxStep = HAND.timeline.length;
         $('loading-screen').classList.add('hidden');
         resetAll();
+        setupHandPeek();
     } catch (e) {
         console.error('Replay load error:', e);
         $('loading-title').textContent = 'リプレイの読み込みに失敗しました';
