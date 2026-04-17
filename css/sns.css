@@ -916,22 +916,25 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
         font-size: 13px;
     }
 
-    /* Side pills: make them bigger & easier to tap */
+    /* Side pills: positioned at bottom-left inside the action panel, left of action buttons */
     #side-pills {
-        position: fixed;
-        left: 0; top: 45%; transform: translateY(-50%);
-        z-index: 350;
-        padding: 0;
+        position: static;
+        transform: none;
+        z-index: auto;
+        flex-direction: column;       /* stacked vertically */
+        justify-content: flex-end;    /* align to bottom of action-panel */
+        align-items: flex-start;
+        padding: 6px 6px 6px 6px;
         gap: 6px;
+        flex-shrink: 0;
     }
     .side-pill {
-        width: 40px; height: 44px;
+        width: 44px; height: 40px;
         font-size: 18px;
         background: rgba(0,0,0,0.55);
         border: 1px solid rgba(0,191,255,0.3);
-        border-left: none;
-        border-radius: 0 10px 10px 0;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
     .side-pill:active {
         background: rgba(0,191,255,0.3);
