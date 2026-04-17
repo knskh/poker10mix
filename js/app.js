@@ -2904,7 +2904,8 @@ function showFoldedButtons(state) {
         btnRow.appendChild(leaveBtn);
         btnDiv.appendChild(btnRow);
     } else {
-        // Just folded — show leave + rebuy if low chips
+        // Just folded — show only the rebuy button if chips are low.
+        // Leave / add-table actions are available via the hamburger menu.
         const msg = document.createElement('div');
         msg.className = 'folded-msg';
         msg.textContent = 'フォールド済み — 次のハンドを待っています';
@@ -2922,18 +2923,10 @@ function showFoldedButtons(state) {
             });
             btnDiv.appendChild(rebuyBtn);
         }
-
-        const leaveBtn = document.createElement('button');
-        leaveBtn.className = 'btn-action btn-fold';
-        leaveBtn.textContent = '退室';
-        leaveBtn.addEventListener('click', () => {
-            if (isInZoom) client.leaveZoom();
-            else { client.leaveRoom(activeTableId); removeTable(activeTableId); }
-        });
-        btnDiv.appendChild(leaveBtn);
+        return; // Skip the shared add-table button below for the folded state.
     }
 
-    // Add table button (shown when under max tables)
+    // Add table button (shown for pendingRejoin / sitout states only, when under max tables)
     if (tables.size < MAX_TABLES) {
         const addBtn = document.createElement('button');
         addBtn.className = 'btn-action btn-check';
