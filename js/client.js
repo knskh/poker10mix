@@ -199,6 +199,15 @@ class PokerClient {
             case 'join_request_cancelled':
                 this.emit('join_request_cancelled', msg);
                 break;
+            case 'post_liked':
+                this.emit('post_liked', msg);
+                break;
+            case 'comment_liked':
+                this.emit('comment_liked', msg);
+                break;
+            case 'rankings':
+                this.emit('rankings', msg);
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -236,7 +245,10 @@ class PokerClient {
     getTimeline() { this.send({ type: 'get_timeline' }); }
     createPost(title, body, mood) { this.send({ type: 'create_post', title, body, mood }); }
     postHand(handData, caption, replayHash) { this.send({ type: 'post_hand', handData, caption: caption || '', replayHash: replayHash || '' }); }
-    addComment(postId, body) { this.send({ type: 'add_comment', postId, body }); }
+    addComment(postId, body, parentCommentId) { this.send({ type: 'add_comment', postId, body, parentCommentId: parentCommentId != null ? parentCommentId : null }); }
+    likePost(postId) { this.send({ type: 'like_post', postId }); }
+    likeComment(postId, commentId) { this.send({ type: 'like_comment', postId, commentId }); }
+    getRankings(period) { this.send({ type: 'get_rankings', period: period === 'weekly' ? 'weekly' : 'all' }); }
     viewProfile(target) { this.send({ type: 'view_profile', target }); }
     getFootprints() { this.send({ type: 'get_footprints' }); }
 }

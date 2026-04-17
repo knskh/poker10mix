@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=51">
+    <link rel="stylesheet" href="css/style.css?v=52">
 </head>
 <body>
     <div id="app">
@@ -94,9 +94,13 @@
             <div class="mx-feed-wrap">
                 <div class="mx-feed-head">
                     <h2>タイムライン</h2>
-                    <span class="mx-feed-sub">注目ハンドの自動投稿 + 履歴から手動投稿</span>
                     <span class="mx-feed-live">LIVE</span>
                     <button id="mx-btn-post-hand" class="mx-feed-post-btn">📝 ハンド投稿</button>
+                </div>
+                <div class="mx-feed-tabs" id="mx-feed-tabs">
+                    <button class="mx-feed-tab active" data-feed-tab="latest">🕒 最新</button>
+                    <button class="mx-feed-tab" data-feed-tab="weekly">🏆 週間ランキング</button>
+                    <button class="mx-feed-tab" data-feed-tab="all">👑 全期間ランキング</button>
                 </div>
                 <div id="sns-timeline"></div>
             </div>
@@ -494,6 +498,6 @@
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
     <script src="js/ui.js?v=38"></script>
-    <script src="js/app.js?v=47"></script>
+    <script src="js/app.js?v=48"></script>
 </body>
 </html>

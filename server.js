@@ -90,6 +90,18 @@ function loadTimeline() {
             nextPostId = (data.nextPostId || 1);
             nextCommentId = (data.nextCommentId || 1);
         }
+        // Migration: ensure likes fields exist on posts and comments
+        for (const p of timelineList) {
+            if (!Array.isArray(p.likes)) p.likes = [];
+            p.likeCount = p.likes.length;
+            if (!Array.isArray(p.comments)) p.comments = [];
+            for (const c of p.comments) {
+                if (!Array.isArray(c.likes)) c.likes = [];
+                c.likeCount = c.likes.length;
+                if (!('parentCommentId' in c)) c.parentCommentId = null;
+                if (!Array.isArray(c.mentions)) c.mentions = [];
+            }
+        }
         console.log(`Loaded ${timelineList.length} timeline posts`);
     } catch (e) {
         console.warn('Failed to load timeline.json:', e.message);
@@ -122,8 +134,12 @@ function createPost(post) {
         handData: post.handData || null,
         mood: post.mood || null,
         autoShared: !!post.autoShared,
+        manualShared: !!post.manualShared,
+        replayHash: post.replayHash || '',
         createdAt: Date.now(),
-        comments: []
+        comments: [],
+        likes: [],
+        likeCount: 0
     };
     timelineList.unshift(p);
     if (timelineList.length > 200) timelineList.length = 200;
@@ -139,11 +155,97 @@ function addCommentToPost(postId, comment) {
         authorName: comment.authorName || '',
         authorAvatar: comment.authorAvatar || null,
         body: (comment.body || '').slice(0, 500),
+        parentCommentId: (comment.parentCommentId != null) ? Number(comment.parentCommentId) : null,
+        mentions: Array.isArray(comment.mentions) ? comment.mentions.slice(0, 10).map(s => String(s).slice(0, 40)) : [],
+        likes: [],
+        likeCount: 0,
         createdAt: Date.now()
     };
     post.comments.push(c);
     saveTimelineDebounced();
     return { post, comment: c };
+}
+
+function togglePostLike(postId, userName) {
+    if (!userName) return null;
+    const post = timelineList.find(p => p.id === postId);
+    if (!post) return null;
+    if (!Array.isArray(post.likes)) post.likes = [];
+    const idx = post.likes.indexOf(userName);
+    let likedNow;
+    if (idx >= 0) {
+        post.likes.splice(idx, 1);
+        likedNow = false;
+    } else {
+        post.likes.push(userName);
+        likedNow = true;
+    }
+    post.likeCount = post.likes.length;
+    saveTimelineDebounced();
+    return { post, likedNow };
+}
+
+function toggleCommentLike(postId, commentId, userName) {
+    if (!userName) return null;
+    const post = timelineList.find(p => p.id === postId);
+    if (!post) return null;
+    const comment = (post.comments || []).find(c => c.id === commentId);
+    if (!comment) return null;
+    if (!Array.isArray(comment.likes)) comment.likes = [];
+    const idx = comment.likes.indexOf(userName);
+    let likedNow;
+    if (idx >= 0) {
+        comment.likes.splice(idx, 1);
+        likedNow = false;
+    } else {
+        comment.likes.push(userName);
+        likedNow = true;
+    }
+    comment.likeCount = comment.likes.length;
+    saveTimelineDebounced();
+    return { post, comment, likedNow };
+}
+
+function getRankings(period) {
+    // period: 'weekly' | 'all'
+    const now = Date.now();
+    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    let pool = timelineList;
+    if (period === 'weekly') {
+        pool = timelineList.filter(p => p.createdAt >= weekAgo);
+    }
+    // Sort by like count descending; tie-break by recency
+    const sorted = [...pool]
+        .filter(p => (p.likeCount || 0) > 0)  // only posts with at least 1 like appear
+        .sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0) || (b.createdAt - a.createdAt));
+    return sorted.slice(0, 20);
+}
+
+function broadcastPostLike(post, actorName, likedNow) {
+    for (const [ws, c] of clients) {
+        if (!c.name) continue;
+        send(ws, {
+            type: 'post_liked',
+            postId: post.id,
+            userName: actorName,
+            likeCount: post.likeCount || 0,
+            liked: likedNow
+        });
+    }
+}
+
+function broadcastCommentLike(post, comment, actorName, likedNow) {
+    for (const [ws, c] of clients) {
+        if (!c.name) continue;
+        send(ws, {
+            type: 'comment_liked',
+            postId: post.id,
+            commentId: comment.id,
+            userName: actorName,
+            likeCount: comment.likeCount || 0,
+            liked: likedNow
+        });
+    }
 }
 
 function getTimelineForUser(name) {
@@ -1376,14 +1478,65 @@ function handleMessage(ws, client, msg) {
             const postId = Number(msg.postId);
             const body = (msg.body || '').trim();
             if (!postId || !body) break;
+            // Optional parentCommentId for replies (flattened: a reply to a reply still
+            // targets the top-level comment of the thread).
+            let parentCommentId = null;
+            if (msg.parentCommentId != null) {
+                const pid = Number(msg.parentCommentId);
+                const post = timelineList.find(p => p.id === postId);
+                if (post) {
+                    const parent = (post.comments || []).find(c => c.id === pid);
+                    if (parent) {
+                        // Normalize: reply-to-reply gets re-parented to the thread root
+                        parentCommentId = parent.parentCommentId != null ? parent.parentCommentId : parent.id;
+                    }
+                }
+            }
+            // Extract @mentions from body for display/validation
+            const mentions = [];
+            const mentionRe = /@([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)/g;
+            let m;
+            while ((m = mentionRe.exec(body)) !== null) {
+                if (mentions.length >= 10) break;
+                if (!mentions.includes(m[1])) mentions.push(m[1]);
+            }
             const result = addCommentToPost(postId, {
                 authorName: client.name,
                 authorAvatar: client.avatar,
-                body
+                body,
+                parentCommentId,
+                mentions
             });
             if (result) {
                 broadcastCommentUpdate(postId, result.comment, result.post.authorName);
             }
+            break;
+        }
+
+        case 'like_post': {
+            if (!client.name) break;
+            const postId = Number(msg.postId);
+            if (!postId) break;
+            const result = togglePostLike(postId, client.name);
+            if (result) broadcastPostLike(result.post, client.name, result.likedNow);
+            break;
+        }
+
+        case 'like_comment': {
+            if (!client.name) break;
+            const postId = Number(msg.postId);
+            const commentId = Number(msg.commentId);
+            if (!postId || !commentId) break;
+            const result = toggleCommentLike(postId, commentId, client.name);
+            if (result) broadcastCommentLike(result.post, result.comment, client.name, result.likedNow);
+            break;
+        }
+
+        case 'get_rankings': {
+            if (!client.name) break;
+            const period = (msg.period === 'weekly') ? 'weekly' : 'all';
+            const posts = getRankings(period);
+            send(ws, { type: 'rankings', period, posts });
             break;
         }
 

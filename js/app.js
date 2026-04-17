@@ -4964,6 +4964,9 @@ function setupSNSEvents() {
     // sns-header-stats / sns-header-history / sns-header-logout are wired directly in
     // setupStatsModal / setupLobbyScreen / setupLoginScreen.
 
+    // Feed tabs (最新 / 週間 / 全期間)
+    setupFeedTabs();
+
     // Play rail actions
     const btnCreate = document.getElementById('mx-btn-create');
     if (btnCreate) btnCreate.addEventListener('click', () => client.createRoom());
@@ -5216,6 +5219,9 @@ function renderSNSSelf() {
 function renderSNSFootprintsMini() { /* removed in unified layout */ }
 function renderSNSSuggested() { /* removed in unified layout */ }
 
+let activeFeedTab = 'latest'; // 'latest' | 'weekly' | 'all'
+let rankingsCache = { weekly: null, all: null };
+
 function renderTimeline(posts) {
     const container = document.getElementById('sns-timeline');
     if (!container) return;
@@ -5229,6 +5235,63 @@ function renderTimeline(posts) {
     for (const post of handPosts) {
         container.appendChild(renderPostEntry(post));
     }
+}
+
+function renderRankings(period, posts) {
+    const container = document.getElementById('sns-timeline');
+    if (!container) return;
+    container.innerHTML = '';
+    const handPosts = (posts || []).filter(p => p.type === 'hand' && p.handData);
+    if (handPosts.length === 0) {
+        const label = period === 'weekly' ? '今週' : '全期間';
+        container.innerHTML = `<div class="mx-empty">${label}のランキングがまだありません。<br>ハンドにいいね❤️を押してランキングを作りましょう！</div>`;
+        return;
+    }
+    // Header
+    const head = document.createElement('div');
+    head.className = 'mx-rank-head';
+    head.textContent = period === 'weekly' ? '🏆 週間ランキング TOP 20' : '👑 全期間ランキング TOP 20';
+    container.appendChild(head);
+    // Rank entries
+    handPosts.forEach((post, i) => {
+        const entry = renderPostEntry(post);
+        entry.classList.add('mx-post-ranked');
+        // Insert rank badge at the head
+        const rank = i + 1;
+        const badge = document.createElement('div');
+        badge.className = 'mx-rank-badge rank-' + (rank <= 3 ? String(rank) : 'other');
+        if (rank === 1) badge.textContent = '🥇 1位';
+        else if (rank === 2) badge.textContent = '🥈 2位';
+        else if (rank === 3) badge.textContent = '🥉 3位';
+        else badge.textContent = `${rank}位`;
+        entry.insertBefore(badge, entry.firstChild);
+        container.appendChild(entry);
+    });
+}
+
+function switchFeedTab(tab) {
+    activeFeedTab = tab;
+    document.querySelectorAll('#mx-feed-tabs .mx-feed-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.feedTab === tab);
+    });
+    if (tab === 'latest') {
+        renderTimeline(snsTimeline);
+    } else {
+        // Always re-fetch to get fresh rankings
+        client.getRankings(tab);
+        const cached = rankingsCache[tab];
+        if (cached) renderRankings(tab, cached);
+        else {
+            const container = document.getElementById('sns-timeline');
+            if (container) container.innerHTML = '<div class="mx-empty">読み込み中...</div>';
+        }
+    }
+}
+
+function setupFeedTabs() {
+    document.querySelectorAll('#mx-feed-tabs .mx-feed-tab').forEach(el => {
+        el.addEventListener('click', () => switchFeedTab(el.dataset.feedTab));
+    });
 }
 
 function renderPostEntry(post) {
@@ -5268,8 +5331,8 @@ function renderPostEntry(post) {
     const commentCount = (post.comments || []).length;
     const commentsHtml = `
         <div class="mx-comments" data-post-id="${post.id}">
-            ${(post.comments || []).map(c => renderCommentHtml(c)).join('')}
-            <div class="mx-comment-input">
+            ${renderCommentsTree(post.comments || [])}
+            <div class="mx-comment-input mx-comment-top-input" data-parent="">
                 <input type="text" placeholder="コメントする…" maxlength="500">
                 <button>送信</button>
             </div>
@@ -5283,6 +5346,9 @@ function renderPostEntry(post) {
                <span class="mx-replay-cta-hint">ハンドをもう一度</span>
            </button>`
         : '';
+
+    const likeCount = post.likeCount != null ? post.likeCount : ((post.likes || []).length);
+    const likedByMe = Array.isArray(post.likes) && client.name && post.likes.includes(client.name);
 
     wrap.innerHTML = `
         <div class="mx-post-head">
@@ -5305,24 +5371,106 @@ function renderPostEntry(post) {
         </div>
         ${replayCtaHtml}
         <div class="mx-post-actions">
+            <button type="button" class="act-like ${likedByMe ? 'liked' : ''}">
+                <span class="like-heart">${likedByMe ? '❤️' : '🤍'}</span>
+                <span class="like-count">${likeCount}</span>
+            </button>
             <span class="act-comments">💬 ${commentCount}</span>
-            ${post.replayHash ? `<span class="act-share">🔗 リプレイを共有</span>` : ''}
+            ${post.replayHash ? `<span class="act-share">🔗 共有</span>` : ''}
         </div>
         ${commentsHtml}
     `;
 
-    // Wire up comment send
-    const sendBtn = wrap.querySelector('.mx-comment-input button');
-    const input = wrap.querySelector('.mx-comment-input input');
-    sendBtn.addEventListener('click', () => {
-        const body = input.value.trim();
-        if (!body) return;
-        // Timeline is shared globally — guests can comment too.
-        client.addComment(post.id, body);
-        input.value = '';
-    });
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendBtn.click();
+    // Like button for post
+    const likeBtn = wrap.querySelector('.act-like');
+    if (likeBtn) {
+        likeBtn.addEventListener('click', () => {
+            if (!client.name) { showToast('名前を設定するといいねできます'); return; }
+            client.likePost(post.id);
+            // Optimistic UI: toggle
+            const now = !likeBtn.classList.contains('liked');
+            likeBtn.classList.toggle('liked', now);
+            const heart = likeBtn.querySelector('.like-heart');
+            if (heart) heart.textContent = now ? '❤️' : '🤍';
+            const cntEl = likeBtn.querySelector('.like-count');
+            if (cntEl) {
+                const cur = parseInt(cntEl.textContent, 10) || 0;
+                cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
+            }
+            if (now) likeBtn.classList.add('pop');
+            setTimeout(() => likeBtn.classList.remove('pop'), 320);
+        });
+    }
+
+    // Top-level comment send
+    const topInput = wrap.querySelector('.mx-comment-top-input input');
+    const topSend = wrap.querySelector('.mx-comment-top-input button');
+    const bindCommentSend = (inputEl, sendEl, parentId) => {
+        sendEl.addEventListener('click', () => {
+            const body = inputEl.value.trim();
+            if (!body) return;
+            client.addComment(post.id, body, parentId);
+            inputEl.value = '';
+            // If this was a reply composer, hide it after send
+            if (parentId != null) {
+                const wrapEl = inputEl.closest('.mx-reply-compose');
+                if (wrapEl) wrapEl.classList.add('hidden');
+            }
+        });
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendEl.click();
+        });
+    };
+    if (topInput && topSend) bindCommentSend(topInput, topSend, null);
+
+    // Comment interactions (like, reply)
+    wrap.querySelectorAll('.mx-comment').forEach(cEl => {
+        const commentId = Number(cEl.dataset.commentId);
+        const comment = (post.comments || []).find(c => c.id === commentId);
+        if (!comment) return;
+        const cLike = cEl.querySelector('.c-like');
+        if (cLike) {
+            cLike.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!client.name) { showToast('名前を設定するといいねできます'); return; }
+                client.likeComment(post.id, comment.id);
+                const now = !cLike.classList.contains('liked');
+                cLike.classList.toggle('liked', now);
+                const heart = cLike.querySelector('.like-heart');
+                if (heart) heart.textContent = now ? '❤️' : '🤍';
+                const cntEl = cLike.querySelector('.like-count');
+                if (cntEl) {
+                    const cur = parseInt(cntEl.textContent, 10) || 0;
+                    cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
+                }
+            });
+        }
+        const cReply = cEl.querySelector('.c-reply');
+        if (cReply) {
+            cReply.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Toggle reply composer for this comment
+                let composer = cEl.querySelector(':scope > .mx-reply-compose');
+                if (!composer) {
+                    composer = document.createElement('div');
+                    composer.className = 'mx-reply-compose mx-comment-input';
+                    composer.innerHTML = `<input type="text" placeholder="@${escapeHtml(comment.authorName)} に返信…" maxlength="500"><button>送信</button>`;
+                    cEl.appendChild(composer);
+                    const inp = composer.querySelector('input');
+                    const snd = composer.querySelector('button');
+                    inp.value = `@${comment.authorName} `;
+                    const parentId = comment.parentCommentId != null ? comment.parentCommentId : comment.id;
+                    bindCommentSend(inp, snd, parentId);
+                    setTimeout(() => { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 30);
+                } else {
+                    composer.classList.toggle('hidden');
+                    if (!composer.classList.contains('hidden')) {
+                        const inp = composer.querySelector('input');
+                        if (inp) setTimeout(() => inp.focus(), 30);
+                    }
+                }
+            });
+        }
     });
 
     // Replay button: open replay.html in a new tab with the post's compressed hash.
@@ -5350,6 +5498,27 @@ function renderPostEntry(post) {
     }
 
     return wrap;
+}
+
+// Render comments as a 1-level nested tree (replies grouped under their parent)
+function renderCommentsTree(comments) {
+    if (!comments || comments.length === 0) return '';
+    const topLevel = comments.filter(c => c.parentCommentId == null);
+    const repliesByParent = new Map();
+    for (const c of comments) {
+        if (c.parentCommentId != null) {
+            if (!repliesByParent.has(c.parentCommentId)) repliesByParent.set(c.parentCommentId, []);
+            repliesByParent.get(c.parentCommentId).push(c);
+        }
+    }
+    // Keep chronological order within each group
+    const byId = new Map(comments.map(c => [c.id, c]));
+    return topLevel.map(c => {
+        const replies = repliesByParent.get(c.id) || [];
+        return renderCommentHtml(c) + (replies.length > 0
+            ? `<div class="mx-replies">${replies.map(r => renderCommentHtml(r, true)).join('')}</div>`
+            : '');
+    }).join('');
 }
 
 function buildReplayUrlFromHash(hash) {
@@ -5390,17 +5559,38 @@ function renderMiniCard(c) {
     return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(rank)}${suit}</span>`;
 }
 
-function renderCommentHtml(c) {
+function renderCommentHtml(c, isReply) {
     const initial = (c.authorName || '?').charAt(0).toUpperCase();
     const avatarHtml = c.authorAvatar
         ? `<img src="avatars/${c.authorAvatar}.svg" alt="">`
         : escapeHtml(initial);
+    const likeCount = c.likeCount != null ? c.likeCount : ((c.likes || []).length);
+    const likedByMe = Array.isArray(c.likes) && client.name && c.likes.includes(client.name);
     return `
-        <div class="mx-comment">
+        <div class="mx-comment ${isReply ? 'mx-comment-reply' : ''}" data-comment-id="${c.id}">
             <div class="mx-c-avatar">${avatarHtml}</div>
-            <div class="mx-c-body"><b>${escapeHtml(c.authorName)}</b>${linkifyBody(c.body)}<span class="mx-c-time">${timeAgo(c.createdAt)}</span></div>
+            <div class="mx-c-body">
+                <div class="mx-c-text"><b>${escapeHtml(c.authorName)}</b>${linkifyMentions(c.body)}<span class="mx-c-time">${timeAgo(c.createdAt)}</span></div>
+                <div class="mx-c-actions">
+                    <button type="button" class="c-like ${likedByMe ? 'liked' : ''}">
+                        <span class="like-heart">${likedByMe ? '❤️' : '🤍'}</span>
+                        <span class="like-count">${likeCount}</span>
+                    </button>
+                    <button type="button" class="c-reply">↪️ 返信</button>
+                </div>
+            </div>
         </div>
     `;
+}
+
+// Convert @mentions in text into blue highlights (safe: does its own escaping)
+function linkifyMentions(raw) {
+    const text = String(raw == null ? '' : raw);
+    // Escape HTML first, then replace @mentions
+    const escaped = text.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    return escaped
+        .replace(/@([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)/g, '<span class="mx-mention">@$1</span>')
+        .replace(/\n/g, '<br>');
 }
 
 function renderOwnDiary() {
@@ -5570,7 +5760,7 @@ function timeAgo(ts) {
 client.on('timeline', (posts) => {
     snsTimeline = posts || [];
     if (document.getElementById('sns-screen') && !document.getElementById('sns-screen').classList.contains('hidden')) {
-        renderTimeline(snsTimeline);
+        if (activeFeedTab === 'latest') renderTimeline(snsTimeline);
         renderSNSSelf();
     }
 });
@@ -5582,7 +5772,8 @@ client.on('timeline_post', (post) => {
         if (snsTimeline.length > 100) snsTimeline.length = 100;
     }
     if (document.getElementById('sns-screen') && !document.getElementById('sns-screen').classList.contains('hidden')) {
-        renderTimeline(snsTimeline);
+        if (activeFeedTab === 'latest') renderTimeline(snsTimeline);
+        // Ranking tabs can stay stable; user can refresh by re-tapping tab
     }
 });
 client.on('timeline_comment', ({ postId, comment }) => {
@@ -5591,21 +5782,67 @@ client.on('timeline_comment', ({ postId, comment }) => {
         post.comments = post.comments || [];
         if (!post.comments.find(c => c.id === comment.id)) post.comments.push(comment);
     }
-    // Update the UI if the post is currently rendered (new case C markup)
+    // Re-render the post so nested replies land in the right thread
     const wrap = document.querySelector(`.mx-post[data-post-id="${postId}"]`);
-    if (wrap) {
-        const cc = wrap.querySelector('.mx-comments');
-        if (cc) {
-            // Insert new comment before the input composer
-            const composer = cc.querySelector('.mx-comment-input');
-            const tmp = document.createElement('div');
-            tmp.innerHTML = renderCommentHtml(comment);
-            const newNode = tmp.firstElementChild;
-            if (composer) cc.insertBefore(newNode, composer);
-            else cc.appendChild(newNode);
+    if (wrap && post) {
+        const fresh = renderPostEntry(post);
+        wrap.replaceWith(fresh);
+    }
+});
+
+client.on('post_liked', ({ postId, userName, likeCount, liked }) => {
+    const post = snsTimeline.find(p => p.id === postId);
+    if (post) {
+        post.likes = post.likes || [];
+        const idx = post.likes.indexOf(userName);
+        if (liked && idx < 0) post.likes.push(userName);
+        if (!liked && idx >= 0) post.likes.splice(idx, 1);
+        post.likeCount = typeof likeCount === 'number' ? likeCount : post.likes.length;
+    }
+    // Update all rendered instances of this post (latest or ranking)
+    document.querySelectorAll(`.mx-post[data-post-id="${postId}"]`).forEach(wrap => {
+        const likeBtn = wrap.querySelector('.act-like');
+        if (!likeBtn) return;
+        const cntEl = likeBtn.querySelector('.like-count');
+        if (cntEl) cntEl.textContent = String(likeCount);
+        // If the actor is me, sync the button state (in case of multi-tab)
+        if (userName === client.name) {
+            likeBtn.classList.toggle('liked', !!liked);
+            const heart = likeBtn.querySelector('.like-heart');
+            if (heart) heart.textContent = liked ? '❤️' : '🤍';
         }
-        const actionCount = wrap.querySelector('.act-comments');
-        if (actionCount && post) actionCount.textContent = `💬 ${post.comments.length}`;
+    });
+});
+
+client.on('comment_liked', ({ postId, commentId, userName, likeCount, liked }) => {
+    const post = snsTimeline.find(p => p.id === postId);
+    if (post) {
+        const c = (post.comments || []).find(x => x.id === commentId);
+        if (c) {
+            c.likes = c.likes || [];
+            const idx = c.likes.indexOf(userName);
+            if (liked && idx < 0) c.likes.push(userName);
+            if (!liked && idx >= 0) c.likes.splice(idx, 1);
+            c.likeCount = typeof likeCount === 'number' ? likeCount : c.likes.length;
+        }
+    }
+    document.querySelectorAll(`.mx-post[data-post-id="${postId}"] .mx-comment[data-comment-id="${commentId}"]`).forEach(cEl => {
+        const cLike = cEl.querySelector('.c-like');
+        if (!cLike) return;
+        const cntEl = cLike.querySelector('.like-count');
+        if (cntEl) cntEl.textContent = String(likeCount);
+        if (userName === client.name) {
+            cLike.classList.toggle('liked', !!liked);
+            const heart = cLike.querySelector('.like-heart');
+            if (heart) heart.textContent = liked ? '❤️' : '🤍';
+        }
+    });
+});
+
+client.on('rankings', ({ period, posts }) => {
+    rankingsCache[period] = posts || [];
+    if (activeFeedTab === period) {
+        renderRankings(period, posts || []);
     }
 });
 client.on('post_created', (post) => {
