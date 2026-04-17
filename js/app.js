@@ -581,7 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
     setupAccountLogin();
     setupLobbyScreen();
-    setupLobbyBottomTabs();
     setupDMModal();
     setupHandPostModal();
     setupRoomScreen();
@@ -610,7 +609,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('connection-status').classList.remove('hidden');
     });
     client.on('room_list', (data) => {
-        renderRoomList(data);
         // Cache for main screen rail and add-table modal
         window.lastRoomList = data.rooms || [];
         window.lastZoomCount = data.zoomCount || 0;
@@ -1016,81 +1014,6 @@ function setupLobbyScreen() {
     if (histCloseBtn) histCloseBtn.addEventListener('click', () => {
         document.getElementById('history-modal').classList.add('hidden');
     });
-}
-
-// renderRoomList is now a no-op — the main screen uses renderRailRooms exclusively.
-function renderRoomList(data) {
-    // no-op: kept for backward compatibility with call sites. Rail is rendered via renderRailRooms.
-    return;
-    // eslint-disable-next-line
-    const rooms = Array.isArray(data) ? data : (data.rooms || []);
-    const zoomCount = data.zoomCount || 0;
-    const zoomBtn = document.getElementById('btn-join-zoom');
-    if (zoomBtn) zoomBtn.textContent = '';
-    const container = document.getElementById('room-list-body');
-    container.innerHTML = '';
-    if (!rooms || rooms.length === 0) {
-        container.innerHTML = '<div class="room-empty">ルームがありません</div>';
-        return;
-    }
-    for (const r of rooms) {
-        const canJoin = r.playerCount < 6;
-        const card = document.createElement('div');
-        card.className = 'room-card' + (canJoin ? '' : ' room-full');
-
-        // Status
-        let statusCls, statusText;
-        if (!r.playing) {
-            statusCls = 'waiting'; statusText = '待機中';
-        } else if (canJoin) {
-            statusCls = 'joinable'; statusText = '参加可';
-        } else {
-            statusCls = 'playing'; statusText = '進行中';
-        }
-
-        // Current game
-        const currentGame = r.playing && r.gameName ? r.gameName : '';
-
-        // Game tags with color by type
-        const gameTags = (r.mergedGames || []).map(i => {
-            const g = GAME_LIST[i];
-            if (!g) return '';
-            const gType = getGameType(g.id);
-            return `<span class="room-card-game-tag tag-${gType}">${g.shortName}</span>`;
-        }).filter(Boolean).join('');
-
-        // Avatar
-        const hostAvatarSrc = r.hostAvatar ? `avatars/${r.hostAvatar}.svg` : null;
-        const avatarHtml = hostAvatarSrc
-            ? `<img class="room-card-avatar" src="${hostAvatarSrc}" alt="">`
-            : `<div class="room-card-avatar">${(r.hostName || '?').charAt(0).toUpperCase()}</div>`;
-
-        // Player bar fill
-        const fillPct = Math.round((r.playerCount / 6) * 100);
-
-        card.innerHTML = `
-            <div class="room-card-header">
-                <span class="room-card-id">${r.locked ? '🔓 ' : ''}${r.id}</span>
-                <span class="room-card-status ${statusCls}">${statusText}</span>
-            </div>
-            <div class="room-card-host">
-                ${avatarHtml}
-                <span class="room-card-hostname">${r.hostName}</span>
-                ${currentGame ? `<span class="room-card-game">▶ ${currentGame}</span>` : ''}
-            </div>
-            <div class="room-card-bottom">
-                <div class="room-card-players">
-                    <div class="room-card-players-bar"><div class="room-card-players-fill" style="width:${fillPct}%"></div></div>
-                    <span>${r.playerCount}/6</span>
-                </div>
-                <div class="room-card-games">${gameTags}</div>
-            </div>
-        `;
-        if (canJoin) {
-            card.addEventListener('click', () => client.joinRoom(r.id));
-        }
-        container.appendChild(card);
-    }
 }
 
 // ==========================================
@@ -4082,10 +4005,6 @@ function onLobbyChat(data) {
 // ==========================================
 // Online User List
 // ==========================================
-function setupLobbyBottomTabs() {
-    // no-op: lobby screen removed; tabs now live inside chat-picker-modal (switchChatTab).
-}
-
 function renderOnlineUsers(users) {
     if (Array.isArray(users)) lastOnlineUsers = users;
     const container = document.getElementById('online-user-list');
@@ -4869,8 +4788,6 @@ function setupSidePanel() {
 // SNS (mixi-style) Screen
 // ==========================================
 let snsTimeline = [];
-let snsFootprints = [];
-let snsActiveTab = 'home';
 let snsLastAutoShare = null;
 let snsInitialized = false;
 
@@ -5121,74 +5038,6 @@ function renderRoomModalList() {
     }
 }
 
-// ---- Online picker modal (removed; online list now lives inside chat modal) ----
-function openOnlineModal() {
-    // Redirect to the chat modal's online tab
-    openChatModal();
-    switchChatTab('online');
-}
-function closeOnlineModal() { /* no-op */ }
-function renderOnlineUsersInModal() { /* no-op */ }
-function renderOnlineUsersInto(container, users) {
-    container.innerHTML = '';
-    const statusOrder = { lobby: 0, playing: 1, zoom: 2 };
-    const statusLabel = { lobby: 'ロビー', playing: 'ゲーム中', zoom: 'Zoom' };
-    const myName = client.name;
-    const iAmGuest = !loggedInAccount;
-    users = [...users].sort((a, b) => {
-        const af = myFollowing.has(a.name) ? 0 : 1;
-        const bf = myFollowing.has(b.name) ? 0 : 1;
-        if (af !== bf) return af - bf;
-        return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
-    });
-    for (const u of users) {
-        const item = document.createElement('div');
-        item.className = 'online-user-item';
-        if (myFollowing.has(u.name)) item.classList.add('is-following');
-        const avatarHtml = u.avatar
-            ? `<img src="avatars/${u.avatar}.svg" alt="">`
-            : `<div class="online-user-initial">${(u.name || '?').charAt(0).toUpperCase()}</div>`;
-        const showDM = !iAmGuest && !u.isGuest && u.name !== myName;
-        const showFollow = !iAmGuest && !u.isGuest && u.name !== myName;
-        const isFollowing = myFollowing.has(u.name);
-        const followBtnHtml = showFollow
-            ? `<button class="online-user-follow ${isFollowing ? 'following' : ''}">${isFollowing ? '★' : '☆'}</button>`
-            : '';
-        const dmBtnHtml = showDM
-            ? `<button class="online-user-dm">💬</button>`
-            : '';
-        item.innerHTML = `
-            ${avatarHtml}
-            <span class="online-user-name">${escapeHtml(u.name)}</span>
-            <span class="online-user-status">
-                <span class="online-status-dot ${u.status}"></span>
-                ${statusLabel[u.status] || ''}
-            </span>
-            ${followBtnHtml}
-            ${dmBtnHtml}
-        `;
-        if (showFollow) {
-            item.querySelector('.online-user-follow').addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (myFollowing.has(u.name)) { client.unfollow(u.name); myFollowing.delete(u.name); }
-                else { client.follow(u.name); myFollowing.add(u.name); }
-                renderOnlineUsersInto(container, users);
-            });
-        }
-        if (showDM) {
-            item.querySelector('.online-user-dm').addEventListener('click', (e) => {
-                e.stopPropagation();
-                openDMModal(u.name);
-            });
-        }
-        item.querySelector('.online-user-name').addEventListener('click', () => {
-            client.viewProfile(u.name);
-            closeOnlineModal();
-        });
-        container.appendChild(item);
-    }
-}
-
 // ---- Chat picker modal (lobby chat + online users tabs) ----
 function openChatModal() {
     document.getElementById('chat-picker-modal').classList.remove('hidden');
@@ -5205,10 +5054,6 @@ function openChatModal() {
 function closeChatModal() {
     document.getElementById('chat-picker-modal').classList.add('hidden');
 }
-function sendChatModalMsg() {
-    // No-op: actual sending handled by hookChatInput('cp-chat-input', 'btn-cp-chat-send') in setupChat.
-    // Left here so setupSNSEvents' extra keydown listener won't double-send.
-}
 function switchChatTab(tab) {
     const tabs = document.querySelectorAll('#chat-picker-modal .cp-tab');
     tabs.forEach(el => el.classList.toggle('active', el.dataset.cpTab === tab));
@@ -5222,27 +5067,10 @@ function switchChatTab(tab) {
     }
 }
 
-function switchSNSTab(tab) {
-    // Tabs removed in the unified layout; kept as no-op for backward compat.
-    snsActiveTab = 'home';
-    renderTimeline(snsTimeline);
-    return;
-    // Dead code below (kept to minimize churn)
-    // eslint-disable-next-line
-    const titleEl = document.getElementById('sns-feed-title');
-    if (tab === 'home') {
-        titleEl.innerHTML = '';
-        renderFootprintsTab();
-    }
-}
-
 function renderSNSSelf() {
     // Old 3-column mixi layout is gone. Simply refresh topbar user info.
     updateMainTopbarUser();
 }
-
-function renderSNSFootprintsMini() { /* removed in unified layout */ }
-function renderSNSSuggested() { /* removed in unified layout */ }
 
 let activeFeedTab = 'latest'; // 'latest' | 'weekly' | 'all'
 let rankingsCache = { weekly: null, all: null };
@@ -5562,13 +5390,6 @@ function pickBadge(handRank, bbNum) {
     return { cls: 'pot', label: '🎉 大勝' };
 }
 
-function renderHandPostBody(post) {
-    // Kept for backward-compat; unused by new renderPostEntry.
-    const h = post.handData || {};
-    const cardsHtml = (h.winnerCards || []).map(c => renderMiniCard(c)).join('');
-    return `<div class="mx-hand-body"><div class="mx-win-amount">${(h.pot || 0).toLocaleString()}</div>${cardsHtml ? '<div class="mx-cards">' + cardsHtml + '</div>' : ''}</div>`;
-}
-
 function renderMiniCard(c) {
     if (!c) return '';
     // Accept both {rank,suit} (server/timeline) and {r,s} (stored history) formats
@@ -5616,122 +5437,6 @@ function linkifyMentions(raw) {
     return escaped
         .replace(/@([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)/g, '<span class="mx-mention">@$1</span>')
         .replace(/\n/g, '<br>');
-}
-
-function renderOwnDiary() {
-    const mine = snsTimeline.filter(p => p.authorName === client.name);
-    renderTimeline(mine);
-}
-
-function renderOwnProfile() {
-    const container = document.getElementById('sns-timeline');
-    container.innerHTML = `
-        <div class="m-entry">
-            <div class="m-entry-head">
-                <div class="m-entry-avatar">${(client.name || '?').charAt(0).toUpperCase()}</div>
-                <div class="m-entry-meta">
-                    <div class="m-entry-name">${escapeHtml(client.name || '')}</div>
-                    <div class="m-entry-date">${loggedInAccount ? 'レギュラー会員' : 'ゲスト'}</div>
-                </div>
-            </div>
-            <div class="m-entry-body">
-                <div>フォロー中: <b>${myFollowing.size}</b> 人</div>
-                <div>フォロワー: <b>${myFollowers.size}</b> 人</div>
-                <div>投稿数: <b>${snsTimeline.filter(p => p.authorName === client.name).length}</b></div>
-                <div>あしあと: <b>${snsFootprints.length}</b> 件</div>
-            </div>
-        </div>
-    `;
-}
-
-function renderFriendsTab() {
-    const container = document.getElementById('sns-timeline');
-    const following = [...myFollowing];
-    if (following.length === 0) {
-        container.innerHTML = '<div class="m-entry" style="text-align:center;color:#888">まだフォローしている仲間がいません。オンラインユーザーリストからフォローしましょう。</div>';
-        return;
-    }
-    container.innerHTML = following.map(name => {
-        const initial = name.charAt(0).toUpperCase();
-        return `
-            <div class="m-entry">
-                <div class="m-entry-head">
-                    <div class="m-entry-avatar">${initial}</div>
-                    <div class="m-entry-meta">
-                        <a href="#" class="m-entry-name" data-profile-name="${escapeHtml(name)}">${escapeHtml(name)}</a>
-                        <div class="m-entry-date">フォロー中</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    container.querySelectorAll('[data-profile-name]').forEach(el => {
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            client.viewProfile(el.dataset.profileName);
-        });
-    });
-}
-
-function renderCommunityTab() {
-    const container = document.getElementById('sns-timeline');
-    container.innerHTML = `
-        <div class="m-entry" style="padding:16px">
-            <div class="m-entry-title">🚧 コミュニティ機能（準備中）</div>
-            <div class="m-entry-body">
-                コミュニティ機能は開発中です。<br>
-                将来的には Discord 連携により、各コミュニティの Discord サーバーへワンクリックで移動できるようになる予定です。
-            </div>
-        </div>
-    `;
-}
-
-function renderFootprintsTab() {
-    const container = document.getElementById('sns-timeline');
-    if (snsFootprints.length === 0) {
-        container.innerHTML = '<div class="m-entry" style="text-align:center;color:#888">まだあしあとがありません</div>';
-        return;
-    }
-    container.innerHTML = snsFootprints.map(fp => {
-        const initial = (fp.viewer || '?').charAt(0).toUpperCase();
-        return `
-            <div class="m-entry">
-                <div class="m-entry-head">
-                    <div class="m-entry-avatar">${initial}</div>
-                    <div class="m-entry-meta">
-                        <a href="#" class="m-entry-name" data-profile-name="${escapeHtml(fp.viewer)}">${escapeHtml(fp.viewer)}</a>
-                        <div class="m-entry-date">${formatDateJP(fp.timestamp)}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    container.querySelectorAll('[data-profile-name]').forEach(el => {
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            client.viewProfile(el.dataset.profileName);
-        });
-    });
-}
-
-function openComposer() {
-    if (!loggedInAccount) { showToast('ログインするとチャット投稿できます'); return; }
-    // Composer is now always visible on home tab; just focus it
-    const bodyEl = document.getElementById('composer-body');
-    if (bodyEl) bodyEl.focus();
-}
-
-function closeComposer() {
-    const bodyEl = document.getElementById('composer-body');
-    if (bodyEl) bodyEl.value = '';
-}
-
-function submitComposer() {
-    const body = document.getElementById('composer-body').value.trim();
-    if (!body) { showToast('メッセージを入力してください'); return; }
-    if (!loggedInAccount) { showToast('ログインするとチャット投稿できます'); return; }
-    client.createPost('', body, '');
-    document.getElementById('composer-body').value = '';
 }
 
 function showAutoShareModal(post) {
@@ -5884,36 +5589,8 @@ client.on('auto_shared', (post) => {
     if (!snsTimeline.find(p => p.id === post.id)) snsTimeline.unshift(post);
     showAutoShareModal(post);
 });
-client.on('footprints', (list) => {
-    snsFootprints = list || [];
-    // Footprints UI removed in unified layout
-});
-client.on('new_footprint', (data) => {
-    // Just refresh our cached footprints
-    client.getFootprints();
-});
-client.on('profile_data', (profile) => {
-    if (!profile) return;
-    // Profile feature removed in unified layout — keep handler no-op to avoid errors
-    return;
-    // eslint-disable-next-line
-    const isFollowing = myFollowing.has(profile.name);
-    const initial = (profile.name || '?').charAt(0).toUpperCase();
-    const statusLabel = profile.isOnline ? (profile.status === 'playing' ? '🎮 ゲーム中' : profile.status === 'zoom' ? '🎥 Zoom中' : '🟢 オンライン') : '⚫ オフライン';
-    const fbtn = document.getElementById('profile-follow-btn');
-    if (fbtn) {
-        fbtn.addEventListener('click', () => {
-            if (myFollowing.has(profile.name)) {
-                client.unfollow(profile.name);
-                myFollowing.delete(profile.name);
-            } else {
-                client.follow(profile.name);
-                myFollowing.add(profile.name);
-            }
-            client.viewProfile(profile.name);
-        });
-    }
-});
+// footprints / new_footprint: UI removed — handler no longer needed
+// profile_data: UI removed — no handler needed
 
 // Init
 setupActionRipple();

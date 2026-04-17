@@ -205,9 +205,13 @@ class PokerUI {
             + ` <span class="game-type-badge" style="background:${betBadge.color}">${betBadge.label}</span>`;
         gameNameEl.innerHTML = s.gameName + badgesHtml;
 
-        document.getElementById('game-rotation').textContent =
-            `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
-        document.getElementById('rules-content').textContent = s.gameRules || '';
+        const rotationEl = document.getElementById('game-rotation');
+        if (rotationEl) {
+            rotationEl.textContent =
+                `${s.currentGameIndex + 1}/${s.totalGames} | ハンド ${s.handsInCurrentGame + 1}/${s.playerCount}`;
+        }
+        const rulesEl = document.getElementById('rules-content');
+        if (rulesEl) rulesEl.textContent = s.gameRules || '';
 
         // BB formatter helper
         const bb = s.bigBlind || 100;
