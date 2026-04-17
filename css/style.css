@@ -382,14 +382,6 @@ body {
 .online-status-dot.playing { background: #ff9800; }
 .online-status-dot.zoom { background: #2196f3; }
 
-/* DM button in user list */
-.online-user-dm {
-    margin-left: 4px; background: none; border: none; color: var(--text-dim);
-    cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px;
-    transition: all 0.15s; flex-shrink: 0;
-}
-.online-user-dm:hover { color: var(--accent); background: rgba(0,191,255,0.1); }
-
 /* Follow button in user list */
 .online-user-follow {
     margin-left: auto; background: none; border: none; color: var(--text-dim);
@@ -400,63 +392,6 @@ body {
 .online-user-follow.following { color: #ffb84d; }
 .online-user-item.is-following { background: rgba(255,184,77,0.06); }
 .online-user-item.is-following .online-user-name { font-weight: 600; }
-.online-user-dm { margin-left: 0; }
-
-/* DM Modal */
-.dm-modal {
-    position: fixed; inset: 0; z-index: 9000;
-    background: rgba(7,10,19,0.8); backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-}
-.dm-modal-content {
-    width: 360px; max-width: 92vw; max-height: 70vh;
-    background: #1a1d25; border: 1px solid #333; border-radius: 12px;
-    display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-}
-.dm-modal-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; border-bottom: 1px solid #2a2d35;
-    background: rgba(0,0,0,0.3);
-}
-.dm-modal-title { font-size: 14px; font-weight: 700; color: var(--text); }
-.dm-modal-close {
-    background: none; border: none; color: var(--text-dim); font-size: 16px;
-    cursor: pointer; padding: 2px 6px; border-radius: 4px;
-}
-.dm-modal-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
-.dm-modal-body {
-    flex: 1; overflow-y: auto; padding: 10px 14px; min-height: 120px; max-height: 300px;
-    display: flex; flex-direction: column; gap: 4px;
-    background: rgba(0,0,0,0.15);
-}
-.dm-msg { font-size: 12px; line-height: 1.5; color: var(--text); }
-.dm-msg-from { font-weight: 700; margin-right: 4px; }
-.dm-msg-from.me { color: var(--accent); }
-.dm-msg-from.other { color: var(--gold); }
-.dm-msg-time { font-size: 10px; color: var(--text-dim); margin-left: 6px; }
-.dm-modal-notice {
-    padding: 4px 14px; font-size: 10px; color: var(--text-dim);
-    background: rgba(255,152,0,0.06); border-top: 1px solid rgba(255,152,0,0.1);
-    text-align: center;
-}
-.dm-modal-input {
-    display: flex; gap: 8px; padding: 8px 12px;
-    border-top: 1px solid #2a2d35; background: rgba(0,0,0,0.3);
-}
-.dm-modal-input input {
-    flex: 1; padding: 8px 12px; background: #181b22;
-    border: 1px solid #3a3d45; border-radius: 6px;
-    color: var(--text); font-size: 13px; outline: none;
-}
-.dm-modal-input input:focus { border-color: var(--accent); }
-.dm-empty { color: var(--text-dim); font-size: 12px; text-align: center; padding: 20px 0; }
-
-/* DM unread badge */
-.dm-unread-dot {
-    width: 8px; height: 8px; border-radius: 50%; background: #ef5350;
-    display: inline-block; margin-left: 4px; flex-shrink: 0;
-}
 
 /* === Stats Modal === */
 /* === Unified Modal System === */
@@ -2807,21 +2742,6 @@ body:not(.theme-classic):not(.theme-midnight) .online-user-item {
 }
 body:not(.theme-classic):not(.theme-midnight) .online-user-item:hover {
     background: #fff;
-}
-
-/* --- DM modal --- */
-body:not(.theme-classic):not(.theme-midnight) .dm-modal-content {
-    background: var(--panel);
-    color: var(--text);
-    border: 1px solid var(--border);
-}
-body:not(.theme-classic):not(.theme-midnight) .dm-modal-header {
-    border-bottom: 1px solid var(--border);
-}
-body:not(.theme-classic):not(.theme-midnight) .dm-modal-input input {
-    background: #f5f6f8;
-    color: var(--text);
-    border: 1px solid var(--border);
 }
 
 /* --- Table felt: minty green on wood rail --- */

@@ -100,9 +100,7 @@ class PokerClient {
             case 'chat':
                 this.emit('chat', msg);
                 break;
-            case 'lobby_chat':
-                this.emit('lobby_chat', { from: msg.from, message: msg.message });
-                break;
+            // lobby_chat removed — no lobby chat feature
             case 'online_users':
                 this.emit('online_users', { users: msg.users, following: msg.following || [] });
                 break;
@@ -136,15 +134,7 @@ class PokerClient {
             case 'new_footprint':
                 this.emit('new_footprint', msg);
                 break;
-            case 'dm':
-                this.emit('dm', msg);
-                break;
-            case 'dm_sent':
-                this.emit('dm_sent', msg);
-                break;
-            case 'dm_failed':
-                this.emit('dm_failed', msg);
-                break;
+            // dm / dm_sent / dm_failed removed — DM feature removed
             case 'game_over':
                 this.emit('game_over', msg);
                 break;
@@ -215,7 +205,6 @@ class PokerClient {
     }
 
     setName(name, avatar, isGuest) { this.name = name; this.avatar = avatar; this.send({ type: 'set_name', name, avatar, isGuest: !!isGuest }); }
-    sendDM(to, message) { this.send({ type: 'dm', to, message }); }
     createRoom() { this.send({ type: 'create_room' }); }
     joinZoom() { this.send({ type: 'join_zoom' }); }
     leaveZoom() { this.send({ type: 'leave_zoom' }); }

@@ -581,7 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
     setupAccountLogin();
     setupLobbyScreen();
-    setupDMModal();
     setupHandPostModal();
     setupRoomScreen();
     setupGameScreen();
@@ -744,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (rid && rid !== activeTableId) return; // ignore chat from background tables
         onChat(msg);
     });
-    client.on('lobby_chat', onLobbyChat);
+    // lobby_chat removed — no lobby chat feature
     client.on('online_users', (data) => {
         // Backward-compat: data may be array (old) or { users, following } (new)
         let users;
@@ -3733,7 +3732,7 @@ function setupChat() {
             if (e.key === 'Enter') send.click();
         });
     }
-    hookChatInput('cp-chat-input', 'btn-cp-chat-send');
+    // Lobby chat (cp-chat-input) removed. In-game chat is still supported.
     hookChatInput('room-chat-input', 'btn-room-chat-send');
     hookChatInput('game-chat-input', 'btn-game-chat-send');
 
@@ -3859,21 +3858,6 @@ function showSeatBubble(fromName, message) {
     setTimeout(() => bubble.remove(), lifetime + 400);
 }
 
-function onLobbyChat(data) {
-    // Lobby chat lives inside the chat-picker-modal now.
-    appendChatMsg('cp-chat-log', data.from, data.message);
-    // Show unread badge on floating chat button if modal is closed
-    const modal = document.getElementById('chat-picker-modal');
-    if (modal && modal.classList.contains('hidden')) {
-        const badge = document.getElementById('mx-fab-badge');
-        if (badge) {
-            const cur = parseInt(badge.textContent || '0', 10) || 0;
-            badge.textContent = String(cur + 1);
-            badge.classList.remove('hidden');
-        }
-    }
-}
-
 // ==========================================
 // Online User List
 // ==========================================
@@ -3906,13 +3890,6 @@ function renderOnlineUsers(users) {
             ? `<img src="avatars/${u.avatar}.svg" alt="">`
             : `<div class="online-user-initial">${(u.name || '?').charAt(0).toUpperCase()}</div>`;
 
-        // Show DM button: only if both parties are non-guest and not self
-        const showDM = !iAmGuest && !u.isGuest && u.name !== myName;
-        const hasUnread = dmUnread.has(u.name);
-        const dmBtnHtml = showDM
-            ? `<button class="online-user-dm" data-dm-target="${u.name}" title="DMを送る">💬${hasUnread ? '<span class="dm-unread-dot"></span>' : ''}</button>`
-            : '';
-
         // Show follow button: only if I'm logged in, target is non-guest, and not self
         const showFollow = !iAmGuest && !u.isGuest && u.name !== myName;
         const isFollowing = myFollowing.has(u.name);
@@ -3928,15 +3905,8 @@ function renderOnlineUsers(users) {
                 ${statusLabel[u.status] || ''}
             </span>
             ${followBtnHtml}
-            ${dmBtnHtml}
         `;
 
-        if (showDM) {
-            item.querySelector('.online-user-dm').addEventListener('click', (e) => {
-                e.stopPropagation();
-                openDMModal(u.name);
-            });
-        }
         if (showFollow) {
             item.querySelector('.online-user-follow').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -4667,10 +4637,6 @@ function setupSNSEvents() {
         });
     }
 
-    // Floating chat button
-    const fab = document.getElementById('mx-fab-chat');
-    if (fab) fab.addEventListener('click', openChatModal);
-
     // Room picker modal (legacy, still available via direct call)
     const btnRpClose = document.getElementById('btn-rp-close');
     if (btnRpClose) btnRpClose.addEventListener('click', closeRoomModal);
@@ -4694,16 +4660,11 @@ function setupSNSEvents() {
         if (e.key === 'Enter') document.getElementById('btn-rp-join-by-id').click();
     });
 
-    // Chat picker modal (chat tab + online tab)
+    // Online users modal close button
     const btnCpClose = document.getElementById('btn-cp-close');
-    if (btnCpClose) btnCpClose.addEventListener('click', closeChatModal);
+    if (btnCpClose) btnCpClose.addEventListener('click', closeOnlineUsersModal);
     const cpBd = document.querySelector('#chat-picker-modal .rp-backdrop');
-    if (cpBd) cpBd.addEventListener('click', closeChatModal);
-    // Chat send/keydown are wired in setupChat via hookChatInput('cp-chat-input', 'btn-cp-chat-send')
-    // Tab buttons
-    document.querySelectorAll('#chat-picker-modal .cp-tab').forEach(el => {
-        el.addEventListener('click', () => switchChatTab(el.dataset.cpTab));
-    });
+    if (cpBd) cpBd.addEventListener('click', closeOnlineUsersModal);
 
     // Auto-share modal handlers
     const btnAsComment = document.getElementById('btn-auto-share-comment');
@@ -4775,34 +4736,18 @@ function renderRoomModalList() {
     }
 }
 
-// ---- Chat picker modal (lobby chat + online users tabs) ----
-function openChatModal() {
+// ---- Online users modal (previously a tabbed chat modal — chat removed) ----
+function openOnlineUsersModal() {
     document.getElementById('chat-picker-modal').classList.remove('hidden');
-    // Clear unread badge
-    const badge = document.getElementById('mx-fab-badge');
-    if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
-    // Default to chat tab
-    switchChatTab('chat');
-    const input = document.getElementById('cp-chat-input');
-    if (input) input.focus();
-    const log = document.getElementById('cp-chat-log');
-    if (log) log.scrollTop = log.scrollHeight;
+    renderOnlineUsers(lastOnlineUsers || []);
 }
-function closeChatModal() {
+function closeOnlineUsersModal() {
     document.getElementById('chat-picker-modal').classList.add('hidden');
 }
-function switchChatTab(tab) {
-    const tabs = document.querySelectorAll('#chat-picker-modal .cp-tab');
-    tabs.forEach(el => el.classList.toggle('active', el.dataset.cpTab === tab));
-    const chatView = document.getElementById('cp-view-chat');
-    const onlineView = document.getElementById('cp-view-online');
-    if (chatView) chatView.classList.toggle('hidden', tab !== 'chat');
-    if (onlineView) onlineView.classList.toggle('hidden', tab !== 'online');
-    if (tab === 'online') {
-        // Re-render online users with latest cache
-        renderOnlineUsers(lastOnlineUsers || []);
-    }
-}
+// Backward-compat aliases (still used by hamburger menu wiring).
+function openChatModal()   { openOnlineUsersModal(); }
+function closeChatModal()  { closeOnlineUsersModal(); }
+function switchChatTab()   { /* no-op — only one view now */ }
 
 function renderSNSSelf() {
     // Old 3-column mixi layout is gone. Simply refresh topbar user info.

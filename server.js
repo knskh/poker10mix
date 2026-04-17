@@ -1335,20 +1335,13 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'chat': {
+            // In-game chat only (room / zoom). Lobby chat has been removed.
             const text = (msg.message || '').slice(0, 200);
             const chatRoomId = msg.roomId || client.roomId;
-            if (chatRoomId) {
-                const room = rooms.get(chatRoomId);
-                if (room) {
-                    broadcastToRoom(room, { type: 'chat', from: client.name, message: text });
-                }
-            } else {
-                // Lobby chat: broadcast to all lobby users
-                for (const [ws, c] of clients) {
-                    if (!c.roomId && !c.inZoom) {
-                        send(ws, { type: 'lobby_chat', from: client.name, message: text });
-                    }
-                }
+            if (!chatRoomId) break; // no lobby fallback
+            const room = rooms.get(chatRoomId);
+            if (room) {
+                broadcastToRoom(room, { type: 'chat', from: client.name, message: text });
             }
             break;
         }
@@ -1582,25 +1575,7 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
-        case 'dm': {
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではDMを送信できません' }); break; }
-            const toName = (msg.to || '').trim();
-            const dmText = (msg.message || '').slice(0, 200);
-            if (!toName || !dmText) break;
-            // Find target client by name
-            let targetWs = null;
-            for (const [tws, tc] of clients) {
-                if (tc.name === toName && tws !== ws) { targetWs = tws; break; }
-            }
-            if (targetWs) {
-                const ts = Date.now();
-                send(targetWs, { type: 'dm', from: client.name, message: dmText, ts });
-                send(ws, { type: 'dm_sent', to: toName, message: dmText, ts });
-            } else {
-                send(ws, { type: 'dm_failed', to: toName, reason: 'オフラインです' });
-            }
-            break;
-        }
+        // 'dm' removed — DM feature removed
 
         case 'get_stats': {
             const room = rooms.get(msg.roomId || client.roomId);

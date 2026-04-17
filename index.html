@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=60">
-    <link rel="stylesheet" href="css/sns.css?v=1">
+    <link rel="stylesheet" href="css/style.css?v=61">
+    <link rel="stylesheet" href="css/sns.css?v=2">
 </head>
 <body>
     <div id="app">
@@ -108,8 +108,6 @@
                 <div id="sns-timeline"></div>
             </div>
 
-            <!-- Floating lobby chat button -->
-            <button id="mx-fab-chat" class="mx-fab" title="ロビーチャット">💬<span id="mx-fab-badge" class="mx-fab-badge hidden"></span></button>
         </div>
 
         <!-- Room picker modal (opens from SNS CTA) -->
@@ -133,25 +131,15 @@
             </div>
         </div>
 
-        <!-- Lobby chat modal (with tabs: chat / online) -->
+        <!-- Online users modal -->
         <div id="chat-picker-modal" class="rp-modal hidden">
             <div class="rp-backdrop"></div>
             <div class="rp-content">
                 <div class="rp-header">
-                    <div class="cp-tabs">
-                        <button class="cp-tab active" id="cp-tab-chat" data-cp-tab="chat">💬 チャット</button>
-                        <button class="cp-tab" id="cp-tab-online" data-cp-tab="online">👥 オンライン <span id="cp-online-count"></span></button>
-                    </div>
+                    <div class="rp-title">👥 オンラインユーザー <span id="cp-online-count"></span></div>
                     <button class="rp-close" id="btn-cp-close">✕</button>
                 </div>
-                <div class="cp-chat-wrap" id="cp-view-chat">
-                    <div id="cp-chat-log" class="room-chat-log"></div>
-                    <div class="chat-bar">
-                        <input type="text" id="cp-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                        <button id="btn-cp-chat-send" class="btn-small">送信</button>
-                    </div>
-                </div>
-                <div class="cp-online-wrap hidden" id="cp-view-online">
+                <div class="cp-online-wrap" id="cp-view-online">
                     <div id="online-user-list" class="online-user-list"></div>
                 </div>
             </div>
@@ -474,21 +462,6 @@
 
         </div>
 
-        <!-- DM Modal -->
-        <div id="dm-modal" class="dm-modal hidden">
-            <div class="dm-modal-content">
-                <div class="dm-modal-header">
-                    <span class="dm-modal-title" id="dm-modal-title"></span>
-                    <button id="dm-modal-close" class="dm-modal-close">✕</button>
-                </div>
-                <div class="dm-modal-body" id="dm-modal-body"></div>
-                <div class="dm-modal-notice">メッセージ履歴は1週間で自動削除されます</div>
-                <div class="dm-modal-input">
-                    <input type="text" id="dm-input" placeholder="メッセージを入力..." maxlength="200" autocomplete="off">
-                    <button id="btn-dm-send" class="btn-small">送信</button>
-                </div>
-            </div>
-        </div>
     </div>
 
     <script src="js/deck.js"></script>
@@ -498,8 +471,7 @@
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=44"></script>
-    <script src="js/app.js?v=54"></script>
-    <script src="js/dm.js?v=1"></script>
+    <script src="js/app.js?v=55"></script>
     <script src="js/hand-post.js?v=1"></script>
 </body>
 </html>
