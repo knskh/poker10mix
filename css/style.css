@@ -762,7 +762,9 @@ body {
 }
 
 #table-felt {
-    contain: layout paint; /* Limit reflow/repaint to this subtree */
+    /* contain: layout (not paint) — seats are positioned *outside* the felt,
+       so using `paint` would clip them. Layout containment alone still helps perf. */
+    contain: layout;
     position: relative;
     width: min(760px, 94vw); height: min(330px, 44vw);
     background:
@@ -1006,6 +1008,7 @@ body {
 .seat {
     contain: layout; /* Isolate seat layout recalcs */
     position: absolute;
+    z-index: 20; /* Above felt pseudo-elements and bet chips */
     background: var(--seat-bg);
     backdrop-filter: var(--glass-blur);
     border-radius: 12px;
