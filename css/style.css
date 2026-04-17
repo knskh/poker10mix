@@ -4192,3 +4192,182 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     color: #1E52A3;
     border-color: #5B9BF0;
 }
+
+/* ==========================================
+   Mobile chat UX improvements (Phase 1 + 2)
+   ========================================== */
+
+/* ---- Phase 1: chat panel as overlay sheet (mobile only) ---- */
+@media (max-width: 767px) {
+    /* When the side panel opens on mobile, let the action-col stay visible
+       and overlay the chat sheet above it. */
+    #action-panel.sp-open {
+        /* Reset the previous "replace action-col" behaviour */
+        height: auto;
+        max-height: none;
+    }
+    #action-panel.sp-open #action-col {
+        display: flex !important; /* keep action buttons visible */
+    }
+    #action-panel.sp-open #side-panel {
+        /* Float over the whole bottom half of the screen */
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        height: 50dvh;
+        max-height: 70vh;
+        z-index: 400;
+        background: rgba(15, 20, 30, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-top: 1px solid rgba(0, 191, 255, 0.25);
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -8px 32px rgba(0,0,0,0.6);
+        animation: sp-slide-up 0.22s ease-out;
+        display: flex;
+    }
+    @keyframes sp-slide-up {
+        0% { transform: translateY(100%); opacity: 0.4; }
+        100% { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Backdrop (tap outside to close) */
+    #action-panel.sp-open::before {
+        content: "";
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 399;
+        animation: sp-backdrop-in 0.22s ease-out;
+    }
+    @keyframes sp-backdrop-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    /* Drag handle + bigger close for the sheet */
+    #action-panel.sp-open #side-panel-header {
+        position: relative;
+        padding: 10px 10px 6px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    #action-panel.sp-open #side-panel-header::before {
+        content: "";
+        position: absolute;
+        top: 4px; left: 50%; transform: translateX(-50%);
+        width: 36px; height: 4px; border-radius: 2px;
+        background: rgba(255,255,255,0.25);
+    }
+    #action-panel.sp-open #side-panel-close {
+        width: 32px; height: 32px; font-size: 16px;
+        background: rgba(255,255,255,0.1);
+    }
+
+    /* Taller, more thumb-friendly inputs inside the sheet */
+    #action-panel.sp-open .game-chat-bar {
+        padding: 8px 10px 10px;
+        gap: 6px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    #action-panel.sp-open .game-chat-bar input {
+        font-size: 15px; padding: 10px 12px;
+        min-height: 40px;
+    }
+    #action-panel.sp-open .game-chat-bar .btn-small {
+        font-size: 14px; padding: 10px 14px;
+        min-height: 40px;
+    }
+    #action-panel.sp-open #chat-log {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
+    /* Side pills: make them bigger & easier to tap */
+    #side-pills {
+        position: fixed;
+        left: 0; top: 45%; transform: translateY(-50%);
+        z-index: 350;
+        padding: 0;
+        gap: 6px;
+    }
+    .side-pill {
+        width: 40px; height: 44px;
+        font-size: 18px;
+        background: rgba(0,0,0,0.55);
+        border: 1px solid rgba(0,191,255,0.3);
+        border-left: none;
+        border-radius: 0 10px 10px 0;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+    }
+    .side-pill:active {
+        background: rgba(0,191,255,0.3);
+        transform: scale(0.95);
+    }
+    .side-pill-badge {
+        top: -2px; right: -4px;
+        min-width: 16px; height: 16px; line-height: 16px;
+        font-size: 9px;
+    }
+}
+
+/* ---- Phase 2: Seat speech bubbles ---- */
+/* Speech bubble anchored to a player's seat, auto-fades */
+.seat-bubble {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    max-width: 180px;
+    background: rgba(255,255,255,0.96);
+    color: #1a1a1a;
+    font-size: 12px; font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.35);
+    pointer-events: none;
+    z-index: 55;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
+    animation: seat-bubble-in 0.25s ease-out;
+}
+.seat-bubble::after {
+    /* Tail (below the bubble, pointing at the seat) */
+    content: "";
+    position: absolute;
+    left: 50%; bottom: -6px; transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(255,255,255,0.96);
+    border-bottom: 0;
+}
+.seat-bubble.seat-bubble-down {
+    /* Variant: tail pointing up (for bubble shown BELOW the seat) */
+    transform: translate(-50%, 8px);
+}
+.seat-bubble.seat-bubble-down::after {
+    top: -6px; bottom: auto;
+    border-top: 0; border-bottom-color: rgba(255,255,255,0.96);
+}
+.seat-bubble.seat-bubble-out {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 8px));
+    transition: opacity 0.35s, transform 0.35s;
+}
+.seat-bubble.seat-bubble-down.seat-bubble-out {
+    transform: translate(-50%, 16px);
+}
+.seat-bubble .bubble-name {
+    display: block;
+    font-size: 10px; font-weight: 700;
+    color: #666; margin-bottom: 2px;
+}
+@keyframes seat-bubble-in {
+    0%   { opacity: 0; transform: translate(-50%, calc(-100% + 10px)) scale(0.9); }
+    60%  { opacity: 1; transform: translate(-50%, calc(-100% - 4px)) scale(1.03); }
+    100% { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
+
+@media (max-width: 480px) {
+    .seat-bubble {
+        max-width: 140px;
+        font-size: 11px; padding: 5px 9px;
+    }
+    .seat-bubble .bubble-name { font-size: 9px; }
+}

@@ -4019,26 +4019,49 @@ function onChat(data) {
     // Room/game chat only (not lobby)
     appendChatMsg('room-chat-log', data.from, data.message);
     addChatEntry(`[${data.from}] ${data.message}`, 'msg');
-    // Show short messages as floating text on table (quick chat style)
-    if (data.message.length <= 15 && currentState) {
-        const seatIdx = currentState.players.findIndex(p => p.name === data.from);
-        if (seatIdx >= 0) {
-            const tableFelt = document.getElementById('table-felt');
-            const seatEl = document.getElementById(`seat-${seatIdx}`);
-            if (tableFelt && seatEl) {
-                const sc = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat');
-                const pm = { 'seat-bottom':[50,65],'seat-bottom-left':[20,60],'seat-top-left':[20,35],'seat-top':[50,25],'seat-top-right':[80,35],'seat-bottom-right':[80,60] };
-                const pos = pm[sc] || [50,50];
-                const el = document.createElement('div');
-                el.className = 'qc-float';
-                el.textContent = data.message;
-                el.style.left = pos[0] + '%';
-                el.style.top = pos[1] + '%';
-                tableFelt.appendChild(el);
-                setTimeout(() => el.remove(), 2600);
-            }
-        }
-    }
+    // Show message as a speech bubble anchored to the speaker's seat
+    showSeatBubble(data.from, data.message);
+}
+
+// Phase 2: speech bubble above/below the speaker's seat (auto-fades)
+function showSeatBubble(fromName, message) {
+    if (!currentState || !message) return;
+    const seatIdx = currentState.players.findIndex(p => p.name === fromName);
+    if (seatIdx < 0) return;
+    const tableFelt = document.getElementById('table-felt');
+    const seatEl = document.getElementById(`seat-${seatIdx}`);
+    if (!tableFelt || !seatEl) return;
+    // Determine where the seat sits so we can anchor the bubble appropriately.
+    const seatClass = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat') || '';
+    const isTopSeat = seatClass.startsWith('seat-top');
+    // Remove existing bubble for the same seat so a new message replaces it cleanly
+    tableFelt.querySelectorAll(`.seat-bubble[data-seat="${seatIdx}"]`).forEach(el => el.remove());
+    // Anchor position: centered horizontally on the seat, above it (or below for top seats).
+    const feltRect = tableFelt.getBoundingClientRect();
+    const seatRect = seatEl.getBoundingClientRect();
+    const leftPct = ((seatRect.left + seatRect.width / 2) - feltRect.left) / feltRect.width * 100;
+    const topPct = isTopSeat
+        ? (seatRect.bottom - feltRect.top) / feltRect.height * 100
+        : (seatRect.top - feltRect.top) / feltRect.height * 100;
+    const bubble = document.createElement('div');
+    bubble.className = 'seat-bubble' + (isTopSeat ? ' seat-bubble-down' : '');
+    bubble.dataset.seat = String(seatIdx);
+    // Truncate very long messages so the bubble stays compact
+    const text = message.length > 80 ? message.slice(0, 80) + '…' : message;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'bubble-name';
+    nameSpan.textContent = fromName;
+    const bodySpan = document.createElement('span');
+    bodySpan.textContent = text;
+    bubble.appendChild(nameSpan);
+    bubble.appendChild(bodySpan);
+    bubble.style.left = leftPct + '%';
+    bubble.style.top = topPct + '%';
+    tableFelt.appendChild(bubble);
+    // Auto-fade after 4s (shorter for very short messages)
+    const lifetime = text.length <= 10 ? 3000 : 4500;
+    setTimeout(() => bubble.classList.add('seat-bubble-out'), lifetime);
+    setTimeout(() => bubble.remove(), lifetime + 400);
 }
 
 function onLobbyChat(data) {
@@ -4776,16 +4799,60 @@ function setupSidePanel() {
     // Close button (mobile only, hidden on PC via CSS)
     document.getElementById('side-panel-close').addEventListener('click', closeSidePanel);
 
+    // Tap outside the sheet (on the backdrop) to close on mobile
+    const ap = document.getElementById('action-panel');
+    if (ap) {
+        ap.addEventListener('click', (e) => {
+            if (!ap.classList.contains('sp-open') || isSidePanelPC()) return;
+            // Close only if the click landed on action-panel itself (the backdrop pseudo-element)
+            // or outside side-panel/side-pills/action-col content.
+            const sp = document.getElementById('side-panel');
+            const pills = document.getElementById('side-pills');
+            const col = document.getElementById('action-col');
+            if (sp && sp.contains(e.target)) return;
+            if (pills && pills.contains(e.target)) return;
+            if (col && col.contains(e.target)) return;
+            closeSidePanel();
+        });
+    }
+
     // On PC: auto-open chat by default
     if (isSidePanelPC()) {
         openSidePanel('chat');
+    }
+
+    // Keyboard-aware height on mobile (visualViewport)
+    if (window.visualViewport) {
+        const applyVV = () => {
+            const sp = document.getElementById('side-panel');
+            if (!sp) return;
+            if (isSidePanelPC()) {
+                sp.style.height = '';
+                sp.style.bottom = '';
+                return;
+            }
+            if (!document.getElementById('action-panel').classList.contains('sp-open')) return;
+            // Constrain sheet to the visible viewport portion
+            const vvH = window.visualViewport.height;
+            const winH = window.innerHeight;
+            const overlap = Math.max(0, winH - (window.visualViewport.offsetTop + vvH));
+            // Sheet anchored to bottom — lift it by the overlap (keyboard height)
+            sp.style.bottom = overlap + 'px';
+            // Clamp height so it fits above the keyboard
+            sp.style.height = Math.min(vvH * 0.7, vvH - 40) + 'px';
+        };
+        window.visualViewport.addEventListener('resize', applyVV);
+        window.visualViewport.addEventListener('scroll', applyVV);
     }
 
     // Handle resize: PC↔mobile transition
     window.addEventListener('resize', () => {
         if (isSidePanelPC()) {
             // Always show side panel on PC
-            document.getElementById('side-panel').classList.remove('hidden');
+            const sp = document.getElementById('side-panel');
+            sp.classList.remove('hidden');
+            sp.style.height = '';
+            sp.style.bottom = '';
             document.getElementById('action-panel').classList.remove('sp-open');
             if (!activeSidePanel) openSidePanel('chat');
         } else {
