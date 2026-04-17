@@ -193,6 +193,8 @@ class PokerUI {
         felt.classList.remove('felt-high', 'felt-low', 'felt-hilo', 'rail-draw', 'rail-stud', 'rail-community');
         felt.classList.add('felt-' + getGameCategory(s.gameId));
         felt.classList.add('rail-' + getGameType(s.gameId));
+        // Heads-up layout: relax pot / community card positions to avoid seat-top overlap
+        felt.classList.toggle('is-heads-up', s.players.length === 2);
 
         // Top bar with game type + category badges
         const gameType = getGameType(s.gameId);
