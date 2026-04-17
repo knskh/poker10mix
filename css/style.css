@@ -3982,3 +3982,159 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
 #chat-picker-modal .online-user-follow.following {
     background: #DBE9FA; color: #1E52A3; border-color: #2A6BC9;
 }
+
+/* ==========================================
+   Manual hand posting UI
+   ========================================== */
+#sns-screen .mx-feed-post-btn {
+    margin-left: auto;
+    background: linear-gradient(180deg, #5B9BF0, #2A6BC9);
+    color: #fff; border: none; border-radius: 10px;
+    padding: 6px 12px; font-size: 12px; font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(42,107,201,0.25);
+    transition: filter .15s, transform .12s;
+    font-family: inherit;
+}
+#sns-screen .mx-feed-post-btn:hover { filter: brightness(1.07); }
+#sns-screen .mx-feed-post-btn:active { transform: translateY(1px); }
+#sns-screen .mx-feed-live + .mx-feed-post-btn { margin-left: 8px; }
+
+/* Post caption (manual posts) */
+#sns-screen .mx-post-caption {
+    font-size: 13px; color: #17202E;
+    line-height: 1.55;
+    background: #F5FAFF;
+    border-left: 3px solid #5B9BF0;
+    border-radius: 0 8px 8px 0;
+    padding: 8px 12px;
+    margin: 6px 0 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Source label in post date line */
+#sns-screen .mx-post-source {
+    color: #1E52A3;
+    font-weight: 600;
+    font-size: 10px;
+}
+
+/* Loss hand styling */
+#sns-screen .mx-post-badge.loss {
+    background: linear-gradient(135deg, #FFDADA, #E57373);
+    color: #7A1C1C;
+    border-color: #C44A4A;
+}
+#sns-screen .mx-hand-body-loss {
+    background: linear-gradient(135deg, #FDF3F3, #F9E2E2);
+    border-color: #F2C3C3;
+}
+#sns-screen .mx-win-amount-neg {
+    color: #B72424;
+}
+
+/* ==========================================
+   Hand history: post button per row
+   ========================================== */
+.hh-row {
+    display: flex; align-items: center; gap: 8px;
+}
+.hh-post-btn {
+    margin-left: auto;
+    background: linear-gradient(180deg, #5B9BF0, #2A6BC9);
+    color: #fff; border: none; border-radius: 8px;
+    padding: 4px 10px; font-size: 11px; font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: filter .15s, transform .12s;
+    flex-shrink: 0;
+}
+.hh-post-btn:hover { filter: brightness(1.08); }
+.hh-post-btn:active { transform: translateY(1px); }
+
+/* ==========================================
+   Hand post caption modal
+   ========================================== */
+#hand-post-modal .hp-content {
+    width: min(480px, 92vw);
+}
+#hand-post-modal .hp-body {
+    padding: 14px 16px 8px;
+    background: linear-gradient(135deg, #F2F7FD, #E5EEFA);
+    border-bottom: 1px solid #DBE9FA;
+}
+#hand-post-modal .hp-preview-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 8px;
+}
+#hand-post-modal .hp-game-tag {
+    font-size: 11px; color: #1E52A3; background: #fff;
+    padding: 3px 10px; border-radius: 10px;
+    border: 1px solid #C5DFFA; font-weight: 700;
+}
+#hand-post-modal .hp-pot {
+    font-family: 'Inter', sans-serif;
+    font-size: 22px; font-weight: 800;
+    color: #1E52A3; letter-spacing: 0.5px;
+}
+#hand-post-modal .hp-pot.hp-pot-plus { color: #1E52A3; }
+#hand-post-modal .hp-pot.hp-pot-minus { color: #B72424; }
+#hand-post-modal .hp-pot-u {
+    font-size: 11px; color: #566579; font-weight: 500;
+}
+#hand-post-modal .hp-cards-row {
+    display: flex; align-items: center; gap: 10px;
+    margin: 6px 0;
+    font-size: 11px; color: #566579;
+}
+#hand-post-modal .hp-cards-label {
+    font-weight: 700; color: #1E52A3; min-width: 90px;
+}
+#hand-post-modal .hp-cards {
+    display: flex; gap: 3px; flex-wrap: wrap;
+}
+#hand-post-modal .hp-cards .mx-card {
+    width: 24px; height: 34px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    background: #fff; border: 1px solid #C5D0DF;
+    font-weight: 700; font-size: 11px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+}
+#hand-post-modal .hp-cards .mx-card.red { color: #D93A3A; }
+#hand-post-modal .hp-cards .mx-card.black { color: #17202E; }
+#hand-post-modal .hp-actions {
+    padding: 12px 16px 14px;
+}
+#hand-post-modal .hp-actions textarea {
+    width: 100%; min-height: 70px; padding: 10px 12px;
+    border: 1px solid #EAF0F9; border-radius: 10px;
+    resize: vertical; font-size: 13px; color: #17202E;
+    outline: none; font-family: inherit; box-sizing: border-box;
+    background: #FBFCFE;
+}
+#hand-post-modal .hp-actions textarea:focus { border-color: #5B9BF0; background: #fff; }
+#hand-post-modal .hp-buttons {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;
+}
+#hand-post-modal .hp-buttons .btn-small {
+    background: #fff; color: #566579; border: 1px solid #DBE9FA;
+    padding: 8px 16px; font-size: 13px; border-radius: 10px; cursor: pointer;
+    font-family: inherit; font-weight: 600;
+}
+#hand-post-modal .hp-buttons .btn-small:hover {
+    background: #F5FAFF; color: #2A6BC9;
+}
+#hand-post-modal .hp-buttons .btn-mixi {
+    padding: 8px 18px; font-size: 13px; border-radius: 10px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    #sns-screen .mx-feed-head { flex-wrap: wrap; }
+    #sns-screen .mx-feed-post-btn {
+        margin-left: 0; flex: 1 1 auto; margin-top: 6px;
+    }
+    #hand-post-modal .hp-cards-row { flex-wrap: wrap; }
+    #hand-post-modal .hp-cards-label { min-width: 0; }
+}

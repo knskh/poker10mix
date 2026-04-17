@@ -1290,6 +1290,49 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'post_hand': {
+            // Manual post of a hand from user's hand history (win or loss)
+            if (!client.name) break;
+            const caption = typeof msg.caption === 'string' ? msg.caption.trim().slice(0, 500) : '';
+            const raw = msg.handData || {};
+            // Basic validation/sanitization
+            const sanitizeCard = (c) => {
+                if (!c || typeof c !== 'object') return null;
+                const rank = typeof c.rank === 'string' ? c.rank.slice(0, 3) : (typeof c.r === 'string' ? c.r.slice(0, 3) : '');
+                const suit = typeof c.suit === 'string' ? c.suit.slice(0, 2) : (typeof c.s === 'string' ? c.s.slice(0, 2) : '');
+                if (!rank || !suit) return null;
+                return { rank, suit };
+            };
+            const clampCards = (arr, max) => {
+                if (!Array.isArray(arr)) return [];
+                return arr.slice(0, max).map(sanitizeCard).filter(Boolean);
+            };
+            const handData = {
+                gameName: typeof raw.gameName === 'string' ? raw.gameName.slice(0, 40) : 'ポーカー',
+                handRank: typeof raw.handRank === 'string' ? raw.handRank.slice(0, 60) : '',
+                pot: Math.max(-1e9, Math.min(1e9, Number(raw.pot) || 0)),
+                bigBlind: Math.max(1, Math.min(1e7, Number(raw.bigBlind) || 100)),
+                winnerCards: clampCards(raw.winnerCards || raw.myCards, 10),
+                communityCards: clampCards(raw.communityCards, 10),
+                result: raw.result === 'loss' ? 'loss' : 'win',
+            };
+            const reasonLabel = handData.result === 'loss' ? '📝 ハンド共有（敗北）' : '📝 ハンド共有';
+            const title = handData.handRank ? `${reasonLabel}: ${handData.handRank}` : reasonLabel;
+            const post = createPost({
+                authorName: client.name,
+                authorAvatar: client.avatar,
+                type: 'hand',
+                title,
+                body: caption,
+                handData,
+                autoShared: false,
+                manualShared: true
+            });
+            broadcastTimelineUpdate(post);
+            send(ws, { type: 'post_created', post });
+            break;
+        }
+
         case 'add_comment': {
             if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではコメントできません' }); break; }
             if (!client.name) break;

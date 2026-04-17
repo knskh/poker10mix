@@ -581,6 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLobbyScreen();
     setupLobbyBottomTabs();
     setupDMModal();
+    setupHandPostModal();
     setupRoomScreen();
     setupGameScreen();
     setupStatsModal();
@@ -1784,6 +1785,8 @@ function renderHandHistory(containerId) {
             }
         }
         html += `<span class="hh-time-label">${h.time || ''}</span>`;
+        // 📢 投稿 button (post to timeline) — available for win or loss
+        html += `<button class="hh-post-btn" data-hh-post-idx="${i}" title="タイムラインに投稿">📢 投稿</button>`;
         html += `</div>`;
     }
     html += '</div>';
@@ -1793,7 +1796,9 @@ function renderHandHistory(containerId) {
 
     // Click handlers
     container.querySelectorAll('.hh-row').forEach(row => {
-        row.addEventListener('click', () => {
+        row.addEventListener('click', (e) => {
+            // Ignore clicks that originated from the post button
+            if (e.target.closest('.hh-post-btn')) return;
             const idx = parseInt(row.dataset.hhIdx);
             const detail = container.querySelector('.hh-detail');
             // Toggle: if same hand, hide
@@ -1808,6 +1813,112 @@ function renderHandHistory(containerId) {
             detail.classList.remove('hidden');
             detail.innerHTML = renderHandDetail(handHistory[idx], idx);
         });
+    });
+
+    // Post-to-timeline button handlers
+    container.querySelectorAll('.hh-post-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.hhPostIdx);
+            openHandPostModal(idx);
+        });
+    });
+}
+
+// ==========================================
+// Manual hand post (from hand history → timeline)
+// ==========================================
+let pendingHandPostIdx = -1;
+
+function buildHandDataFromHistory(h, myName) {
+    if (!h) return null;
+    // Determine my diff (win/loss) and my final hand rank
+    let diff = 0;
+    let myHandRank = '';
+    if (h.handResult && h.handResult.players) {
+        const me = h.handResult.players.find(p => p.name === myName);
+        if (me) {
+            diff = me.chips - me.startChips;
+            // handResult may include per-player rank via evaluator; keep simple for now.
+        }
+    }
+    // Prefer myCardObjs, fallback to startCards
+    const myCards = (h.myCardObjs && h.myCardObjs.length > 0) ? h.myCardObjs : (h.startCards || []);
+    // Remap {r,s} → {rank,suit} for server
+    const toCard = (c) => ({ rank: c.rank || c.r, suit: c.suit || c.s });
+    const cc = (h.handResult && Array.isArray(h.handResult.communityCards))
+        ? h.handResult.communityCards : (h.communityCardObjs || []);
+    return {
+        gameName: h.gameName || 'ポーカー',
+        handRank: myHandRank,
+        pot: diff,           // positive = win, negative = loss
+        bigBlind: 100,       // default (history doesn't store bb explicitly)
+        winnerCards: myCards.map(toCard),
+        communityCards: cc.map(toCard),
+        result: diff < 0 ? 'loss' : 'win',
+    };
+}
+
+function openHandPostModal(idx) {
+    const h = handHistory[idx];
+    if (!h) return;
+    pendingHandPostIdx = idx;
+    const data = buildHandDataFromHistory(h, client.name);
+    const preview = document.getElementById('hp-preview');
+    if (preview) {
+        const cardsHtml = (data.winnerCards || []).map(c => renderMiniCard({ rank: c.rank, suit: c.suit })).join('');
+        const ccHtml = (data.communityCards || []).map(c => renderMiniCard({ rank: c.rank, suit: c.suit })).join('');
+        const sign = data.pot >= 0 ? '+' : '';
+        const resultLabel = data.result === 'loss' ? '敗北' : '勝利';
+        const potCls = data.pot >= 0 ? 'hp-pot-plus' : 'hp-pot-minus';
+        preview.innerHTML = `
+            <div class="hp-preview-row">
+                <div class="hp-game-tag">${escapeHtml(data.gameName)}</div>
+                <div class="hp-pot ${potCls}">${sign}${data.pot.toLocaleString()} <span class="hp-pot-u">chips · ${resultLabel}</span></div>
+            </div>
+            ${cardsHtml ? `<div class="hp-cards-row"><span class="hp-cards-label">あなたの手札</span><div class="hp-cards">${cardsHtml}</div></div>` : ''}
+            ${ccHtml ? `<div class="hp-cards-row"><span class="hp-cards-label">コミュニティ</span><div class="hp-cards">${ccHtml}</div></div>` : ''}
+        `;
+    }
+    const captionEl = document.getElementById('hp-caption');
+    if (captionEl) captionEl.value = '';
+    document.getElementById('hand-post-modal').classList.remove('hidden');
+    if (captionEl) setTimeout(() => captionEl.focus(), 50);
+}
+
+function closeHandPostModal() {
+    document.getElementById('hand-post-modal').classList.add('hidden');
+    pendingHandPostIdx = -1;
+}
+
+function submitHandPost() {
+    if (pendingHandPostIdx < 0) return;
+    const h = handHistory[pendingHandPostIdx];
+    if (!h) return;
+    const caption = (document.getElementById('hp-caption').value || '').trim();
+    const handData = buildHandDataFromHistory(h, client.name);
+    client.postHand(handData, caption);
+    showToast('タイムラインに投稿しました');
+    closeHandPostModal();
+    // Close history modal too so user sees the feed
+    const histModal = document.getElementById('history-modal');
+    if (histModal) histModal.classList.add('hidden');
+}
+
+function setupHandPostModal() {
+    const closeBtn = document.getElementById('btn-hp-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeHandPostModal);
+    const cancelBtn = document.getElementById('btn-hp-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', closeHandPostModal);
+    const submitBtn = document.getElementById('btn-hp-submit');
+    if (submitBtn) submitBtn.addEventListener('click', submitHandPost);
+    const bd = document.querySelector('#hand-post-modal .rp-backdrop');
+    if (bd) bd.addEventListener('click', closeHandPostModal);
+    // Timeline header "📝 ハンド投稿" button → open hand history modal
+    const headerPostBtn = document.getElementById('mx-btn-post-hand');
+    if (headerPostBtn) headerPostBtn.addEventListener('click', () => {
+        renderHandHistory('lobby-hand-history');
+        document.getElementById('history-modal').classList.remove('hidden');
     });
 }
 
@@ -5017,7 +5128,7 @@ function renderTimeline(posts) {
     // Only show hand-type posts (notable hands)
     const handPosts = (posts || []).filter(p => p.type === 'hand' && p.handData);
     if (handPosts.length === 0) {
-        container.innerHTML = '<div class="mx-empty">まだ注目ハンドがありません。<br>ゲームに参加すると、50BB以上のポット獲得やストレートフラッシュ以上で自動投稿されます。</div>';
+        container.innerHTML = '<div class="mx-empty">まだ投稿がありません。<br>ゲームに参加すると注目ハンドが自動投稿されます。<br>ハンド履歴から「📢 投稿」で手動投稿もできます。</div>';
         return;
     }
     for (const post of handPosts) {
@@ -5042,7 +5153,22 @@ function renderPostEntry(post) {
     const bb = h.bigBlind || 100;
     const bbNum = Math.round(pot / bb);
     const handRank = h.handRank || '';
-    const badge = pickBadge(handRank, bbNum);
+    const isManual = !!post.manualShared || post.autoShared === false;
+    const isLoss = h.result === 'loss' || pot < 0;
+    const badge = isLoss
+        ? { cls: 'loss', label: '😔 敗北' }
+        : pickBadge(handRank, Math.abs(bbNum));
+
+    const sourceLabel = isManual ? '📝 手動投稿' : '⚡ 自動共有';
+    const sign = pot >= 0 ? '+' : '';
+    const amountCls = pot >= 0 ? '' : 'mx-win-amount-neg';
+    const labelText = handRank
+        ? `${handRank} · ${Math.abs(bbNum)}BB ${isLoss ? '喪失' : '獲得'}`
+        : `${Math.abs(bbNum)}BB ${isLoss ? '喪失' : '獲得'}`;
+
+    const captionHtml = post.body
+        ? `<div class="mx-post-caption">${linkifyBody(post.body)}</div>`
+        : '';
 
     const commentCount = (post.comments || []).length;
     const commentsHtml = `
@@ -5060,17 +5186,18 @@ function renderPostEntry(post) {
             <div class="mx-post-avatar">${avatarHtml}</div>
             <div class="mx-post-meta">
                 <div class="mx-post-name">${escapeHtml(post.authorName)}</div>
-                <div class="mx-post-date">${timeAgo(post.createdAt)}${h.gameName ? ' / ' + escapeHtml(h.gameName) : ''}</div>
+                <div class="mx-post-date">${timeAgo(post.createdAt)}${h.gameName ? ' / ' + escapeHtml(h.gameName) : ''} · <span class="mx-post-source">${sourceLabel}</span></div>
             </div>
             <div class="mx-post-badge ${badge.cls}">${badge.label}</div>
         </div>
-        <div class="mx-hand-body">
+        ${captionHtml}
+        <div class="mx-hand-body ${isLoss ? 'mx-hand-body-loss' : ''}">
             <div class="mx-hand-top">
-                <div class="mx-win-amount">+${pot.toLocaleString()}<span class="u">chips</span></div>
+                <div class="mx-win-amount ${amountCls}">${sign}${pot.toLocaleString()}<span class="u">chips</span></div>
                 <span class="mx-game-tag">${escapeHtml(h.gameName || 'Poker')}</span>
             </div>
             ${cardsHtml ? `<div class="mx-cards">${cardsHtml}</div>` : ''}
-            <div class="mx-hand-label">${handRank ? escapeHtml(handRank) + ' · ' : ''}${bbNum}BB 獲得</div>
+            <div class="mx-hand-label">${escapeHtml(labelText)}</div>
             ${ccHtml ? `<div class="mx-cc-row">コミュニティ: <span class="mx-cards" style="display:inline-flex">${ccHtml}</span></div>` : ''}
         </div>
         <div class="mx-post-actions">
@@ -5344,6 +5471,8 @@ client.on('post_created', (post) => {
     if (!snsTimeline.find(p => p.id === post.id)) snsTimeline.unshift(post);
     if (!document.getElementById('sns-screen').classList.contains('hidden')) {
         renderTimeline(snsTimeline);
+    } else {
+        showToast('タイムラインに投稿しました');
     }
 });
 client.on('auto_shared', (post) => {
