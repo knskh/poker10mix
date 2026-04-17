@@ -147,28 +147,24 @@ function addCommentToPost(postId, comment) {
 }
 
 function getTimelineForUser(name) {
-    // Return recent posts from self + followed users (limit 50)
-    const following = getFollowing(name);
-    const allowed = new Set([name, ...following]);
-    return timelineList.filter(p => allowed.has(p.authorName)).slice(0, 50);
+    // Global timeline: all users (including guests) see the same feed.
+    // The `name` argument is kept for API compatibility but no longer filters.
+    return timelineList.slice(0, 50);
 }
 
 function broadcastTimelineUpdate(post) {
-    // Push new post to connected clients who follow the author (or are the author)
+    // Broadcast to every connected client with a name (authenticated or guest).
     for (const [ws, c] of clients) {
         if (!c.name) continue;
-        if (c.name === post.authorName || getFollowing(c.name).includes(post.authorName)) {
-            send(ws, { type: 'timeline_post', post });
-        }
+        send(ws, { type: 'timeline_post', post });
     }
 }
 
 function broadcastCommentUpdate(postId, comment, postAuthor) {
+    // Broadcast to every connected client with a name (authenticated or guest).
     for (const [ws, c] of clients) {
         if (!c.name) continue;
-        if (c.name === postAuthor || c.name === comment.authorName || getFollowing(c.name).includes(postAuthor)) {
-            send(ws, { type: 'timeline_comment', postId, comment });
-        }
+        send(ws, { type: 'timeline_comment', postId, comment });
     }
 }
 
@@ -1375,7 +1371,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'add_comment': {
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではコメントできません' }); break; }
+            // Timeline is shared with everyone (including guests); comments are too.
             if (!client.name) break;
             const postId = Number(msg.postId);
             const body = (msg.body || '').trim();

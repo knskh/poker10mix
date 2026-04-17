@@ -5240,7 +5240,7 @@ function renderPostEntry(post) {
     sendBtn.addEventListener('click', () => {
         const body = input.value.trim();
         if (!body) return;
-        if (!loggedInAccount) { showToast('ログインするとコメントできます'); return; }
+        // Timeline is shared globally — guests can comment too.
         client.addComment(post.id, body);
         input.value = '';
     });
