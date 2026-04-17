@@ -322,7 +322,7 @@ function removeTable(roomId) {
             }
         } else {
             activeTableId = null;
-            showScreen('lobby');
+            showScreen('sns');
         }
     }
     renderTableTabs();
@@ -648,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (rid) {
             removeTable(rid);
         } else {
-            showScreen('lobby');
+            showScreen('sns');
         }
     });
     client.on('game_started', (msg) => {
@@ -746,17 +746,19 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('lobby_chat', onLobbyChat);
     client.on('online_users', (data) => {
         // Backward-compat: data may be array (old) or { users, following } (new)
+        let users;
         if (Array.isArray(data)) {
-            renderOnlineUsers(data);
+            users = data;
         } else {
             if (Array.isArray(data.following)) myFollowing = new Set(data.following);
-            renderOnlineUsers(data.users || []);
+            users = data.users || [];
         }
+        lastOnlineUsers = users;
+        renderOnlineUsers(users);
         if (typeof updateSNSCTACounts === 'function') updateSNSCTACounts();
-        const onlineModal = document.getElementById('online-picker-modal');
-        if (onlineModal && !onlineModal.classList.contains('hidden')) {
-            renderOnlineUsersInModal();
-        }
+        // Update count badge inside chat modal tab
+        const ccEl = document.getElementById('cp-online-count');
+        if (ccEl) ccEl.textContent = `(${users.length})`;
     });
     client.on('follows', (msg) => {
         myFollowing = new Set(msg.following || []);
@@ -803,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('big_hand', onBigHand);
     client.on('auto_kicked', () => {
         alert('10分間離席のため自動退室されました');
-        showScreen('lobby');
+        showScreen('sns');
     });
 
     // 承認制テーブル: 参加リクエスト送信後の待機
@@ -844,13 +846,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // Screen Management
 // ==========================================
 function showScreen(name) {
-    ['login-screen', 'lobby-screen', 'room-screen', 'game-screen', 'sns-screen'].forEach(id => {
+    ['login-screen', 'room-screen', 'game-screen', 'sns-screen'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
     const target = document.getElementById(name + '-screen');
     if (target) target.classList.remove('hidden');
-    if (name === 'lobby') client.getRooms();
     if (name === 'sns') initSNSScreen();
 }
 
@@ -886,31 +887,28 @@ function setupLoginScreen() {
         document.getElementById('login-guest-form').classList.add('hidden');
     });
 
-    // Logout
-    document.getElementById('btn-logout').addEventListener('click', () => {
-        // Guest account: clear hand history and stats on logout
-        if (!loggedInAccount) {
-            handHistory = [];
-            persistHandHistory();
-            localStorage.removeItem(STATS_STORAGE_KEY);
-            localStorage.removeItem(RAW_STATS_KEY);
-            localStorage.removeItem(RAW_ZOOM_STATS_KEY);
-            localStorage.removeItem(STATS_HISTORY_KEY);
-            lastSessionRaw = {};
-        }
-        loggedInAccount = null;
-        showScreen('login');
-    });
+    // Logout (wired directly on main-screen header button)
+    const headerLogoutBtn = document.getElementById('sns-header-logout');
+    if (headerLogoutBtn) headerLogoutBtn.addEventListener('click', doLogout);
+}
+
+function doLogout() {
+    // Guest account: clear hand history and stats on logout
+    if (!loggedInAccount) {
+        handHistory = [];
+        persistHandHistory();
+        localStorage.removeItem(STATS_STORAGE_KEY);
+        localStorage.removeItem(RAW_STATS_KEY);
+        localStorage.removeItem(RAW_ZOOM_STATS_KEY);
+        localStorage.removeItem(STATS_HISTORY_KEY);
+        lastSessionRaw = {};
+    }
+    loggedInAccount = null;
+    showScreen('login');
 }
 
 function enterLobby(displayName) {
     // Unified landing: main screen (sns-screen id is kept for compat)
-    const userEl = document.getElementById('lobby-username');
-    if (userEl) {
-        const avatarSrc = getAvatarSrc(selectedAvatar);
-        userEl.innerHTML = (avatarSrc ? `<img class="lobby-avatar" src="${avatarSrc}" alt="">` : '') +
-            escapeHtml(displayName);
-    }
     showScreen('sns');
     client.getRooms();
 }
@@ -996,45 +994,36 @@ function onAuthResult(data) {
 }
 
 // ==========================================
-// Lobby Screen
+// Global (ex-Lobby) setup — now wires modal + main-screen header buttons
 // ==========================================
 function setupLobbyScreen() {
-    document.getElementById('btn-create-room').addEventListener('click', () => client.createRoom());
-    document.getElementById('btn-join-zoom').addEventListener('click', () => {
-        client.joinZoom();
-    });
-    document.getElementById('btn-join-by-id').addEventListener('click', () => {
-        const id = document.getElementById('room-id-input').value.trim().toUpperCase();
-        if (id.length === 4) client.joinRoom(id);
-    });
-    document.getElementById('room-id-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') document.getElementById('btn-join-by-id').click();
-    });
-    document.getElementById('btn-refresh-rooms').addEventListener('click', () => client.getRooms());
-
-    // Ranking close button
-    document.getElementById('btn-ranking-close').addEventListener('click', () => {
+    // Ranking close button (modal still used by game screen)
+    const rankingClose = document.getElementById('btn-ranking-close');
+    if (rankingClose) rankingClose.addEventListener('click', () => {
         document.getElementById('ranking-modal').classList.add('hidden');
     });
 
-    // Hand history button
-    document.getElementById('btn-lobby-history').addEventListener('click', () => {
+    // Hand history: open/close modal directly from main-screen header
+    const headerHistBtn = document.getElementById('sns-header-history');
+    if (headerHistBtn) headerHistBtn.addEventListener('click', () => {
         renderHandHistory('lobby-hand-history');
         document.getElementById('history-modal').classList.remove('hidden');
     });
-    document.getElementById('btn-history-close').addEventListener('click', () => {
+    const histCloseBtn = document.getElementById('btn-history-close');
+    if (histCloseBtn) histCloseBtn.addEventListener('click', () => {
         document.getElementById('history-modal').classList.add('hidden');
     });
 }
 
+// renderRoomList is now a no-op — the main screen uses renderRailRooms exclusively.
 function renderRoomList(data) {
+    // no-op: kept for backward compatibility with call sites. Rail is rendered via renderRailRooms.
+    return;
+    // eslint-disable-next-line
     const rooms = Array.isArray(data) ? data : (data.rooms || []);
     const zoomCount = data.zoomCount || 0;
-
-    // Update zoom player count
     const zoomBtn = document.getElementById('btn-join-zoom');
-    if (zoomBtn) zoomBtn.textContent = `Zoom卓に参加${zoomCount > 0 ? ' (' + zoomCount + '人)' : ''}`;
-
+    if (zoomBtn) zoomBtn.textContent = '';
     const container = document.getElementById('room-list-body');
     container.innerHTML = '';
     if (!rooms || rooms.length === 0) {
@@ -1151,7 +1140,7 @@ function setupRoomScreen() {
     document.getElementById('btn-leave-room').addEventListener('click', () => {
         client.leaveRoom(activeTableId);
         if (activeTableId) removeTable(activeTableId);
-        else showScreen('lobby');
+        else showScreen('sns');
     });
 
     // Lock toggle (承認制テーブル)
@@ -1460,7 +1449,7 @@ function setupGameScreen() {
         if (confirm('ルームに戻りますか？（ゲームを離脱します）')) {
             client.leaveRoom(activeTableId);
             if (activeTableId) removeTable(activeTableId);
-            else showScreen('lobby');
+            else showScreen('sns');
         }
     });
 
@@ -1680,7 +1669,7 @@ function onZoomLeft() {
     document.getElementById('btn-zoom-exit').classList.add('hidden');
     document.getElementById('btn-back-room').classList.remove('hidden');
     saveCurrentHand();
-    showScreen('lobby');
+    showScreen('sns');
 }
 
 function onZoomSitout() {
@@ -2962,7 +2951,7 @@ function showSessionSummary(ranking) {
     lobbyBtn.onclick = () => {
         overlay.classList.add('hidden');
         // Table is already removed by game_over handler
-        if (tables.size === 0) showScreen('lobby');
+        if (tables.size === 0) showScreen('sns');
     };
 
     const shareBtn = document.getElementById('btn-ss-share');
@@ -3257,7 +3246,9 @@ function setupStatsModal() {
     document.getElementById('btn-stats-close').addEventListener('click', () => {
         document.getElementById('stats-modal').classList.add('hidden');
     });
-    document.getElementById('btn-lobby-stats').addEventListener('click', () => {
+    // Stats: open directly from main-screen header
+    const headerStatsBtn = document.getElementById('sns-header-stats');
+    if (headerStatsBtn) headerStatsBtn.addEventListener('click', () => {
         renderStatsFromStorage();
         document.getElementById('stats-modal').classList.remove('hidden');
     });
@@ -3808,7 +3799,7 @@ function setupChat() {
             if (e.key === 'Enter') send.click();
         });
     }
-    hookChatInput('lobby-chat-input', 'btn-lobby-chat-send');
+    hookChatInput('cp-chat-input', 'btn-cp-chat-send');
     hookChatInput('room-chat-input', 'btn-room-chat-send');
     hookChatInput('game-chat-input', 'btn-game-chat-send');
 
@@ -3912,23 +3903,25 @@ function onChat(data) {
 }
 
 function onLobbyChat(data) {
-    // Lobby chat only
-    appendChatMsg('lobby-chat-log', data.from, data.message);
+    // Lobby chat lives inside the chat-picker-modal now.
+    appendChatMsg('cp-chat-log', data.from, data.message);
+    // Show unread badge on floating chat button if modal is closed
+    const modal = document.getElementById('chat-picker-modal');
+    if (modal && modal.classList.contains('hidden')) {
+        const badge = document.getElementById('mx-fab-badge');
+        if (badge) {
+            const cur = parseInt(badge.textContent || '0', 10) || 0;
+            badge.textContent = String(cur + 1);
+            badge.classList.remove('hidden');
+        }
+    }
 }
 
 // ==========================================
 // Online User List
 // ==========================================
 function setupLobbyBottomTabs() {
-    document.querySelectorAll('.lobby-bottom-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.lobby-bottom-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            const target = tab.dataset.tab;
-            document.getElementById('lobby-tab-chat').classList.toggle('hidden', target !== 'chat');
-            document.getElementById('lobby-tab-online').classList.toggle('hidden', target !== 'online');
-        });
-    });
+    // no-op: lobby screen removed; tabs now live inside chat-picker-modal (switchChatTab).
 }
 
 function renderOnlineUsers(users) {
@@ -4762,22 +4755,8 @@ function renderRailRooms(rooms) {
 }
 
 function setupSNSEvents() {
-    // Header action buttons (proxy to hidden lobby buttons)
-    const statsBtn = document.getElementById('sns-header-stats');
-    if (statsBtn) statsBtn.addEventListener('click', () => {
-        const lobbyStatsBtn = document.getElementById('btn-lobby-stats');
-        if (lobbyStatsBtn) lobbyStatsBtn.click();
-    });
-    const histBtn = document.getElementById('sns-header-history');
-    if (histBtn) histBtn.addEventListener('click', () => {
-        const lobbyHistBtn = document.getElementById('btn-lobby-history');
-        if (lobbyHistBtn) lobbyHistBtn.click();
-    });
-    const logoutBtn = document.getElementById('sns-header-logout');
-    if (logoutBtn) logoutBtn.addEventListener('click', () => {
-        const lobbyLogoutBtn = document.getElementById('btn-logout');
-        if (lobbyLogoutBtn) lobbyLogoutBtn.click();
-    });
+    // sns-header-stats / sns-header-history / sns-header-logout are wired directly in
+    // setupStatsModal / setupLobbyScreen / setupLoginScreen.
 
     // Play rail actions
     const btnCreate = document.getElementById('mx-btn-create');
@@ -4827,22 +4806,15 @@ function setupSNSEvents() {
         if (e.key === 'Enter') document.getElementById('btn-rp-join-by-id').click();
     });
 
-    // Online picker modal (kept for legacy; not surfaced in main UI anymore)
-    const btnOpClose = document.getElementById('btn-op-close');
-    if (btnOpClose) btnOpClose.addEventListener('click', closeOnlineModal);
-    const opBd = document.querySelector('#online-picker-modal .rp-backdrop');
-    if (opBd) opBd.addEventListener('click', closeOnlineModal);
-
-    // Chat picker modal (lobby chat)
+    // Chat picker modal (chat tab + online tab)
     const btnCpClose = document.getElementById('btn-cp-close');
     if (btnCpClose) btnCpClose.addEventListener('click', closeChatModal);
     const cpBd = document.querySelector('#chat-picker-modal .rp-backdrop');
     if (cpBd) cpBd.addEventListener('click', closeChatModal);
-    const btnCpSend = document.getElementById('btn-cp-chat-send');
-    if (btnCpSend) btnCpSend.addEventListener('click', sendChatModalMsg);
-    const cpInput = document.getElementById('cp-chat-input');
-    if (cpInput) cpInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendChatModalMsg();
+    // Chat send/keydown are wired in setupChat via hookChatInput('cp-chat-input', 'btn-cp-chat-send')
+    // Tab buttons
+    document.querySelectorAll('#chat-picker-modal .cp-tab').forEach(el => {
+        el.addEventListener('click', () => switchChatTab(el.dataset.cpTab));
     });
 
     // Auto-share modal handlers
@@ -4915,21 +4887,14 @@ function renderRoomModalList() {
     }
 }
 
-// ---- Online picker modal ----
+// ---- Online picker modal (removed; online list now lives inside chat modal) ----
 function openOnlineModal() {
-    document.getElementById('online-picker-modal').classList.remove('hidden');
-    // Re-render into modal container
-    renderOnlineUsersInModal();
+    // Redirect to the chat modal's online tab
+    openChatModal();
+    switchChatTab('online');
 }
-function closeOnlineModal() {
-    document.getElementById('online-picker-modal').classList.add('hidden');
-}
-function renderOnlineUsersInModal() {
-    const container = document.getElementById('op-user-list');
-    if (!container) return;
-    // Clone the online-user-list markup from lobby by rendering the cached list
-    const temp = renderOnlineUsersInto(container, lastOnlineUsers || []);
-}
+function closeOnlineModal() { /* no-op */ }
+function renderOnlineUsersInModal() { /* no-op */ }
 function renderOnlineUsersInto(container, users) {
     container.innerHTML = '';
     const statusOrder = { lobby: 0, playing: 1, zoom: 2 };
@@ -4990,33 +4955,37 @@ function renderOnlineUsersInto(container, users) {
     }
 }
 
-// ---- Chat picker modal (lobby chat) ----
+// ---- Chat picker modal (lobby chat + online users tabs) ----
 function openChatModal() {
     document.getElementById('chat-picker-modal').classList.remove('hidden');
-    // Sync log from lobby to modal
-    const lobbyLog = document.getElementById('lobby-chat-log');
-    const modalLog = document.getElementById('cp-chat-log');
-    if (lobbyLog && modalLog) {
-        modalLog.innerHTML = lobbyLog.innerHTML;
-        modalLog.scrollTop = modalLog.scrollHeight;
-    }
-    document.getElementById('cp-chat-input').focus();
+    // Clear unread badge
+    const badge = document.getElementById('mx-fab-badge');
+    if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+    // Default to chat tab
+    switchChatTab('chat');
+    const input = document.getElementById('cp-chat-input');
+    if (input) input.focus();
+    const log = document.getElementById('cp-chat-log');
+    if (log) log.scrollTop = log.scrollHeight;
 }
 function closeChatModal() {
     document.getElementById('chat-picker-modal').classList.add('hidden');
 }
 function sendChatModalMsg() {
-    const input = document.getElementById('cp-chat-input');
-    const msg = input.value.trim();
-    if (!msg) return;
-    // Reuse lobby chat send flow
-    const lobbyInput = document.getElementById('lobby-chat-input');
-    if (lobbyInput) {
-        lobbyInput.value = msg;
-        const sendBtn = document.getElementById('btn-lobby-chat-send');
-        if (sendBtn) sendBtn.click();
+    // No-op: actual sending handled by hookChatInput('cp-chat-input', 'btn-cp-chat-send') in setupChat.
+    // Left here so setupSNSEvents' extra keydown listener won't double-send.
+}
+function switchChatTab(tab) {
+    const tabs = document.querySelectorAll('#chat-picker-modal .cp-tab');
+    tabs.forEach(el => el.classList.toggle('active', el.dataset.cpTab === tab));
+    const chatView = document.getElementById('cp-view-chat');
+    const onlineView = document.getElementById('cp-view-online');
+    if (chatView) chatView.classList.toggle('hidden', tab !== 'chat');
+    if (onlineView) onlineView.classList.toggle('hidden', tab !== 'online');
+    if (tab === 'online') {
+        // Re-render online users with latest cache
+        renderOnlineUsers(lastOnlineUsers || []);
     }
-    input.value = '';
 }
 
 function switchSNSTab(tab) {

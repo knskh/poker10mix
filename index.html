@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=45">
+    <link rel="stylesheet" href="css/style.css?v=46">
 </head>
 <body>
     <div id="app">
@@ -48,50 +48,6 @@
                         <div class="avatar-grid" id="avatar-grid"></div>
                     </div>
                     <button id="btn-account-submit" class="btn-primary">ログイン</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Lobby Screen (hidden, kept for backward compatibility / internal proxy) -->
-        <div id="lobby-screen" class="hidden">
-            <div class="lobby-header">
-                <img class="site-logo-lobby" src="logos/mix_1_logo_minimalist_1775651849102.png" alt="mix-1">
-                <div class="lobby-user">
-                    <span id="lobby-username"></span>
-                    <button id="btn-lobby-stats" class="btn-small">Stats</button>
-                    <button id="btn-lobby-history" class="btn-small">ハンド履歴</button>
-                    <button id="btn-logout">ログアウト</button>
-                </div>
-            </div>
-            <div class="lobby-body">
-                <div class="lobby-rooms">
-                    <h2>ルーム一覧</h2>
-                    <div class="room-actions">
-                        <button id="btn-create-room" class="btn-primary">ルーム作成</button>
-                        <button id="btn-join-zoom" class="btn-primary btn-zoom">Zoom卓に参加</button>
-                        <div class="join-by-id">
-                            <input type="text" id="room-id-input" placeholder="ルームID" maxlength="4" style="text-transform:uppercase">
-                            <button id="btn-join-by-id" class="btn-small">参加</button>
-                        </div>
-                        <button id="btn-refresh-rooms" class="btn-small">更新</button>
-                    </div>
-                    <div id="room-list-body" class="room-card-grid"></div>
-                </div>
-            </div>
-            <div class="room-chat hidden">
-                <div class="lobby-bottom-tabs">
-                    <button class="lobby-bottom-tab active" id="tab-lobby-chat" data-tab="chat">チャット</button>
-                    <button class="lobby-bottom-tab" id="tab-lobby-online" data-tab="online">ユーザーリスト</button>
-                </div>
-                <div id="lobby-tab-chat">
-                    <div id="lobby-chat-log" class="room-chat-log"></div>
-                    <div class="chat-bar">
-                        <input type="text" id="lobby-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
-                        <button id="btn-lobby-chat-send" class="btn-small">送信</button>
-                    </div>
-                </div>
-                <div id="lobby-tab-online" class="hidden">
-                    <div id="online-user-list" class="online-user-list"></div>
                 </div>
             </div>
         </div>
@@ -169,32 +125,26 @@
             </div>
         </div>
 
-        <!-- Online users modal -->
-        <div id="online-picker-modal" class="rp-modal hidden">
-            <div class="rp-backdrop"></div>
-            <div class="rp-content">
-                <div class="rp-header">
-                    <div class="rp-title">👥 オンラインユーザー</div>
-                    <button class="rp-close" id="btn-op-close">✕</button>
-                </div>
-                <div id="op-user-list" class="online-user-list"></div>
-            </div>
-        </div>
-
-        <!-- Lobby chat modal -->
+        <!-- Lobby chat modal (with tabs: chat / online) -->
         <div id="chat-picker-modal" class="rp-modal hidden">
             <div class="rp-backdrop"></div>
             <div class="rp-content">
                 <div class="rp-header">
-                    <div class="rp-title">💬 ロビーチャット</div>
+                    <div class="cp-tabs">
+                        <button class="cp-tab active" id="cp-tab-chat" data-cp-tab="chat">💬 チャット</button>
+                        <button class="cp-tab" id="cp-tab-online" data-cp-tab="online">👥 オンライン <span id="cp-online-count"></span></button>
+                    </div>
                     <button class="rp-close" id="btn-cp-close">✕</button>
                 </div>
-                <div class="cp-chat-wrap">
+                <div class="cp-chat-wrap" id="cp-view-chat">
                     <div id="cp-chat-log" class="room-chat-log"></div>
                     <div class="chat-bar">
                         <input type="text" id="cp-chat-input" placeholder="チャット..." maxlength="200" autocomplete="off">
                         <button id="btn-cp-chat-send" class="btn-small">送信</button>
                     </div>
+                </div>
+                <div class="cp-online-wrap hidden" id="cp-view-online">
+                    <div id="online-user-list" class="online-user-list"></div>
                 </div>
             </div>
         </div>
@@ -523,6 +473,6 @@
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
     <script src="js/ui.js?v=37"></script>
-    <script src="js/app.js?v=40"></script>
+    <script src="js/app.js?v=41"></script>
 </body>
 </html>
