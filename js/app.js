@@ -4766,13 +4766,16 @@ function renderTimeline(posts) {
     const container = document.getElementById('sns-timeline');
     if (!container) return;
     container.innerHTML = '';
-    // Only show hand-type posts (notable hands)
-    const handPosts = (posts || []).filter(p => p.type === 'hand' && p.handData);
-    if (handPosts.length === 0) {
+    // Show hand posts (notable hands / manual) and session summary posts.
+    const visible = (posts || []).filter(p =>
+        (p.type === 'hand' && p.handData) ||
+        (p.type === 'session' && p.sessionData)
+    );
+    if (visible.length === 0) {
         container.innerHTML = '<div class="mx-empty">まだ投稿がありません。<br>ゲームに参加すると注目ハンドが自動投稿されます。<br>ハンド履歴から「📢 投稿」で手動投稿もできます。</div>';
         return;
     }
-    for (const post of handPosts) {
+    for (const post of visible) {
         container.appendChild(renderPostEntry(post));
     }
 }
@@ -4781,7 +4784,10 @@ function renderRankings(period, posts) {
     const container = document.getElementById('sns-timeline');
     if (!container) return;
     container.innerHTML = '';
-    const handPosts = (posts || []).filter(p => p.type === 'hand' && p.handData);
+    const handPosts = (posts || []).filter(p =>
+        (p.type === 'hand' && p.handData) ||
+        (p.type === 'session' && p.sessionData)
+    );
     if (handPosts.length === 0) {
         const label = period === 'weekly' ? '今週' : '全期間';
         container.innerHTML = `<div class="mx-empty">${label}のランキングがまだありません。<br>ハンドにいいね❤️を押してランキングを作りましょう！</div>`;
@@ -4835,6 +4841,11 @@ function setupFeedTabs() {
 }
 
 function renderPostEntry(post) {
+    // Session summary posts have their own compact card layout.
+    if (post.type === 'session' && post.sessionData) {
+        return renderSessionPostEntry(post);
+    }
+
     const wrap = document.createElement('div');
     wrap.className = 'mx-post';
     wrap.dataset.postId = post.id;
@@ -5065,6 +5076,127 @@ function buildReplayUrlFromHash(hash) {
     if (!hash) return '';
     const base = window.location.href.replace(/\/[^/]*$/, '/');
     return base + 'replay.html#' + hash;
+}
+
+// Render a session-summary post (type: 'session').
+// Shows hand count, duration, and all participants' chip P/L, ranked.
+function renderSessionPostEntry(post) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mx-post mx-session-post';
+    wrap.dataset.postId = post.id;
+
+    const sd = post.sessionData || {};
+    const players = Array.isArray(sd.players) ? sd.players : [];
+    const handsPlayed = sd.handsPlayed || 0;
+    const durationMin = Math.max(1, Math.round((sd.durationMs || 0) / 60000));
+
+    // Commenting/like wiring reuses the same helpers as hand posts.
+    const commentCount = (post.comments || []).length;
+    const likeCount = post.likeCount != null ? post.likeCount : ((post.likes || []).length);
+    const likedByMe = Array.isArray(post.likes) && client.name && post.likes.includes(client.name);
+
+    const playerRowsHtml = players.map((p, i) => {
+        const sign = p.diff >= 0 ? '+' : '';
+        const diffCls = p.diff > 0 ? 'diff-win' : p.diff < 0 ? 'diff-loss' : 'diff-even';
+        const rankLabelStr = (i === 0 && p.diff > 0) ? '🏆'
+                          : (i === players.length - 1 && p.diff < 0) ? '😔'
+                          : `${i + 1}`;
+        const avatarHtml = p.avatar
+            ? `<img src="avatars/${p.avatar}.svg" alt="">`
+            : escapeHtml((p.name || '?').charAt(0).toUpperCase());
+        const tag = p.leftEarly ? '<span class="sess-tag">途中退室</span>' : '';
+        return `
+            <div class="sess-row ${diffCls}">
+                <span class="sess-rank">${rankLabelStr}</span>
+                <span class="sess-avatar">${avatarHtml}</span>
+                <span class="sess-name">${escapeHtml(p.name)}${tag}</span>
+                <span class="sess-diff">${sign}${Number(p.diff || 0).toLocaleString()}</span>
+            </div>
+        `;
+    }).join('');
+
+    const commentsHtml = `
+        <div class="mx-comments" data-post-id="${post.id}">
+            ${renderCommentsTree(post.comments || [])}
+            <div class="mx-comment-input mx-comment-top-input" data-parent="">
+                <input type="text" placeholder="コメントする…" maxlength="500">
+                <button>送信</button>
+            </div>
+        </div>
+    `;
+
+    wrap.innerHTML = `
+        <div class="mx-post-head">
+            <div class="mx-post-avatar sess-avatar-big">🎲</div>
+            <div class="mx-post-meta">
+                <div class="mx-post-name">テーブル ${escapeHtml(sd.tableId || '')} 終了</div>
+                <div class="mx-post-date">${timeAgo(post.createdAt)} · ${escapeHtml(sd.gameName || '')}</div>
+            </div>
+            <div class="mx-post-badge pot">📊 セッション</div>
+        </div>
+        <div class="mx-session-body">
+            <div class="sess-meta">
+                <span><b>${handsPlayed}</b> ハンド</span>
+                <span>·</span>
+                <span><b>${durationMin}</b> 分</span>
+                <span>·</span>
+                <span><b>${players.length}</b> 人参加</span>
+            </div>
+            <div class="sess-rows">${playerRowsHtml}</div>
+        </div>
+        <div class="mx-post-actions">
+            <button type="button" class="act-like ${likedByMe ? 'liked' : ''}">
+                <span class="like-heart">${likedByMe ? '❤️' : '🤍'}</span>
+                <span class="like-count">${likeCount}</span>
+            </button>
+            <span class="act-comments">💬 ${commentCount}</span>
+        </div>
+        ${commentsHtml}
+    `;
+
+    // Like button
+    const likeBtn = wrap.querySelector('.act-like');
+    if (likeBtn) {
+        likeBtn.addEventListener('click', () => {
+            if (!client.name) { showToast('名前を設定するといいねできます'); return; }
+            client.likePost(post.id);
+            const now = !likeBtn.classList.contains('liked');
+            likeBtn.classList.toggle('liked', now);
+            const heart = likeBtn.querySelector('.like-heart');
+            if (heart) heart.textContent = now ? '❤️' : '🤍';
+            const cntEl = likeBtn.querySelector('.like-count');
+            if (cntEl) {
+                const cur = parseInt(cntEl.textContent, 10) || 0;
+                cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
+            }
+            if (now) likeBtn.classList.add('pop');
+            setTimeout(() => likeBtn.classList.remove('pop'), 320);
+        });
+    }
+
+    // Top-level comment send (reuses same pattern as hand post)
+    const topInput = wrap.querySelector('.mx-comment-top-input input');
+    const topSend = wrap.querySelector('.mx-comment-top-input button');
+    if (topInput && topSend) {
+        topSend.addEventListener('click', () => {
+            const body = topInput.value.trim();
+            if (!body) return;
+            client.addComment(post.id, body, null);
+            topInput.value = '';
+        });
+        topInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') topSend.click();
+        });
+    }
+
+    // Wire comment interactions for existing comments
+    wrap.querySelectorAll('.mx-comment').forEach(cEl => {
+        const commentId = Number(cEl.dataset.commentId);
+        const comment = (post.comments || []).find(c => c.id === commentId);
+        if (comment) wireCommentInteractions(cEl, post, comment);
+    });
+
+    return wrap;
 }
 
 function pickBadge(handRank, bbNum) {

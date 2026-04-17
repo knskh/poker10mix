@@ -129,10 +129,11 @@ function createPost(post) {
         id: nextPostId++,
         authorName: post.authorName || '',
         authorAvatar: post.authorAvatar || null,
-        type: post.type || 'diary', // 'hand' | 'diary' | 'community'
+        type: post.type || 'diary', // 'hand' | 'diary' | 'community' | 'session'
         title: (post.title || '').slice(0, 100),
         body: (post.body || '').slice(0, 2000),
         handData: post.handData || null,
+        sessionData: post.sessionData || null,
         mood: post.mood || null,
         autoShared: !!post.autoShared,
         manualShared: !!post.manualShared,
@@ -1615,10 +1616,75 @@ function hasActiveMemberInRoom(room) {
     return false;
 }
 
+// Build a session summary for a room at close time.
+// Returns null if no hands were played (e.g. game never started).
+function buildSessionSummary(room) {
+    if (!room || !room.handsPlayed) return null;
+    const startingChips = (room.settings && room.settings.startingChips) || 10000;
+    const gameName = (room.game && room.game.gameConfig && room.game.gameConfig.name) || 'ポーカー';
+    const rebuys = room.totalRebuys || {};
+    const participants = room.sessionParticipants || {};
+    // Collect final chip totals. Primary source: game.players (still seated).
+    // For players who left mid-session we rely on participants but can't know their final chips,
+    // so they're recorded as "退室" with invested only (diff = -invested relative to their stake left on the table).
+    const finalByName = {};
+    if (room.game && room.game.players) {
+        for (const p of room.game.players) {
+            if (p.name) finalByName[p.name] = p.chips;
+        }
+    }
+    const players = [];
+    for (const name of Object.keys(participants)) {
+        const rebuyAmount = rebuys[name] || 0;
+        const invested = startingChips + rebuyAmount;
+        const endChips = (name in finalByName) ? finalByName[name] : 0;
+        const diff = endChips - invested;
+        players.push({
+            name,
+            avatar: (participants[name] && participants[name].avatar) || null,
+            invested,
+            endChips,
+            diff,
+            leftEarly: !(name in finalByName),
+        });
+    }
+    // Sort: biggest winners first, biggest losers last
+    players.sort((a, b) => b.diff - a.diff);
+    return {
+        tableId: room.id,
+        gameName,
+        handsPlayed: room.handsPlayed || 0,
+        durationMs: room.sessionStart ? Date.now() - room.sessionStart : 0,
+        players,
+    };
+}
+
+// Create a session-summary post on the timeline and broadcast it.
+function postSessionSummary(room, reason) {
+    const summary = buildSessionSummary(room);
+    if (!summary || !summary.players || summary.players.length === 0) return;
+    // Pick the winner as author (the biggest positive diff). If none positive,
+    // use the top of the sorted list (smallest loss).
+    const top = summary.players[0];
+    const post = createPost({
+        authorName: top.name,
+        authorAvatar: top.avatar || null,
+        type: 'session',
+        title: `テーブル ${room.id} セッション終了`,
+        body: '',
+        sessionData: summary,
+        autoShared: true,
+    });
+    broadcastTimelineUpdate(post);
+}
+
 // Delete a room: clear timers, evict remaining members, remove from map,
-// broadcast lobby update.
+// broadcast lobby update. Also posts the session summary to the timeline if
+// at least one hand was played.
 function deleteRoomAndEvict(room, reason) {
     if (!room) return;
+    // Post session summary before tearing down so buildSessionSummary sees room state.
+    try { postSessionSummary(room, reason); } catch (e) { console.warn('postSessionSummary failed:', e && e.message); }
     if (room.pending) { try { clearTimeout(room.pending.timer); } catch {} room.pending = null; }
     // Notify + detach any remaining members (sitout players stay in room until this runs)
     for (const m of [...(room.members || [])]) {
@@ -1978,6 +2044,15 @@ function startGame(room) {
         room.stats.endHand(game.players, hadShowdown);
         broadcastStatsUpdate(room);
 
+        // Session tracking: increment hand count and refresh participant list.
+        room.handsPlayed = (room.handsPlayed || 0) + 1;
+        if (!room.sessionParticipants) room.sessionParticipants = {};
+        for (const p of game.players) {
+            if (p.name && !room.sessionParticipants[p.name]) {
+                room.sessionParticipants[p.name] = { avatar: p.avatar || null };
+            }
+        }
+
         // Big hand detection → broadcast to lobby
         const bigBlind = (gc && gc.bigBlind) || game.bigBlind || 100;
         const potThreshold = bigBlind * 50;
@@ -2031,6 +2106,17 @@ function startGame(room) {
 
     room.game = game;
     room.playing = true;
+    // Session tracking (for session summary when room closes)
+    if (!room.sessionStart) room.sessionStart = Date.now();
+    if (room.handsPlayed == null) room.handsPlayed = 0;
+    // Snapshot initial participants (name → avatar) so we can show avatars even
+    // if a player leaves before the session ends.
+    if (!room.sessionParticipants) room.sessionParticipants = {};
+    for (const m of room.members) {
+        if (m.name && !room.sessionParticipants[m.name]) {
+            room.sessionParticipants[m.name] = { avatar: m.avatar || null };
+        }
+    }
 
     broadcastToRoom(room, { type: 'game_started' });
     broadcastRoomList();
