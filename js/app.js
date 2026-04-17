@@ -5384,18 +5384,11 @@ function pickBadge(handRank, bbNum) {
 }
 
 function renderMiniCard(c) {
-    if (!c) return '';
-    // Accept both {rank,suit} (server/timeline) and {r,s} (stored history) formats
-    const rawRank = c.rank != null ? c.rank : c.r;
-    const rawSuit = c.suit != null ? c.suit : c.s;
-    if (rawRank == null || rawSuit == null) return '';
-    // Translate numeric ranks to letters (11=J, 12=Q, 13=K, 14=A)
-    const rankMap = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-    const rank = rankMap[rawRank] || String(rawRank);
-    const suitMap = { h: '♥', d: '♦', s: '♠', c: '♣' };
-    const suit = suitMap[rawSuit] || rawSuit || '?';
-    const isRed = rawSuit === 'h' || rawSuit === 'd';
-    return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(rank)}${suit}</span>`;
+    // Accept both {rank,suit} and {r,s} forms via normalizeCard (utils.js)
+    const n = normalizeCard(c);
+    if (!n) return '';
+    const isRed = n.suit === 'h' || n.suit === 'd';
+    return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(rankLabel(n.rank))}${suitSymbol(n.suit)}</span>`;
 }
 
 function renderCommentHtml(c, isReply) {
@@ -5422,15 +5415,8 @@ function renderCommentHtml(c, isReply) {
     `;
 }
 
-// Convert @mentions in text into blue highlights (safe: does its own escaping)
-function linkifyMentions(raw) {
-    const text = String(raw == null ? '' : raw);
-    // Escape HTML first, then replace @mentions
-    const escaped = text.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    return escaped
-        .replace(/@([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)/g, '<span class="mx-mention">@$1</span>')
-        .replace(/\n/g, '<br>');
-}
+// linkifyMentions / escapeHtml / linkifyBody / formatDateJP / timeAgo
+// are provided by js/utils.js (loaded before this script).
 
 function showAutoShareModal(post) {
     snsLastAutoShare = post;
@@ -5449,34 +5435,6 @@ function showAutoShareModal(post) {
 function hideAutoShareModal() {
     document.getElementById('auto-share-modal').classList.add('hidden');
     snsLastAutoShare = null;
-}
-
-// ---- utility helpers ----
-function escapeHtml(s) {
-    if (s == null) return '';
-    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
-
-function linkifyBody(s) {
-    return escapeHtml(s || '').replace(/\n/g, '<br>');
-}
-
-function formatDateJP(ts) {
-    const d = new Date(ts);
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${y}年${m}月${day}日 ${hh}:${mm}`;
-}
-
-function timeAgo(ts) {
-    const diff = Date.now() - ts;
-    if (diff < 60000) return 'たった今';
-    if (diff < 3600000) return `${Math.floor(diff/60000)}分前`;
-    if (diff < 86400000) return `${Math.floor(diff/3600000)}時間前`;
-    return `${Math.floor(diff/86400000)}日前`;
 }
 
 // ---- Wire up SNS events to the websocket client ----
