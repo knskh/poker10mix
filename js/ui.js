@@ -238,18 +238,22 @@ class PokerUI {
         // Between seat edge and table center, shifted inward for clarity
         // Bet chip positions keyed by visual seat class
         const isMobile = window.innerWidth <= 600;
+        const playerCount = s.players.length;
+        const isHeadsUp = playerCount === 2;
         const betPosByClass = isMobile ? {
             'seat-bottom':       [50, 68],
             'seat-bottom-left':  [30, 62],
             'seat-top-left':     [30, 36],
-            'seat-top':          [50, 28],
+            // Heads-up: push opponent chip further up to avoid overlapping pot at 32%
+            'seat-top':          isHeadsUp ? [50, 18] : [50, 28],
             'seat-top-right':    [70, 36],
             'seat-bottom-right': [70, 62],
         } : {
             'seat-bottom':       [50, 72],
             'seat-bottom-left':  [28, 68],
             'seat-top-left':     [28, 30],
-            'seat-top':          [50, 20],
+            // Heads-up on desktop: slight extra lift (pot at 32%)
+            'seat-top':          isHeadsUp ? [50, 12] : [50, 20],
             'seat-top-right':    [72, 30],
             'seat-bottom-right': [72, 68],
         };

@@ -709,14 +709,31 @@ img.room-card-avatar { background: none; }
     overflow: hidden;
 }
 
-#top-bar {
-    display: flex; align-items: center; justify-content: flex-start;
-    gap: 10px; padding: 6px 12px;
-    background: #111318; border-bottom: 1px solid #2a2d35;
-    height: 40px; flex-shrink: 0;
+/* #top-bar: removed from layout. Styles retained as a no-op in case of legacy references. */
+#top-bar { display: none; }
+.hidden-compat { display: none !important; }
+
+/* Game name pill — floats on the top-left of the felt */
+.game-name-pill {
+    position: absolute;
+    top: 52px;    /* below table-tabs bar */
+    left: 10px;
+    z-index: 90;
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,215,0,0.2);
+    color: var(--text);
+    font-size: 12px; font-weight: 700;
+    padding: 4px 10px; border-radius: 14px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    pointer-events: none;
+    max-width: calc(100vw - 20px);
+    overflow: hidden; text-overflow: ellipsis;
 }
-#game-name { font-size: 16px; font-weight: bold; color: var(--text); }
-#game-rotation { font-size: 13px; color: var(--text-dim); }
+.game-name-pill .game-type-badge {
+    font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700;
+}
 
 /* Hamburger menu */
 #top-bar-menu-wrap { position: relative; }
@@ -1680,13 +1697,24 @@ img.room-card-avatar { background: none; }
 .bhf-winner { color: #ffd54f; font-weight: 700; }
 .bhf-pot { color: #4fc3f7; font-weight: 700; }
 
-/* Multi-table tabs */
+/* Unified top bar: multi-table tabs + hamburger menu on the right */
 #table-tabs {
-    display: flex; gap: 4px; padding: 4px 8px;
-    background: rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.08);
-    overflow-x: auto; flex-shrink: 0;
+    display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+    background: #111318; border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+    height: 40px; box-sizing: border-box;
 }
 #table-tabs.hidden { display: none; }
+#table-tabs-list {
+    display: flex; gap: 4px;
+    overflow-x: auto; flex: 1; min-width: 0;
+    scrollbar-width: thin;
+}
+#table-tabs-list::-webkit-scrollbar { height: 4px; }
+#table-tabs-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+#table-tabs #top-bar-menu-wrap {
+    flex-shrink: 0; position: relative; margin-left: auto;
+}
 .table-tab {
     display: flex; align-items: center; gap: 6px;
     padding: 6px 12px; font-size: 12px; font-weight: 600;
@@ -2102,10 +2130,10 @@ img.room-card-avatar { background: none; }
     .room-players { min-width: unset; width: 100%; }
 
     /* --- Game Screen --- */
-    #top-bar { height: 36px; gap: 6px; padding: 4px 8px; }
-    #game-name { font-size: 13px; }
+    #table-tabs { height: 36px; gap: 6px; padding: 4px 8px; }
+    .game-name-pill { top: 42px; font-size: 11px; padding: 3px 8px; }
+    .game-name-pill .game-type-badge { font-size: 8px; padding: 1px 4px; }
     .game-type-badge { font-size: 8px; padding: 1px 4px; margin-left: 4px; }
-    #game-rotation { font-size: 11px; }
     #btn-hamburger { padding: 6px 10px; font-size: 14px; }
 
     /* Table - mobile rail */
@@ -2264,9 +2292,8 @@ img.room-card-avatar { background: none; }
    RESPONSIVE - Landscape Mobile
    ============================================================ */
 @media (max-height: 500px) and (orientation: landscape) {
-    #top-bar { height: 28px; padding: 2px 8px; }
-    #game-name { font-size: 11px; }
-    #game-rotation { font-size: 10px; }
+    #table-tabs { height: 28px; padding: 2px 8px; }
+    .game-name-pill { top: 34px; font-size: 10px; padding: 2px 7px; }
     #player-hand { height: 60px; padding: 1px 0; margin-top: 28px; }
     #player-cards .card { width: 34px; height: 46px; }
     .btn-action { padding: 8px 10px; font-size: 12px; }

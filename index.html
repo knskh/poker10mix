@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=48">
+    <link rel="stylesheet" href="css/style.css?v=49">
 </head>
 <body>
     <div id="app">
@@ -266,20 +266,9 @@
 
         <!-- Game Screen -->
         <div id="game-screen" class="hidden">
+            <!-- Unified top bar: table tabs on the left, hamburger on the right -->
             <div id="table-tabs" class="hidden">
-                <!-- Populated dynamically by JS -->
-            </div>
-            <div id="game-change-overlay" class="hidden">
-                <div class="gc-inner">
-                    <div class="gc-label">ゲームチェンジ</div>
-                    <div class="gc-name"></div>
-                    <div class="gc-badges"></div>
-                </div>
-            </div>
-            <div id="top-bar">
-                <div id="game-name"></div>
-                <div id="game-rotation"></div>
-                <div id="top-bar-icons"></div>
+                <div id="table-tabs-list"><!-- tabs + "+" populated by JS --></div>
                 <div id="top-bar-menu-wrap">
                     <button id="btn-hamburger" class="btn-tiny" title="メニュー">☰</button>
                     <div id="top-bar-menu" class="hidden">
@@ -296,6 +285,18 @@
                     </div>
                 </div>
             </div>
+            <div id="game-change-overlay" class="hidden">
+                <div class="gc-inner">
+                    <div class="gc-label">ゲームチェンジ</div>
+                    <div class="gc-name"></div>
+                    <div class="gc-badges"></div>
+                </div>
+            </div>
+            <!-- Compact game-name pill (absolute positioned on felt) -->
+            <div id="game-name" class="game-name-pill"></div>
+            <!-- Kept for backward-compat; hidden visually -->
+            <div id="game-rotation" class="hidden-compat"></div>
+            <div id="top-bar-icons" class="hidden-compat"></div>
 
             <div id="rules-modal" class="hidden">
                 <div id="rules-modal-inner">
@@ -492,7 +493,7 @@
     <script src="js/evaluator.js"></script>
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
-    <script src="js/ui.js?v=37"></script>
-    <script src="js/app.js?v=44"></script>
+    <script src="js/ui.js?v=38"></script>
+    <script src="js/app.js?v=45"></script>
 </body>
 </html>

@@ -269,14 +269,16 @@ function switchToTable(roomId) {
 
 function renderTableTabs() {
     const tabsEl = document.getElementById('table-tabs');
-    // Always show tab bar when in game screen (for the + button)
+    const listEl = document.getElementById('table-tabs-list');
+    // Always show the unified top bar while on game screen (hamburger must be accessible)
     const gameScreen = document.getElementById('game-screen');
-    if (gameScreen.classList.contains('hidden') || tables.size === 0) {
+    if (gameScreen.classList.contains('hidden')) {
         tabsEl.classList.add('hidden');
         return;
     }
     tabsEl.classList.remove('hidden');
-    tabsEl.innerHTML = '';
+    if (!listEl) return;
+    listEl.innerHTML = '';
     for (const [rid, ctx] of tables) {
         const tab = document.createElement('div');
         tab.className = 'table-tab' + (rid === activeTableId ? ' active' : '');
@@ -293,7 +295,7 @@ function renderTableTabs() {
             }
             switchToTable(rid);
         });
-        tabsEl.appendChild(tab);
+        listEl.appendChild(tab);
     }
     // Add "+" button
     const addBtn = document.createElement('div');
@@ -304,7 +306,7 @@ function renderTableTabs() {
         if (tables.size >= MAX_TABLES) return;
         openAddTableModal();
     });
-    tabsEl.appendChild(addBtn);
+    listEl.appendChild(addBtn);
 }
 
 function removeTable(roomId) {
