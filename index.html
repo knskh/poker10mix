@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=52">
+    <link rel="stylesheet" href="css/style.css?v=53">
 </head>
 <body>
     <div id="app">
@@ -57,20 +57,22 @@
 
         <!-- Main Screen (unified lobby + notable-hand timeline) -->
         <div id="sns-screen" class="hidden">
-            <!-- Top bar -->
+            <!-- Top bar: avatar on the left, hamburger menu on the right -->
             <div class="mx-topbar">
-                <div class="mx-brand">
-                    <img class="mx-brand-icon" src="logos/mix_1_logo_minimalist_1775651849102.png" alt="mix-1">
-                    <span class="mx-brand-name">mix-1</span>
-                </div>
-                <div class="mx-top-spacer"></div>
                 <div class="mx-top-user" id="mx-top-user">
                     <span class="mx-av" id="mx-top-av">?</span>
                     <span id="mx-top-name">ゲスト</span>
                 </div>
-                <button id="sns-header-stats" class="mx-icon-btn" title="統計">📊</button>
-                <button id="sns-header-history" class="mx-icon-btn" title="ハンド履歴">📜</button>
-                <button id="sns-header-logout" class="mx-icon-btn" title="ログアウト">🚪</button>
+                <div class="mx-top-spacer"></div>
+                <div id="mx-header-menu-wrap">
+                    <button id="btn-mx-hamburger" class="mx-icon-btn" title="メニュー">☰</button>
+                    <div id="mx-header-menu" class="hidden">
+                        <button id="sns-header-stats" class="menu-item">スタッツ</button>
+                        <button id="sns-header-history" class="menu-item">ハンド履歴</button>
+                        <button id="sns-header-online" class="menu-item">オンラインユーザーリスト</button>
+                        <button id="sns-header-logout" class="menu-item">ログアウト</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Play rail: horizontal room list + quick actions -->
@@ -498,6 +500,6 @@
     <script src="js/game.js"></script>
     <script src="js/client.js"></script>
     <script src="js/ui.js?v=38"></script>
-    <script src="js/app.js?v=48"></script>
+    <script src="js/app.js?v=49"></script>
 </body>
 </html>

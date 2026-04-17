@@ -4967,6 +4967,31 @@ function setupSNSEvents() {
     // Feed tabs (最新 / 週間 / 全期間)
     setupFeedTabs();
 
+    // Header hamburger menu (toggle + outside click close + close on item click)
+    const hamburger = document.getElementById('btn-mx-hamburger');
+    const headerMenu = document.getElementById('mx-header-menu');
+    if (hamburger && headerMenu) {
+        hamburger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            headerMenu.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+            if (headerMenu.classList.contains('hidden')) return;
+            if (headerMenu.contains(e.target) || e.target === hamburger) return;
+            headerMenu.classList.add('hidden');
+        });
+        headerMenu.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', () => headerMenu.classList.add('hidden'));
+        });
+    }
+
+    // Online users menu item → open chat modal with the online tab selected
+    const onlineBtn = document.getElementById('sns-header-online');
+    if (onlineBtn) onlineBtn.addEventListener('click', () => {
+        openChatModal();
+        switchChatTab('online');
+    });
+
     // Play rail actions
     const btnCreate = document.getElementById('mx-btn-create');
     if (btnCreate) btnCreate.addEventListener('click', () => client.createRoom());

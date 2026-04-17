@@ -4662,3 +4662,60 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     #sns-screen .mx-reply-compose { margin-left: 18px; }
     #sns-screen .mx-rank-head { font-size: 13px; padding: 8px 12px; }
 }
+
+/* ==========================================
+   Main screen header hamburger menu (dropdown)
+   ========================================== */
+#sns-screen #mx-header-menu-wrap {
+    position: relative;
+}
+#sns-screen #btn-mx-hamburger {
+    font-size: 18px;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+}
+#sns-screen #mx-header-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #fff;
+    border: 1px solid #DBE9FA;
+    border-radius: 12px;
+    padding: 6px 0;
+    min-width: 210px;
+    box-shadow: 0 8px 28px rgba(14,34,56,0.18);
+    z-index: 40;
+    animation: mx-menu-in 0.14s ease-out;
+}
+#sns-screen #mx-header-menu.hidden { display: none; }
+@keyframes mx-menu-in {
+    0%   { opacity: 0; transform: translateY(-4px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+#sns-screen #mx-header-menu .menu-item {
+    display: block;
+    width: 100%;
+    padding: 11px 18px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: #17202E;
+    font-size: 13px; font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .12s, color .12s;
+}
+#sns-screen #mx-header-menu .menu-item:hover {
+    background: #EEF5FF;
+    color: #2A6BC9;
+}
+#sns-screen #mx-header-menu .menu-item:active {
+    background: #DBE9FA;
+}
+
+/* Responsive: slightly narrower dropdown on small screens */
+@media (max-width: 480px) {
+    #sns-screen #mx-header-menu { min-width: 180px; }
+    #sns-screen #mx-header-menu .menu-item { padding: 10px 14px; font-size: 12px; }
+}
