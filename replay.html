@@ -92,6 +92,18 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
     width: 24px; height: 34px; border-radius: 3px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     font-weight: 700; font-size: 9px; line-height: 1; transition: transform 0.4s, opacity 0.3s;
+    position: relative; /* for .stud-street-label positioning */
+}
+.stud-street-label {
+    position: absolute; top: -9px; right: -4px;
+    font-size: 8px; font-weight: 800; letter-spacing: 0.3px;
+    padding: 0 3px;
+    background: rgba(10,14,20,0.92);
+    border-radius: 3px;
+    line-height: 10px;
+    pointer-events: none;
+    z-index: 3;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }
 .seat-card.facedown { background: linear-gradient(135deg, #1a3a7a, #0d2050); border: 1px solid #3366aa; }
 .seat-card.faceup { background: #fff; }
@@ -419,6 +431,18 @@ const RANK_LETTER = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const POS_COLORS = { BTN:'#e65100', SB:'#37474f', BB:'#37474f', CO:'#6a1b9a', HJ:'#1565c0', EP:'#2e7d32',
     S1:'#e65100', S2:'#1565c0', S3:'#2e7d32', S4:'#6a1b9a', S5:'#37474f', S6:'#37474f' };
 
+// Stud street color coding (matches in-game table — see js/ui.js studStreetInfo)
+const STUD_STREET_COLORS = {
+    '3rd': { color: '#999',    label: '3rd' },
+    '4th': { color: '#67e8f9', label: '4th' },
+    '5th': { color: '#fbbf24', label: '5th' },
+    '6th': { color: '#f472b6', label: '6th' },
+    '7th': { color: '#4ade80', label: '7th' },
+};
+function streetNameFromIndex(n) {
+    return n === 3 ? '3rd' : n === 4 ? '4th' : n === 5 ? '5th' : n === 6 ? '6th' : n === 7 ? '7th' : '3rd';
+}
+
 function rankLabel(r) {
     // Accept number or string; show J/Q/K/A for 11-14, else the raw value.
     return RANK_LETTER[r] !== undefined ? RANK_LETTER[r] : String(r);
@@ -488,16 +512,16 @@ function buildTimeline(hr, players, board, gameType) {
 
     // Determine initial round
     if (gameType === 'stud') {
-        // Stud: studDeal first
+        // Stud: studDeal first (all three cards are 3rd street)
         const studCards = players.map(p => {
             if (p.downCards.length >= 2 && p.upCards.length >= 1) {
                 return [
-                    { ...p.downCards[0], up: false },
-                    { ...p.downCards[1], up: false },
-                    { ...p.upCards[0], up: true },
+                    { ...p.downCards[0], up: false, street: '3rd' },
+                    { ...p.downCards[1], up: false, street: '3rd' },
+                    { ...p.upCards[0],   up: true,  street: '3rd' },
                 ];
             }
-            return p.allCards.slice(0, 3).map((c, i) => ({ ...c, up: i === 2 }));
+            return p.allCards.slice(0, 3).map((c, i) => ({ ...c, up: i === 2, street: '3rd' }));
         });
         timeline.push({ type: 'round', name: '3rd Street', cls: 'street-3rd' });
         timeline.push({ type: 'studDeal', cards: studCards });
@@ -538,16 +562,17 @@ function buildTimeline(hr, players, board, gameType) {
                     studStreet++;
                     const isDown = studStreet === 7;
                     const upIdx = studStreet - 3; // 4th=1, 5th=2, 6th=3, 7th=4
+                    const streetName = streetNameFromIndex(studStreet);
                     const studAddCards = players.map(p => {
                         if (p.folded) return null;
                         if (isDown && p.downCards.length > 2) {
-                            return { ...p.downCards[2], up: false };
+                            return { ...p.downCards[2], up: false, street: streetName };
                         } else if (!isDown && p.upCards.length > upIdx - 1) {
-                            return { ...p.upCards[upIdx], up: true };
+                            return { ...p.upCards[upIdx], up: true, street: streetName };
                         }
                         return null;
                     });
-                    timeline.push({ type: 'studCard', cards: studAddCards });
+                    timeline.push({ type: 'studCard', cards: studAddCards, street: streetName });
                 }
 
                 // Draw info
@@ -735,6 +760,25 @@ function dealCards() {
     });
 }
 
+// Apply stud street color border + label to a card element.
+// Matches the in-game table's studStreetInfo color coding.
+function applyStudStreet(el, street) {
+    const info = STUD_STREET_COLORS[street];
+    if (!info) return;
+    el.style.borderColor = info.color;
+    el.style.borderWidth = '2px';
+    el.style.borderStyle = 'solid';
+    el.dataset.street = street;
+    // 4th-7th get a small corner label; 3rd skips (initial deal)
+    if (street !== '3rd') {
+        const lbl = document.createElement('div');
+        lbl.className = 'stud-street-label';
+        lbl.style.color = info.color;
+        lbl.textContent = info.label;
+        el.appendChild(lbl);
+    }
+}
+
 function studDealCards(cardsPerSeat) {
     cardsPerSeat.forEach((seatCards, i) => {
         if (!seatCards || i >= HAND.players.length) return;
@@ -745,6 +789,7 @@ function studDealCards(cardsPerSeat) {
             const cardCls = c.up ? 'faceup' : 'downcard';
             el.className = `seat-card ${cardCls} ${c.c}`;
             el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+            applyStudStreet(el, c.street || '3rd');
             cont.appendChild(el);
         });
     });
@@ -758,6 +803,7 @@ function studAddCard(cardsPerSeat) {
         const cardCls = c.up ? 'faceup' : 'downcard';
         el.className = `seat-card ${cardCls} ${c.c}`;
         el.innerHTML = `<span>${c.r}</span><span>${c.s}</span>`;
+        if (c.street) applyStudStreet(el, c.street);
         cont.appendChild(el);
     });
 }
