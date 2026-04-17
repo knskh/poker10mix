@@ -154,7 +154,24 @@ class PokerUI {
         this._prevCCCount = 0; // previous community card count for deal animation
         this._prevMyCardCount = 0; // previous player card count
         this._prevFolded = {}; // track fold state per seat index
+        this._cacheElements();
         this._setupResize();
+    }
+
+    // Cache frequently accessed DOM elements. Called once at construction.
+    // Using getters keeps the lookup lazy and survives late-attached elements.
+    _cacheElements() {
+        this.$ = {
+            tableFelt:      document.getElementById('table-felt'),
+            potDisplay:     document.getElementById('pot-display'),
+            tableInfo:      document.getElementById('table-info'),
+            communityCards: document.getElementById('community-cards'),
+            rulesContent:   document.getElementById('rules-content'),
+            gameRotation:   document.getElementById('game-rotation'),
+            tableContainer: document.getElementById('table-container'),
+            tableArea:      document.getElementById('table-area'),
+            seats:          [0, 1, 2, 3, 4, 5].map(i => document.getElementById('seat-' + i)),
+        };
     }
 
     _setupResize() {
@@ -189,7 +206,8 @@ class PokerUI {
         if (!s) return;
 
         // Table theme by game category (felt color) + game type (rail color)
-        const felt = document.getElementById('table-felt');
+        const felt = this.$.tableFelt || (this.$.tableFelt = document.getElementById('table-felt'));
+        if (!felt) return;
         felt.classList.remove('felt-high', 'felt-low', 'felt-hilo', 'rail-draw', 'rail-stud', 'rail-community');
         felt.classList.add('felt-' + getGameCategory(s.gameId));
         felt.classList.add('rail-' + getGameType(s.gameId));

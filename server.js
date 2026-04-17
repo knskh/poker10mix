@@ -111,6 +111,7 @@ function loadTimeline() {
 let saveTimelineTimer = null;
 function saveTimelineDebounced() {
     if (saveTimelineTimer) return;
+    // 3000ms debounce: aggregates bursts of likes/comments into fewer writes.
     saveTimelineTimer = setTimeout(() => {
         saveTimelineTimer = null;
         try {
@@ -120,7 +121,7 @@ function saveTimelineDebounced() {
         } catch (e) {
             console.warn('Failed to save timeline.json:', e.message);
         }
-    }, 800);
+    }, 3000);
 }
 
 function createPost(post) {

@@ -762,6 +762,7 @@ body {
 }
 
 #table-felt {
+    contain: layout paint; /* Limit reflow/repaint to this subtree */
     position: relative;
     width: min(760px, 94vw); height: min(330px, 44vw);
     background:
@@ -1003,6 +1004,7 @@ body {
 
 /* === Seats - PokerStars Style === */
 .seat {
+    contain: layout; /* Isolate seat layout recalcs */
     position: absolute;
     background: var(--seat-bg);
     backdrop-filter: var(--glass-blur);
@@ -3288,6 +3290,7 @@ body:not(.theme-classic):not(.theme-midnight) .pending-join-name {
 
 /* Post */
 #sns-screen .mx-post {
+    contain: layout; /* Isolate post layout recalcs when comments update */
     background: #fff;
     border: 1px solid #EAF0F9; border-radius: 12px;
     padding: 14px 16px; margin-bottom: 10px;

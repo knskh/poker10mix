@@ -5503,15 +5503,111 @@ client.on('timeline_comment', ({ postId, comment }) => {
     const post = snsTimeline.find(p => p.id === postId);
     if (post) {
         post.comments = post.comments || [];
-        if (!post.comments.find(c => c.id === comment.id)) post.comments.push(comment);
+        if (post.comments.find(c => c.id === comment.id)) return; // already have it
+        post.comments.push(comment);
     }
-    // Re-render the post so nested replies land in the right thread
+    // Partial update: insert the new comment into the existing thread, preserving
+    // reply composers, input focus, scroll position and other ephemeral state.
     const wrap = document.querySelector(`.mx-post[data-post-id="${postId}"]`);
-    if (wrap && post) {
-        const fresh = renderPostEntry(post);
-        wrap.replaceWith(fresh);
+    if (!wrap || !post) return;
+    const commentsRoot = wrap.querySelector('.mx-comments');
+    if (!commentsRoot) return;
+
+    // Build the comment HTML as a standalone element, then insert in the right spot.
+    const isReply = comment.parentCommentId != null;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderCommentHtml(comment, isReply);
+    const newNode = tmp.firstElementChild;
+    if (!newNode) return;
+
+    if (isReply) {
+        // Find the parent comment element. The thread root is the comment whose
+        // id equals comment.parentCommentId (server flattens to 1 level).
+        const parentEl = commentsRoot.querySelector(`.mx-comment[data-comment-id="${comment.parentCommentId}"]`);
+        if (parentEl) {
+            // parent node structure: <comment/> followed by sibling <.mx-replies> (if any)
+            let repliesGroup = parentEl.nextElementSibling;
+            if (!repliesGroup || !repliesGroup.classList.contains('mx-replies')) {
+                repliesGroup = document.createElement('div');
+                repliesGroup.className = 'mx-replies';
+                parentEl.after(repliesGroup);
+            }
+            repliesGroup.appendChild(newNode);
+        } else {
+            // Parent not rendered for some reason → append to root just before input
+            const topInput = commentsRoot.querySelector('.mx-comment-top-input');
+            if (topInput) topInput.before(newNode);
+            else commentsRoot.appendChild(newNode);
+        }
+    } else {
+        // Top-level comment → insert before the top-level composer
+        const topInput = commentsRoot.querySelector('.mx-comment-top-input');
+        if (topInput) topInput.before(newNode);
+        else commentsRoot.appendChild(newNode);
     }
+
+    // Wire the new comment's like / reply buttons without touching others.
+    wireCommentInteractions(newNode, post, comment);
+
+    // Update comment counter on the post
+    const counter = wrap.querySelector('.act-comments');
+    if (counter) counter.textContent = `💬 ${post.comments.length}`;
 });
+
+// Helper: wire like/reply handlers for a single newly-inserted comment element.
+function wireCommentInteractions(cEl, post, comment) {
+    const cLike = cEl.querySelector('.c-like');
+    if (cLike) {
+        cLike.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!client.name) { showToast('名前を設定するといいねできます'); return; }
+            client.likeComment(post.id, comment.id);
+            const now = !cLike.classList.contains('liked');
+            cLike.classList.toggle('liked', now);
+            const heart = cLike.querySelector('.like-heart');
+            if (heart) heart.textContent = now ? '❤️' : '🤍';
+            const cntEl = cLike.querySelector('.like-count');
+            if (cntEl) {
+                const cur = parseInt(cntEl.textContent, 10) || 0;
+                cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
+            }
+        });
+    }
+    const cReply = cEl.querySelector('.c-reply');
+    if (cReply) {
+        cReply.addEventListener('click', (e) => {
+            e.stopPropagation();
+            let composer = cEl.querySelector(':scope > .mx-reply-compose');
+            if (!composer) {
+                composer = document.createElement('div');
+                composer.className = 'mx-reply-compose mx-comment-input';
+                composer.innerHTML = `<input type="text" placeholder="@${escapeHtml(comment.authorName)} に返信…" maxlength="500"><button>送信</button>`;
+                cEl.appendChild(composer);
+                const inp = composer.querySelector('input');
+                const snd = composer.querySelector('button');
+                inp.value = `@${comment.authorName} `;
+                const parentId = comment.parentCommentId != null ? comment.parentCommentId : comment.id;
+                snd.addEventListener('click', () => {
+                    const body = inp.value.trim();
+                    if (!body) return;
+                    client.addComment(post.id, body, parentId);
+                    inp.value = '';
+                    composer.classList.add('hidden');
+                });
+                inp.addEventListener('keydown', (e2) => {
+                    if (e2.key === 'Enter') snd.click();
+                });
+                setTimeout(() => { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 30);
+            } else {
+                composer.classList.toggle('hidden');
+                if (!composer.classList.contains('hidden')) {
+                    const inp = composer.querySelector('input');
+                    if (inp) setTimeout(() => inp.focus(), 30);
+                }
+            }
+        });
+    }
+}
 
 client.on('post_liked', ({ postId, userName, likeCount, liked }) => {
     const post = snsTimeline.find(p => p.id === postId);
