@@ -1330,31 +1330,35 @@ function handleMessage(ws, client, msg) {
 
         case 'sitout_request': {
             const room = rooms.get(msg.roomId || client.roomId);
-            if (!room || !room.game || !room.game.running) break;
+            if (!room) break;
             const seat = room.seatMap[client.id];
             if (seat === undefined) break;
             if (room.sitout && room.sitout[seat]) break; // already sitting out
             if (room.pendingSitoutRequest && room.pendingSitoutRequest[seat]) break; // already reserved
 
-            const player = room.game.players[seat];
+            // A hand is in progress when room.playing is true and the game hasn't
+            // reached gameOver yet. (Note: game has no .running flag — older code
+            // referenced it by mistake, which silently disabled the sitout button.)
+            const handInProgress = !!(room.playing && room.game && !room.game.gameOver);
+            const player = (room.game && room.game.players) ? room.game.players[seat] : null;
             const alreadyFolded = player && player.folded;
 
-            if (alreadyFolded) {
-                // Player is already out of the hand — apply sitout immediately.
+            if (handInProgress && !alreadyFolded) {
+                // Reserve sitout for after the current hand ends.
+                if (!room.pendingSitoutRequest) room.pendingSitoutRequest = {};
+                room.pendingSitoutRequest[seat] = true;
+                broadcastLog(room, `${client.name} が離席予約しました（ハンド終了後に適用）`, 'important');
+            } else {
+                // No active hand, or player is already folded → apply sitout now.
                 if (!room.sitout) room.sitout = {};
                 if (!room.sitoutTime) room.sitoutTime = {};
                 room.sitout[seat] = true;
                 room.sitoutTime[seat] = Date.now();
                 broadcastLog(room, `${client.name} が離席しました`, 'important');
-            } else {
-                // Reserve sitout for after the current hand ends.
-                if (!room.pendingSitoutRequest) room.pendingSitoutRequest = {};
-                room.pendingSitoutRequest[seat] = true;
-                broadcastLog(room, `${client.name} が離席予約しました（ハンド終了後に適用）`, 'important');
             }
             broadcastGameState(room);
             // Auto-close only applies when sitout is actually set (not pending),
-            // so this is a no-op during reservation but useful for the folded case.
+            // so this is a no-op during reservation but useful for the immediate case.
             maybeAutoCloseRoom(room);
             break;
         }
@@ -1779,7 +1783,8 @@ function maybeAutoCloseRoom(room) {
         return true;
     }
     // Don't interrupt an in-progress hand; onHandEnd will re-evaluate.
-    if (room.playing && room.game && room.game.running && !room.game.gameOver) {
+    // (game has no .running flag; playing + !gameOver is the correct check.)
+    if (room.playing && room.game && !room.game.gameOver) {
         return false;
     }
     if (!hasActiveMemberInRoom(room)) {
