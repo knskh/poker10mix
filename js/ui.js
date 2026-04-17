@@ -260,7 +260,9 @@ class PokerUI {
             'seat-bottom':       isHeadsUp ? [50, 82] : [50, 68],
             'seat-bottom-left':  [30, 62],
             'seat-top-left':     [30, 36],
-            'seat-top':          isHeadsUp ? [50, 18] : [50, 28],
+            // Heads-up mobile: push bet chip below the opponent seat (avoids overlap
+            // with seat cards/avatar which occupy -32% … +11% range)
+            'seat-top':          isHeadsUp ? [50, 32] : [50, 28],
             'seat-top-right':    [70, 36],
             'seat-bottom-right': [70, 62],
         } : {

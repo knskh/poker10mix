@@ -935,7 +935,7 @@ body {
         top: 42%;
     }
     #table-felt.is-heads-up .seat-top {
-        top: -28%;
+        top: -32%;   /* Lift opponent seat further so bet chip (at 32%) has clearance */
     }
 }
 
