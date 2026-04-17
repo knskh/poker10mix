@@ -645,6 +645,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     client.on('room_left', (msg) => {
         const rid = msg.roomId;
+        // If the server closed the table (e.g. all members on sitout), let the
+        // user know before the game screen disappears.
+        if (msg && msg.reason === 'all_sitout') {
+            showToast('参加者全員が離席したためテーブルを閉じました');
+        }
         if (rid) {
             removeTable(rid);
         } else {

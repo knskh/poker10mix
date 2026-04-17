@@ -1331,6 +1331,9 @@ function handleMessage(ws, client, msg) {
                 broadcastLog(room, `${client.name} が離席しました`, 'important');
             }
             broadcastGameState(room);
+            // If every seated member is now on sitout, the table will be closed
+            // once the current hand ends (or immediately if no hand is active).
+            maybeAutoCloseRoom(room);
             break;
         }
 
@@ -1598,6 +1601,61 @@ function handleMessage(ws, client, msg) {
 }
 
 // ============================================
+// Room activity / auto-close helpers
+// ============================================
+// Returns true if the room has at least one member who is NOT on sitout.
+// Members without an assigned seat (pre-game lobby) are always considered active.
+function hasActiveMemberInRoom(room) {
+    if (!room || !room.members || room.members.length === 0) return false;
+    for (const m of room.members) {
+        const seat = room.seatMap ? room.seatMap[m.clientId] : undefined;
+        if (seat === undefined) return true;           // pre-game / unassigned
+        if (!room.sitout || !room.sitout[seat]) return true;
+    }
+    return false;
+}
+
+// Delete a room: clear timers, evict remaining members, remove from map,
+// broadcast lobby update.
+function deleteRoomAndEvict(room, reason) {
+    if (!room) return;
+    if (room.pending) { try { clearTimeout(room.pending.timer); } catch {} room.pending = null; }
+    // Notify + detach any remaining members (sitout players stay in room until this runs)
+    for (const m of [...(room.members || [])]) {
+        try { send(m.ws, { type: 'room_left', roomId: room.id, reason: reason || 'closed' }); } catch {}
+        const c = clients.get(m.ws);
+        if (c) {
+            c.roomIds = (c.roomIds || []).filter(id => id !== room.id);
+            c.roomId = c.roomIds.length > 0 ? c.roomIds[c.roomIds.length - 1] : null;
+        }
+    }
+    room.members = [];
+    rooms.delete(room.id);
+    broadcastRoomList();
+}
+
+// Auto-close a room if nobody is actively playing (all members gone or all on sitout).
+// Skipped mid-hand — the onHandEnd hook re-runs this check on the next tick.
+function maybeAutoCloseRoom(room) {
+    if (!room || !rooms.has(room.id)) return false;
+    // Completely empty → delete
+    if (!room.members || room.members.length === 0) {
+        deleteRoomAndEvict(room, 'empty');
+        return true;
+    }
+    // Don't interrupt an in-progress hand; onHandEnd will re-evaluate.
+    if (room.playing && room.game && room.game.running && !room.game.gameOver) {
+        return false;
+    }
+    if (!hasActiveMemberInRoom(room)) {
+        try { broadcastLog(room, '参加者全員が離席したためテーブルを閉じます', 'important'); } catch {}
+        deleteRoomAndEvict(room, 'all_sitout');
+        return true;
+    }
+    return false;
+}
+
+// ============================================
 // Leave Room
 // ============================================
 function leaveRoom(client, targetRoomId) {
@@ -1639,15 +1697,12 @@ function leaveRoom(client, targetRoomId) {
         delete room.seatMap[client.id];
     }
 
-    if (room.members.length === 0) {
-        // Clean up empty room
-        if (room.pending) clearTimeout(room.pending.timer);
-        rooms.delete(room.id);
-    } else {
-        // Transfer host only when game is not active
-        if (room.hostId === client.id && !room.playing) {
-            room.hostId = room.members[0].clientId;
-        }
+    // Transfer host if necessary (game not active)
+    if (room.members.length > 0 && room.hostId === client.id && !room.playing) {
+        room.hostId = room.members[0].clientId;
+    }
+    // Auto-close if empty or every remaining member is on sitout; otherwise just notify.
+    if (!maybeAutoCloseRoom(room) && room.members.length > 0) {
         broadcastRoomUpdate(room);
     }
 }
@@ -1968,6 +2023,10 @@ function startGame(room) {
                 autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name, room.currentHandLogs || []);
             }
         }
+
+        // Close the table if every remaining member is on sitout (checked on next
+        // tick so the hand's result broadcast settles first).
+        setTimeout(() => maybeAutoCloseRoom(room), 50);
     };
 
     room.game = game;
