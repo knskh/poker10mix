@@ -246,50 +246,6 @@ class PokerUI {
 
         // Blind info — removed from table display
 
-        // Floating bet chips on table — placed on the table-side of each seat icon
-        const tableFelt = document.getElementById('table-felt');
-        tableFelt.querySelectorAll('.table-bet-chip').forEach(el => el.remove());
-        // Positions: [left%, top%] within table-felt
-        // Between seat edge and table center, shifted inward for clarity
-        // Bet chip positions keyed by visual seat class
-        const isMobile = window.innerWidth <= 600;
-        const playerCount = s.players.length;
-        const isHeadsUp = playerCount === 2;
-        const betPosByClass = isMobile ? {
-            // Heads-up on mobile uses a diagonal layout:
-            //   opponent (seat-top)    → top-left corner    → bet chip at [30%, 28%]
-            //   self     (seat-bottom) → bottom-right corner → bet chip at [70%, 72%]
-            // See #table-felt.is-heads-up rules in style.css
-            'seat-bottom':       isHeadsUp ? [70, 72] : [50, 68],
-            'seat-bottom-left':  [30, 62],
-            'seat-top-left':     [30, 36],
-            'seat-top':          isHeadsUp ? [30, 28] : [50, 28],
-            'seat-top-right':    [70, 36],
-            'seat-bottom-right': [70, 62],
-        } : {
-            // Heads-up on desktop: pot at 58% → push chips further apart
-            'seat-bottom':       isHeadsUp ? [50, 82] : [50, 72],
-            'seat-bottom-left':  [28, 68],
-            'seat-top-left':     [28, 30],
-            'seat-top':          isHeadsUp ? [50, 12] : [50, 20],
-            'seat-top-right':    [72, 30],
-            'seat-bottom-right': [72, 68],
-        };
-        s.players.forEach((p, i) => {
-            if (p.seatBet > 0) {
-                const seatEl = document.getElementById(`seat-${i}`);
-                const seatClass = [...seatEl.classList].find(c => c.startsWith('seat-') && c !== 'seat');
-                const pos = betPosByClass[seatClass];
-                if (!pos) return;
-                const chip = document.createElement('div');
-                chip.className = 'table-bet-chip';
-                chip.innerHTML = `<span class="chip-icon"></span>${p.seatBet.toLocaleString()}`;
-                chip.style.left = pos[0] + '%';
-                chip.style.top = pos[1] + '%';
-                tableFelt.appendChild(chip);
-            }
-        });
-
         // Community cards with deal animation
         const ccDiv = document.getElementById('community-cards');
         const prevCC = this._prevCCCount;
@@ -334,6 +290,56 @@ class PokerUI {
 
         // Reposition seats dynamically
         this.positionSeats(s.players.length, s.mySeatIndex);
+
+        // Floating bet chips on table — placed on the table-side of each seat icon.
+        // IMPORTANT: this must run AFTER positionSeats() so the positional seat
+        // class (seat-top / seat-bottom / ...) reflects the current rotation.
+        // Before, this block ran earlier and read stale classes, which could cause
+        // the chip for SB/BB (posted just before the first game_state of a hand)
+        // to be skipped when the positional class didn't match the lookup table.
+        const tableFelt = document.getElementById('table-felt');
+        tableFelt.querySelectorAll('.table-bet-chip').forEach(el => el.remove());
+        const isMobile = window.innerWidth <= 600;
+        const playerCount = s.players.length;
+        const isHeadsUp = playerCount === 2;
+        const betPosByClass = isMobile ? {
+            // Heads-up on mobile uses a diagonal layout:
+            //   opponent (seat-top)    → top-left corner    → bet chip at [30%, 28%]
+            //   self     (seat-bottom) → bottom-right corner → bet chip at [70%, 72%]
+            'seat-bottom':       isHeadsUp ? [70, 72] : [50, 68],
+            'seat-bottom-left':  [30, 62],
+            'seat-top-left':     [30, 36],
+            'seat-top':          isHeadsUp ? [30, 28] : [50, 28],
+            'seat-top-right':    [70, 36],
+            'seat-bottom-right': [70, 62],
+        } : {
+            // Heads-up on desktop: pot at 58% → push chips further apart
+            'seat-bottom':       isHeadsUp ? [50, 82] : [50, 72],
+            'seat-bottom-left':  [28, 68],
+            'seat-top-left':     [28, 30],
+            'seat-top':          isHeadsUp ? [50, 12] : [50, 20],
+            'seat-top-right':    [72, 30],
+            'seat-bottom-right': [72, 68],
+        };
+        // Only look up the six known positional classes — earlier the code used
+        // classList.find(c => c.startsWith('seat-')), which could return
+        // modifiers like `seat-timed-out` or `seat-winner` and miss the real
+        // positional class entirely, silently hiding the bet chip.
+        const POSITIONAL_CLASSES = ['seat-bottom', 'seat-bottom-left', 'seat-top-left', 'seat-top', 'seat-top-right', 'seat-bottom-right'];
+        s.players.forEach((p, i) => {
+            if (!(p.seatBet > 0)) return;
+            const seatEl = document.getElementById(`seat-${i}`);
+            if (!seatEl) return;
+            const seatClass = POSITIONAL_CLASSES.find(c => seatEl.classList.contains(c));
+            const pos = seatClass ? betPosByClass[seatClass] : null;
+            if (!pos) return;
+            const chip = document.createElement('div');
+            chip.className = 'table-bet-chip';
+            chip.innerHTML = `<span class="chip-icon"></span>${p.seatBet.toLocaleString()}`;
+            chip.style.left = pos[0] + '%';
+            chip.style.top = pos[1] + '%';
+            tableFelt.appendChild(chip);
+        });
 
         // Player hand (my cards, large)
         this.renderPlayerHand(s);
