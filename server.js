@@ -614,6 +614,7 @@ class Room {
     constructor(id, hostId, hostName) {
         this.id = id;
         this.hostId = hostId;
+        this.hostName = hostName || '';  // Preserved even when room is temporarily empty (for lobby display)
         this.members = []; // [{ clientId, name, ws }]
         this.playerGames = {}; // clientId -> [gameIndex, ...] (per-player selection)
         this.settings = {
@@ -699,7 +700,8 @@ function broadcastToRoom(room, data) {
 
 function broadcastRoomList() {
     const list = [...rooms.values()].map(r => ({
-        id: r.id, hostName: r.members[0]?.name || '???',
+        id: r.id,
+        hostName: r.members[0]?.name || r.hostName || '???',
         hostAvatar: r.members[0]?.avatar || null,
         playerCount: r.members.length, playing: r.playing,
         gameName: r.game?.gameConfig?.name || '',
@@ -983,6 +985,15 @@ function handleMessage(ws, client, msg) {
                     });
                 }
                 break;
+            }
+
+            // Cancel any pending idle-close timer — this table is active again.
+            cancelIdleCloseRoom(room);
+            // If this is the first member returning to an empty room, transfer
+            // the host to them so the room has a valid host again.
+            if (room.members.length === 0) {
+                room.hostId = client.id;
+                room.hostName = client.name || room.hostName;
             }
 
             room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
@@ -1754,6 +1765,7 @@ function deleteRoomAndEvict(room, reason) {
     // Post session summary before tearing down so buildSessionSummary sees room state.
     try { postSessionSummary(room, reason); } catch (e) { console.warn('postSessionSummary failed:', e && e.message); }
     if (room.pending) { try { clearTimeout(room.pending.timer); } catch {} room.pending = null; }
+    if (room.idleCloseTimer) { try { clearTimeout(room.idleCloseTimer); } catch {} room.idleCloseTimer = null; }
     // Notify + detach any remaining members (sitout players stay in room until this runs)
     for (const m of [...(room.members || [])]) {
         try { send(m.ws, { type: 'room_left', roomId: room.id, reason: reason || 'closed' }); } catch {}
@@ -1811,25 +1823,68 @@ function applyPendingReservations(room) {
     }
 }
 
-// Auto-close a room if nobody is actively playing (all members gone or all on sitout).
-// Skipped mid-hand — the onHandEnd hook re-runs this check on the next tick.
+// ============================================
+// Idle-close timer (delayed close for empty rooms)
+// ============================================
+// Rooms stay alive even when empty or when every member is on sitout, so that
+// players who stepped away can rejoin the same table from the lobby. Empty
+// rooms are cleaned up after IDLE_CLOSE_MS of inactivity.
+const IDLE_CLOSE_MS = 10 * 60 * 1000; // 10 minutes
+
+function scheduleIdleCloseRoom(room) {
+    if (!room || !rooms.has(room.id)) return;
+    if (room.idleCloseTimer) return; // already scheduled
+    room.idleCloseTimer = setTimeout(() => {
+        room.idleCloseTimer = null;
+        // Re-verify emptiness at fire time (member may have rejoined)
+        if (!rooms.has(room.id)) return;
+        if (room.members && room.members.length > 0) return;
+        deleteRoomAndEvict(room, 'idle');
+    }, IDLE_CLOSE_MS);
+}
+
+function cancelIdleCloseRoom(room) {
+    if (!room || !room.idleCloseTimer) return;
+    clearTimeout(room.idleCloseTimer);
+    room.idleCloseTimer = null;
+}
+
+// If the room has no members but a game is still running, end it gracefully so
+// the background loop doesn't keep cycling through hands without players.
+function endGameIfAbandoned(room) {
+    if (!room || !room.game) return;
+    if (room.members && room.members.length > 0) return;
+    if (room.game.gameOver) return;
+    try { room.game.gameOver = true; } catch {}
+    if (room.pending) {
+        try { clearTimeout(room.pending.timer); } catch {}
+        const p = room.pending;
+        room.pending = null;
+        // Resolve any waiting action as a fold so the betting round can finish.
+        try {
+            if (p.type === 'draw') p.resolve([]);
+            else p.resolve({ type: 'fold' });
+        } catch {}
+    }
+    room.playing = false;
+}
+
+// Previously this function deleted the room when nobody was actively playing.
+// That forced solo play to disband the table and prevented a player from
+// leaving to the lobby and rejoining. Now rooms stay alive while they have
+// any member (even if everyone is on sitout); empty rooms get a 10-minute
+// idle-close grace period so the lobby can be used to rejoin.
 function maybeAutoCloseRoom(room) {
     if (!room || !rooms.has(room.id)) return false;
-    // Completely empty → delete
-    if (!room.members || room.members.length === 0) {
-        deleteRoomAndEvict(room, 'empty');
-        return true;
-    }
-    // Don't interrupt an in-progress hand; onHandEnd will re-evaluate.
-    // (game has no .running flag; playing + !gameOver is the correct check.)
-    if (room.playing && room.game && !room.game.gameOver) {
+    if (room.members && room.members.length > 0) {
+        // Keep room alive. Make sure no stale idle-close timer is pending.
+        cancelIdleCloseRoom(room);
         return false;
     }
-    if (!hasActiveMemberInRoom(room)) {
-        try { broadcastLog(room, '参加者全員が離席したためテーブルを閉じます', 'important'); } catch {}
-        deleteRoomAndEvict(room, 'all_sitout');
-        return true;
-    }
+    // Empty room: schedule delayed cleanup instead of deleting immediately so
+    // a player who briefly returned to the lobby can come back to the table.
+    endGameIfAbandoned(room);
+    scheduleIdleCloseRoom(room);
     return false;
 }
 
@@ -1878,8 +1933,10 @@ function leaveRoom(client, targetRoomId) {
     // Transfer host if necessary (game not active)
     if (room.members.length > 0 && room.hostId === client.id && !room.playing) {
         room.hostId = room.members[0].clientId;
+        room.hostName = room.members[0].name || room.hostName;
     }
-    // Auto-close if empty or every remaining member is on sitout; otherwise just notify.
+    // Keep-alive: empty rooms get a grace period (idle-close timer); non-empty
+    // rooms stay alive even if everyone is on sitout.
     if (!maybeAutoCloseRoom(room) && room.members.length > 0) {
         broadcastRoomUpdate(room);
     }
@@ -1925,6 +1982,9 @@ function handleDisconnect(client) {
                 delete room.seatMap[client.id];
                 broadcastLog(room, `${client.name} が切断されました`, 'dim');
                 broadcastGameState(room);
+                // If the disconnect emptied the room, start idle-close timer so
+                // the table doesn't run hands forever with no live players.
+                maybeAutoCloseRoom(room);
                 continue;
             }
         }
@@ -2273,6 +2333,7 @@ async function runGameLoop(room) {
     // Now that game ended, transfer host if original host left during play
     if (!room.members.find(m => m.clientId === room.hostId) && room.members.length > 0) {
         room.hostId = room.members[0].clientId;
+        room.hostName = room.members[0].name || room.hostName;
     }
     // Recompute merged games with current members
     room.settings.selectedGames = room.getMergedGames();
