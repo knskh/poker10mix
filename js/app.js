@@ -926,6 +926,7 @@ function enterLobby(displayName) {
 // Account Login / Register
 // ==========================================
 let accountMode = 'login'; // 'login' or 'register'
+let authTimeoutHandle = null;
 
 function setupAccountLogin() {
     const nameInput = document.getElementById('account-name');
@@ -969,6 +970,17 @@ function setupAccountLogin() {
         submitBtn.disabled = true;
         submitBtn.textContent = '処理中...';
 
+        // Safety timeout: if the server never replies (ws was down, network
+        // lost, etc.) re-enable the button and show an error instead of
+        // leaving the user stuck at "処理中...".
+        if (authTimeoutHandle) clearTimeout(authTimeoutHandle);
+        authTimeoutHandle = setTimeout(() => {
+            authTimeoutHandle = null;
+            submitBtn.disabled = false;
+            submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+            showLoginError('サーバーから応答がありません。接続を確認してもう一度お試しください。');
+        }, 10000);
+
         if (accountMode === 'register') {
             client.send({ type: 'register', name, email, password });
         } else {
@@ -989,6 +1001,9 @@ function showLoginError(msg) {
 }
 
 function onAuthResult(data) {
+    // Clear the safety timeout — the server replied.
+    if (authTimeoutHandle) { clearTimeout(authTimeoutHandle); authTimeoutHandle = null; }
+
     const submitBtn = document.getElementById('btn-account-submit');
     submitBtn.disabled = false;
     submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';

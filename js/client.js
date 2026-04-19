@@ -9,6 +9,10 @@ class PokerClient {
         this.connected = false;
         this.handlers = {};
         this.reconnectTimer = null;
+        // Queued outbound messages for sends that happen before the WebSocket
+        // is OPEN (e.g. login clicked during the 3-second reconnect window).
+        // These are flushed in order on the next onopen.
+        this._outQueue = [];
     }
 
     on(event, fn) { this.handlers[event] = fn; }
@@ -23,6 +27,11 @@ class PokerClient {
             if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
             this.emit('connected');
             if (this.name) this.send({ type: 'set_name', name: this.name });
+            // Flush queued messages (login/register etc. that were attempted
+            // before the socket finished opening).
+            while (this._outQueue.length > 0) {
+                try { this.ws.send(JSON.stringify(this._outQueue.shift())); } catch { break; }
+            }
         };
 
         this.ws.onmessage = (e) => {
@@ -44,7 +53,12 @@ class PokerClient {
     send(data) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(data));
+            return;
         }
+        // Queue until the socket is open. Keep the queue bounded so a
+        // long-running disconnection can't eat all memory. Important enough
+        // for auth flows that we don't want silent drops.
+        if (this._outQueue.length < 50) this._outQueue.push(data);
     }
 
     handleMessage(msg) {
