@@ -435,16 +435,40 @@ function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, 
 }
 
 // ============================================
-// Account System (Supabase + password hashing)
+// Account System (Supabase with local JSON fallback)
 // ============================================
 const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
+let createClient = null;
+try { ({ createClient } = require('@supabase/supabase-js')); } catch (e) { /* optional */ }
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
-const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const supabase = (createClient && SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-if (!supabase) console.warn('Supabase not configured. Account registration/login will not persist.');
+// Local JSON fallback (used when Supabase is not configured). This restores
+// login on local / unconfigured deployments where the env vars are missing,
+// instead of failing every request with "データベース未設定です".
+const ACCOUNTS_FILE = path.join(__dirname, 'accounts.json');
+let localAccounts = {};
+function loadLocalAccounts() {
+    try {
+        if (fs.existsSync(ACCOUNTS_FILE)) {
+            localAccounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')) || {};
+        }
+    } catch (e) { console.error('Failed to load accounts.json:', e.message); }
+}
+function saveLocalAccounts() {
+    try {
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(localAccounts, null, 2), 'utf8');
+    } catch (e) { console.error('Failed to save accounts.json:', e.message); }
+}
+loadLocalAccounts();
+
+if (supabase) {
+    console.log('Auth: using Supabase backend.');
+} else {
+    console.warn('Auth: Supabase not configured → using local accounts.json fallback.');
+}
 
 function hashPassword(password, salt) {
     if (!salt) salt = crypto.randomBytes(16).toString('hex');
@@ -453,7 +477,7 @@ function hashPassword(password, salt) {
 }
 
 // ============================================
-// Auth Handlers (async for Supabase)
+// Auth Handlers (async; Supabase preferred, local JSON fallback)
 // ============================================
 async function handleRegister(ws, client, msg) {
     const email = (msg.email || '').trim().toLowerCase();
@@ -465,28 +489,30 @@ async function handleRegister(ws, client, msg) {
         return;
     }
 
-    if (!supabase) {
-        send(ws, { type: 'auth_result', success: false, message: 'データベース未設定です' });
-        return;
-    }
-
     try {
-        // Check if email already exists
-        const { data: existing } = await supabase.from('accounts').select('email').eq('email', email).limit(1);
-        if (existing && existing.length > 0) {
-            send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
-            return;
-        }
-
-        const { hash, salt } = hashPassword(password);
-        const { error } = await supabase.from('accounts').insert({
-            email, name, password_hash: hash, salt
-        });
-
-        if (error) {
-            console.error('Register error:', error.message);
-            send(ws, { type: 'auth_result', success: false, message: '登録に失敗しました' });
-            return;
+        if (supabase) {
+            // --- Supabase backend ---
+            const { data: existing } = await supabase.from('accounts').select('email').eq('email', email).limit(1);
+            if (existing && existing.length > 0) {
+                send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
+                return;
+            }
+            const { hash, salt } = hashPassword(password);
+            const { error } = await supabase.from('accounts').insert({ email, name, password_hash: hash, salt });
+            if (error) {
+                console.error('Register error (supabase):', error.message);
+                send(ws, { type: 'auth_result', success: false, message: '登録に失敗しました' });
+                return;
+            }
+        } else {
+            // --- Local JSON fallback ---
+            if (localAccounts[email]) {
+                send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
+                return;
+            }
+            const { hash, salt } = hashPassword(password);
+            localAccounts[email] = { email, name, passwordHash: hash, salt };
+            saveLocalAccounts();
         }
 
         client.name = name;
@@ -509,32 +535,44 @@ async function handleLogin(ws, client, msg) {
         return;
     }
 
-    if (!supabase) {
-        send(ws, { type: 'auth_result', success: false, message: 'データベース未設定です' });
-        return;
-    }
-
     try {
-        const { data, error } = await supabase.from('accounts').select('*').eq('email', email).limit(1);
+        let accountName = null;
+        let accountSalt = null;
+        let storedHash = null;
 
-        if (error || !data || data.length === 0) {
+        if (supabase) {
+            // --- Supabase backend ---
+            const { data, error } = await supabase.from('accounts').select('*').eq('email', email).limit(1);
+            if (error || !data || data.length === 0) {
+                send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+                return;
+            }
+            accountName = data[0].name;
+            accountSalt = data[0].salt;
+            storedHash = data[0].password_hash;
+        } else {
+            // --- Local JSON fallback ---
+            const acc = localAccounts[email];
+            if (!acc) {
+                send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+                return;
+            }
+            accountName = acc.name;
+            accountSalt = acc.salt;
+            storedHash = acc.passwordHash;
+        }
+
+        const { hash } = hashPassword(password, accountSalt);
+        if (hash !== storedHash) {
             send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
             return;
         }
 
-        const account = data[0];
-        const { hash } = hashPassword(password, account.salt);
-
-        if (hash !== account.password_hash) {
-            send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
-            return;
-        }
-
-        client.name = account.name;
+        client.name = accountName;
         client.email = email;
         client.authenticated = true;
-        console.log(`Login: ${account.name} (${email})`);
-        send(ws, { type: 'auth_result', success: true, name: account.name, email });
+        console.log(`Login: ${accountName} (${email})`);
+        send(ws, { type: 'auth_result', success: true, name: accountName, email });
     } catch (e) {
         console.error('Login error:', e.message);
         send(ws, { type: 'auth_result', success: false, message: 'エラーが発生しました' });
