@@ -395,11 +395,17 @@ function buildReplayHash(handResult, handLogs) {
 }
 
 function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, gameName, handLogs) {
-    // Find winner's avatar
+    // Find winner's avatar, and skip auto-share for guest accounts entirely.
     let authorAvatar = null;
+    let isGuestAuthor = false;
     for (const [, c] of clients) {
-        if (c.name === winnerName) { authorAvatar = c.avatar || null; break; }
+        if (c.name === winnerName) {
+            authorAvatar = c.avatar || null;
+            isGuestAuthor = !!c.isGuest;
+            break;
+        }
     }
+    if (isGuestAuthor) return; // guests cannot post to the timeline
     const winnerP = (handResult.players || []).find(p => p.name === winnerName);
     const reasonLabel = reason === 'strong' ? '🎉 強力なハンド達成' : '💰 大きなポット獲得';
     const title = `${reasonLabel}: ${handRank || 'ポットを獲得'}`;
@@ -1423,6 +1429,7 @@ function handleMessage(ws, client, msg) {
 
         case 'chat': {
             // In-game chat only (room / zoom). Lobby chat has been removed.
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではチャットを送信できません' }); break; }
             const text = (msg.message || '').slice(0, 200);
             const chatRoomId = msg.roomId || client.roomId;
             if (!chatRoomId) break; // no lobby fallback
@@ -1507,6 +1514,7 @@ function handleMessage(ws, client, msg) {
 
         case 'post_hand': {
             // Manual post of a hand from user's hand history (win or loss)
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではハンドを投稿できません' }); break; }
             if (!client.name) break;
             const caption = typeof msg.caption === 'string' ? msg.caption.trim().slice(0, 500) : '';
             // replayHash is a pre-compressed base64url string produced by the client.
@@ -1554,7 +1562,9 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'add_comment': {
-            // Timeline is shared with everyone (including guests); comments are too.
+            // Timeline is visible to everyone (including guests), but only
+            // registered accounts can comment.
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではコメントできません' }); break; }
             if (!client.name) break;
             const postId = Number(msg.postId);
             const body = (msg.body || '').trim();
@@ -1595,6 +1605,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'like_post': {
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではいいねできません' }); break; }
             if (!client.name) break;
             const postId = Number(msg.postId);
             if (!postId) break;
@@ -1604,6 +1615,7 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'like_comment': {
+            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではいいねできません' }); break; }
             if (!client.name) break;
             const postId = Number(msg.postId);
             const commentId = Number(msg.commentId);

@@ -33,6 +33,11 @@ function buildHandDataFromHistory(h, myName) {
 }
 
 function openHandPostModal(idx) {
+    // Guests are restricted to table play only; posting a hand is disallowed.
+    if (typeof loggedInAccount !== 'undefined' && !loggedInAccount) {
+        if (typeof showLoginRequiredToast === 'function') showLoginRequiredToast('ハンド投稿');
+        return;
+    }
     const h = handHistory[idx];
     if (!h) return;
     pendingHandPostIdx = idx;

@@ -1667,6 +1667,14 @@ let currentHandGameType = '';
 
 function saveCurrentHand() {
     if (currentHandLogs.length > 1) {
+        // Guests are restricted to live play only — don't persist their
+        // hands to history. (Matches the server-side restriction on posting,
+        // chatting and commenting.)
+        if (!loggedInAccount) {
+            currentHandLogs = [];
+            return;
+        }
+
         // Only save hands I actually played in. Without this filter, hands
         // observed as a spectator or hands from a table I joined mid-session
         // without a seat end up in the list, which looks like "other players'
@@ -1747,6 +1755,12 @@ function saveCurrentHand() {
 function renderHandHistory(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
+    // Guests are table-play-only — they don't accumulate hand history.
+    // Make that explicit in the UI so they're not puzzled by an empty list.
+    if (!loggedInAccount) {
+        container.innerHTML = '<p style="color:var(--text-dim);padding:8px;line-height:1.6;">ゲストアカウントではハンド履歴は保存されません。<br>アカウント登録するとプレイしたハンドが記録されます。</p>';
+        return;
+    }
     if (handHistory.length === 0) {
         container.innerHTML = '<p style="color:var(--text-dim);padding:8px;">まだ履歴がありません</p>';
         return;
@@ -2197,6 +2211,12 @@ function showToast(msg) {
     t.textContent = msg;
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Shown when a guest tries to use a feature that requires an account
+// (chat / 投稿 / コメント / いいね ...).
+function showLoginRequiredToast(featureLabel) {
+    showToast(`${featureLabel}はアカウント登録が必要です（ゲストはプレイのみ）`);
 }
 
 // Event delegation for replay/share buttons
@@ -3789,11 +3809,21 @@ function drawStatsGraph(canvas, playerName, selectedKeys, filters) {
 // Chat
 // ==========================================
 function setupChat() {
+    function guardGuestChat() {
+        // Guests are table-play-only; block chat inputs from the client side
+        // so no request even hits the server.
+        if (!loggedInAccount) {
+            showLoginRequiredToast('チャット');
+            return true;
+        }
+        return false;
+    }
     function hookChatInput(inputId, sendId) {
         const input = document.getElementById(inputId);
         const send = document.getElementById(sendId);
         if (!input || !send) return;
         send.addEventListener('click', () => {
+            if (guardGuestChat()) { input.value = ''; return; }
             const msg = input.value.trim();
             if (msg) { client.sendChat(msg, activeTableId); input.value = ''; }
         });
@@ -3816,6 +3846,7 @@ function setupChat() {
         qcPalette.querySelectorAll('.qc-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (guardGuestChat()) { qcPalette.classList.add('hidden'); return; }
                 const msg = btn.dataset.msg;
                 if (msg) {
                     client.sendChat(msg, activeTableId);
@@ -4738,6 +4769,7 @@ function setupSNSEvents() {
     // Auto-share modal handlers
     const btnAsComment = document.getElementById('btn-auto-share-comment');
     if (btnAsComment) btnAsComment.addEventListener('click', () => {
+        if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
         const txt = document.getElementById('auto-share-comment').value.trim();
         if (txt && snsLastAutoShare) {
             client.addComment(snsLastAutoShare.id, txt);
@@ -5000,6 +5032,7 @@ function renderPostEntry(post) {
     const likeBtn = wrap.querySelector('.act-like');
     if (likeBtn) {
         likeBtn.addEventListener('click', () => {
+            if (!loggedInAccount) { showLoginRequiredToast('いいね'); return; }
             if (!client.name) { showToast('名前を設定するといいねできます'); return; }
             client.likePost(post.id);
             // Optimistic UI: toggle
@@ -5022,6 +5055,7 @@ function renderPostEntry(post) {
     const topSend = wrap.querySelector('.mx-comment-top-input button');
     const bindCommentSend = (inputEl, sendEl, parentId) => {
         sendEl.addEventListener('click', () => {
+            if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
             const body = inputEl.value.trim();
             if (!body) return;
             client.addComment(post.id, body, parentId);
@@ -5047,6 +5081,7 @@ function renderPostEntry(post) {
         if (cLike) {
             cLike.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (!loggedInAccount) { showLoginRequiredToast('いいね'); return; }
                 if (!client.name) { showToast('名前を設定するといいねできます'); return; }
                 client.likeComment(post.id, comment.id);
                 const now = !cLike.classList.contains('liked');
@@ -5234,6 +5269,7 @@ function renderSessionPostEntry(post) {
     const likeBtn = wrap.querySelector('.act-like');
     if (likeBtn) {
         likeBtn.addEventListener('click', () => {
+            if (!loggedInAccount) { showLoginRequiredToast('いいね'); return; }
             if (!client.name) { showToast('名前を設定するといいねできます'); return; }
             client.likePost(post.id);
             const now = !likeBtn.classList.contains('liked');
@@ -5255,6 +5291,7 @@ function renderSessionPostEntry(post) {
     const topSend = wrap.querySelector('.mx-comment-top-input button');
     if (topInput && topSend) {
         topSend.addEventListener('click', () => {
+            if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
             const body = topInput.value.trim();
             if (!body) return;
             client.addComment(post.id, body, null);
@@ -5448,6 +5485,7 @@ function wireCommentInteractions(cEl, post, comment) {
                 inp.value = `@${comment.authorName} `;
                 const parentId = comment.parentCommentId != null ? comment.parentCommentId : comment.id;
                 snd.addEventListener('click', () => {
+                    if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
                     const body = inp.value.trim();
                     if (!body) return;
                     client.addComment(post.id, body, parentId);
