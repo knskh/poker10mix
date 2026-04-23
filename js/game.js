@@ -23,19 +23,19 @@ const GAME_LIST = [
     {
         id: 'razz', name: 'ラズ', shortName: 'Razz',
         type: 'stud', betting: 'limit', hasLow: false, lowOnly: true,
-        smallBet: 400, bigBet: 800, ante: 100, bringIn: 100,
+        smallBet: 200, bigBet: 400, ante: 50, bringIn: 50,
         rules: 'ルール：7カードスタッドのローボール版。\n最も弱いハンドが勝ち（A-5ロー）。\nエースはロー。ストレート・フラッシュは無視。\n最強ハンド：A-2-3-4-5'
     },
     {
         id: 'stud', name: 'セブンカードスタッド', shortName: 'Stud',
         type: 'stud', betting: 'limit', hasLow: false,
-        smallBet: 400, bigBet: 800, ante: 100, bringIn: 100,
+        smallBet: 200, bigBet: 400, ante: 50, bringIn: 50,
         rules: 'ルール：7枚のカード（3枚裏＋4枚表）でベスト5枚。\n3rd Streetで最低カードがブリングイン。\n通常のハイハンドで勝負。'
     },
     {
         id: 'stud8', name: 'スタッド Hi-Lo', shortName: 'Stud8',
         type: 'stud', betting: 'limit', hasLow: true, lowQualifier: 8,
-        smallBet: 400, bigBet: 800, ante: 100, bringIn: 100,
+        smallBet: 200, bigBet: 400, ante: 50, bringIn: 50,
         rules: 'ルール：7カードスタッドのHi-Lo版。\nハイとロー（8以下）でポット分割。\nロー該当なしならハイ総取り。'
     },
     {
