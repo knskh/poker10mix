@@ -398,14 +398,33 @@ function setupAddTableModal() {
     }
 }
 
+// Hand history is scoped per identity so two people sharing the same browser
+// (or switching between a guest name and an account) don't see each other's
+// hands. Key format:
+//   - Logged-in account: `poker10mix_hand_history_acc:<email>`
+//   - Guest:             `poker10mix_hand_history_guest:<name>`
+//   - Unknown:           `poker10mix_hand_history` (legacy / pre-name)
+function getHandHistoryKey() {
+    if (typeof loggedInAccount !== 'undefined' && loggedInAccount && loggedInAccount.email) {
+        return 'poker10mix_hand_history_acc:' + loggedInAccount.email.toLowerCase();
+    }
+    const n = (typeof client !== 'undefined' && client && client.name) ? client.name : '';
+    if (n) return 'poker10mix_hand_history_guest:' + n;
+    return 'poker10mix_hand_history';
+}
 function loadHandHistory() {
     try {
-        const raw = localStorage.getItem('poker10mix_hand_history');
+        const raw = localStorage.getItem(getHandHistoryKey());
         return raw ? JSON.parse(raw) : [];
     } catch (e) { return []; }
 }
 function persistHandHistory() {
-    try { localStorage.setItem('poker10mix_hand_history', JSON.stringify(handHistory)); } catch (e) {}
+    try { localStorage.setItem(getHandHistoryKey(), JSON.stringify(handHistory)); } catch (e) {}
+}
+// Call after login / guest-entry / logout so the in-memory handHistory reflects
+// the new identity's own hands. Safe to call before any UI render.
+function reloadHandHistoryForIdentity() {
+    handHistory = loadHandHistory();
 }
 
 // ==========================================
@@ -876,6 +895,9 @@ function setupLoginScreen() {
         if (!name || name.length < 1) { alert('名前を入力してください'); return; }
         loggedInAccount = null;
         client.setName(name, null, true);
+        // Switch hand history to this guest's scope so they don't see the
+        // previous identity's hands.
+        reloadHandHistoryForIdentity();
         enterLobby(name);
     });
     input.addEventListener('keydown', (e) => {
@@ -913,6 +935,9 @@ function doLogout() {
         lastSessionRaw = {};
     }
     loggedInAccount = null;
+    // Clear the in-memory hand history so the next person on this device
+    // doesn't briefly see the previous identity's hands before they re-enter.
+    handHistory = [];
     showScreen('login');
 }
 
@@ -1011,6 +1036,8 @@ function onAuthResult(data) {
     if (data.success) {
         loggedInAccount = { name: data.name, email: data.email };
         client.setName(data.name, selectedAvatar, false);
+        // Switch to this account's hand history scope.
+        reloadHandHistoryForIdentity();
         enterLobby(data.name);
     } else {
         showLoginError(data.message || 'エラーが発生しました');
@@ -1640,6 +1667,22 @@ let currentHandGameType = '';
 
 function saveCurrentHand() {
     if (currentHandLogs.length > 1) {
+        // Only save hands I actually played in. Without this filter, hands
+        // observed as a spectator or hands from a table I joined mid-session
+        // without a seat end up in the list, which looks like "other players'
+        // hands" to the user. If I was not seated OR the hand_result doesn't
+        // include me, skip saving.
+        const mySeat = currentState ? currentState.mySeatIndex : -1;
+        const iWasSeated = mySeat != null && mySeat >= 0
+            && currentState && currentState.players && !!currentState.players[mySeat];
+        const myName = (client && client.name) ? client.name : '';
+        const iInResult = !!(lastHandResult && lastHandResult.players
+            && myName && lastHandResult.players.some(p => p.name === myName));
+        if (!iWasSeated && !iInResult) {
+            currentHandLogs = [];
+            return;
+        }
+
         const gameName = currentHandGameName || (currentState ? currentState.gameName : '');
         let myCards = '';
         let myCardObjs = [];
