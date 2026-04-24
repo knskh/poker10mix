@@ -3807,7 +3807,7 @@ function showPlayerStats(playerName) {
     const stats = saved[playerName];
     const container = document.getElementById('stats-table-container');
     if (!stats || !stats.hands) {
-        container.innerHTML = `<h3 style="color:var(--gold)">${playerName}</h3><p style="color:var(--text-dim);padding:16px;">データなし</p>`;
+        container.innerHTML = `<h3 style="color:var(--gold)">${escapeHtml(playerName)}</h3><p style="color:var(--text-dim);padding:16px;">データなし</p>`;
     } else {
         const isMeFlag = playerName === client.name;
         container.innerHTML = renderPlayerStatsWithTabs(playerName, stats, ' style="color:var(--gold)"', isMeFlag);
@@ -3874,15 +3874,19 @@ const GAME_NAMES = {
 };
 
 function renderPlayerStatsWithTabs(pName, c, extraAttr, isMe) {
+    // pName comes from server-supplied account names — escape for safety so
+    // a malicious display name can't smuggle markup through the heading or
+    // the data-player attribute.
+    const safeName = escapeHtml(pName);
     let html = `<div class="stats-player-panel">`;
-    html += `<h3${extraAttr || ''}>${pName} (${c.hands}ハンド)</h3>`;
+    html += `<h3${extraAttr || ''}>${safeName} (${c.hands}ハンド)</h3>`;
     if (!c.hands || c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p></div>'; return html; }
 
     // Tabs
     html += `<div class="stats-tabs-bar">`;
     html += `<button class="stats-tab active" data-tab="total">全体</button>`;
     html += `<button class="stats-tab" data-tab="game">ゲーム別</button>`;
-    html += `<button class="stats-tab" data-tab="graph" data-player="${pName.replace(/"/g, '&quot;')}">グラフ</button>`;
+    html += `<button class="stats-tab" data-tab="graph" data-player="${safeName}">グラフ</button>`;
     html += `</div>`;
 
     // Total tab
@@ -3909,7 +3913,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr, isMe) {
 
     // Graph tab
     html += `<div class="stats-tab-content hidden" data-tab="graph">`;
-    html += `<div class="graph-controls" data-player="${pName.replace(/"/g, '&quot;')}">`;
+    html += `<div class="graph-controls" data-player="${safeName}">`;
     // Filter dropdowns
     html += `<div class="graph-filters">`;
     html += `<select class="graph-filter-game stats-dropdown"><option value="">全ゲーム</option>`;
@@ -4280,7 +4284,9 @@ function appendChatMsg(logId, from, message) {
     const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const div = document.createElement('div');
     div.className = 'room-chat-msg';
-    div.innerHTML = `<span class="chat-ts">${ts}</span><span class="room-chat-name">${from}:</span> ${message}`;
+    // `from` and `message` are user-controlled — always escape before
+    // injecting into innerHTML so a name/message can't smuggle <script> markup.
+    div.innerHTML = `<span class="chat-ts">${escapeHtml(ts)}</span><span class="room-chat-name">${escapeHtml(from)}:</span> ${escapeHtml(message)}`;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
 }
@@ -4573,7 +4579,9 @@ function onReaction(data) {
 
     const el = document.createElement('div');
     el.className = 'reaction-pop';
-    el.innerHTML = `<span class="reaction-pop-emoji">${data.emote}</span><span class="reaction-pop-name">${data.from}</span>`;
+    // `data.from` is the player name and `data.emote` is server-relayed —
+    // escape both before insertion to prevent XSS via crafted names.
+    el.innerHTML = `<span class="reaction-pop-emoji">${escapeHtml(data.emote)}</span><span class="reaction-pop-name">${escapeHtml(data.from)}</span>`;
 
     // Stagger multiple reactions
     const existing = tableFelt.querySelectorAll('.reaction-pop');

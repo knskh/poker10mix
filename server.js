@@ -571,6 +571,18 @@ async function lookupAccount(email) {
     return null;
 }
 
+// Basic email shape check — not RFC-compliant, just to reject obviously
+// wrong inputs like "abc" or "@@". Combined with a length cap to keep DB
+// rows bounded.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// Display-name allow-list: ASCII alphanumerics, underscore/hyphen/space,
+// hiragana / katakana / CJK / Latin diacritics. Blocks angle brackets,
+// quotes, ampersands and other HTML-significant characters at registration
+// time so display names can never smuggle markup downstream (chat, stats,
+// reactions, profile views, etc.).
+const NAME_RE = /^[A-Za-z0-9_\- \u3040-\u309f\u30a0-\u30ff\u4e00-\u9fff\u00c0-\u024f]{1,20}$/;
+
 async function handleRegister(ws, client, msg) {
     const email = (msg.email || '').trim().toLowerCase();
     const name = (msg.name || '').trim().slice(0, 20);
@@ -578,6 +590,14 @@ async function handleRegister(ws, client, msg) {
 
     if (!email || !name || password.length < 4) {
         send(ws, { type: 'auth_result', success: false, message: '入力内容を確認してください (メール/名前/4文字以上のパスワード)' });
+        return;
+    }
+    if (!EMAIL_RE.test(email) || email.length > 120) {
+        send(ws, { type: 'auth_result', success: false, message: '正しいメールアドレスを入力してください' });
+        return;
+    }
+    if (!NAME_RE.test(name)) {
+        send(ws, { type: 'auth_result', success: false, message: '名前は英数字・日本語・ハイフン・アンダースコアのみ使用できます' });
         return;
     }
 
@@ -1036,7 +1056,12 @@ function handleMessage(ws, client, msg) {
     switch (msg.type) {
         case 'set_name':
             client.name = (msg.name || '').trim().slice(0, 20) || 'Player' + client.id;
-            if (msg.avatar && typeof msg.avatar === 'string') client.avatar = msg.avatar.slice(0, 30);
+            if (msg.avatar && typeof msg.avatar === 'string') {
+                // Avatar is rendered via <img src="avatars/<avatar>.svg">. Restrict
+                // to safe filename characters so it can't break out of the attribute.
+                const a = msg.avatar.slice(0, 30);
+                client.avatar = /^[A-Za-z0-9_\-]+$/.test(a) ? a : null;
+            }
             client.isGuest = !!msg.isGuest;
             send(ws, { type: 'name_set', name: client.name });
             broadcastOnlineUsers();
