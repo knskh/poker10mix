@@ -1467,3 +1467,167 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     #sns-screen .sess-breakdown { font-size: 9px; padding-left: 30px; }
     #sns-screen .sess-footnote { font-size: 9px; }
 }
+
+/* ==========================================
+   Welcome-back card (Idea 1)
+   ========================================== */
+.welcome-back-card {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 18px 12px 10px;
+}
+.welcome-back-card.hidden { display: none !important; }
+.wb-av-wrap {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, #2A6BC9, #6AA8F0);
+    display: flex; align-items: center; justify-content: center;
+    padding: 3px; box-shadow: 0 4px 14px rgba(42,107,201,0.3);
+}
+.wb-av {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: #fff; object-fit: cover;
+}
+.wb-name {
+    font-weight: 700; font-size: 18px; color: #fff;
+    margin-top: 4px; letter-spacing: 0.2px;
+}
+.wb-email {
+    font-size: 12px; color: rgba(255,255,255,0.65);
+    margin-bottom: 8px;
+}
+.welcome-back-card .wb-continue {
+    width: 100%; margin-top: 4px;
+}
+.wb-switch-btn {
+    background: transparent; border: 0; color: #8ab4f8;
+    font-size: 13px; cursor: pointer; padding: 8px 4px;
+    font-family: inherit;
+}
+.wb-switch-btn:hover { color: #c5dcff; text-decoration: underline; }
+
+/* ==========================================
+   Table preview popover (Idea 2)
+   ========================================== */
+.mx-table-preview {
+    position: fixed; z-index: 1000;
+    min-width: 240px; max-width: 320px;
+    background: #fff;
+    border: 1px solid #D0DFF2; border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(23,32,46,0.18), 0 2px 6px rgba(23,32,46,0.08);
+    padding: 12px 14px; font-size: 13px; color: #17202E;
+    pointer-events: auto;
+}
+.mx-table-preview.hidden { display: none; }
+.mx-preview-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 8px;
+}
+.mx-preview-id {
+    font-family: 'Inter', monospace; font-weight: 700;
+    color: #1E52A3; font-size: 13px; letter-spacing: 0.5px;
+}
+.mx-preview-status {
+    font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+}
+.mx-preview-status.waiting { color: #1b7f4e; background: #DFF7EA; }
+.mx-preview-status.playing { color: #a86a1f; background: #FFEEC7; }
+.mx-preview-status.full    { color: #8b2a2a; background: #F6D7D7; }
+.mx-preview-host {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.mx-preview-host-av {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #EAF0F9; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex: 0 0 auto;
+}
+.mx-preview-host-av img { width: 100%; height: 100%; object-fit: cover; }
+.mx-preview-host-name { font-weight: 700; font-size: 13px; color: #17202E; }
+.mx-preview-host-sub  { font-size: 11px; color: #566579; }
+.mx-preview-game {
+    padding: 6px 8px; background: #F5FAFF; border-radius: 8px;
+    margin-bottom: 8px; font-size: 12px; color: #1E52A3; font-weight: 600;
+}
+.mx-preview-members {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px;
+    margin-bottom: 8px;
+}
+.mx-preview-seat {
+    aspect-ratio: 1; border-radius: 50%;
+    background: #EAF0F9; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; font-size: 9px; color: #566579; font-weight: 700;
+}
+.mx-preview-seat.empty { background: #F8FAFC; border: 1px dashed #D5E0EE; }
+.mx-preview-seat img { width: 100%; height: 100%; object-fit: cover; }
+.mx-preview-footer {
+    font-size: 11px; color: #566579; text-align: center;
+    padding-top: 6px; border-top: 1px solid #EAF0F9;
+}
+.mx-preview-footer.locked { color: #a86a1f; }
+
+/* ==========================================
+   Mobile bottom nav (Idea 3)
+   ========================================== */
+.mx-bottom-nav { display: none; }
+@media (max-width: 768px) {
+    #sns-screen .mx-bottom-nav {
+        display: flex;
+        position: fixed; left: 0; right: 0; bottom: 0;
+        background: rgba(255,255,255,0.97);
+        -webkit-backdrop-filter: saturate(180%) blur(10px);
+        backdrop-filter: saturate(180%) blur(10px);
+        border-top: 1px solid #EAF0F9;
+        padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+        z-index: 90;
+        box-shadow: 0 -2px 10px rgba(23,32,46,0.06);
+    }
+    #sns-screen .mxbn-tab {
+        flex: 1; background: transparent; border: 0;
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        padding: 4px 2px; cursor: pointer;
+        color: #8794A8; font-family: inherit;
+        transition: color .12s;
+    }
+    #sns-screen .mxbn-tab.active { color: #2A6BC9; }
+    #sns-screen .mxbn-tab:hover { color: #2A6BC9; }
+    #sns-screen .mxbn-ic { font-size: 20px; line-height: 1; }
+    #sns-screen .mxbn-label { font-size: 10px; font-weight: 600; line-height: 1; }
+    /* Hide only the hamburger button on mobile; the "マイ" tab in the nav
+       triggers the same menu (floated above the nav for thumb reach). */
+    #sns-screen #btn-mx-hamburger { display: none; }
+    #sns-screen #mx-header-menu {
+        position: fixed;
+        right: 12px;
+        bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+        top: auto;
+    }
+    /* Reserve space so content isn't hidden behind the nav */
+    #sns-screen { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Resume pill (shown on sns-screen when user has open tables) */
+.mx-resume-pill {
+    margin: 8px 16px 0;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 12px;
+    background: linear-gradient(90deg, #2A6BC9, #3E84E4);
+    color: #fff; font-weight: 700; font-size: 14px;
+    cursor: pointer; user-select: none;
+    box-shadow: 0 4px 12px rgba(42,107,201,0.3);
+    transition: transform .1s, box-shadow .15s;
+}
+.mx-resume-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(42,107,201,0.4);
+}
+.mx-resume-pill.hidden { display: none !important; }
+.mx-resume-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ffeb66; flex: 0 0 auto;
+    box-shadow: 0 0 0 0 rgba(255,235,102,0.9);
+    animation: mx-resume-pulse 1.4s ease-out infinite;
+}
+.mx-resume-arrow { margin-left: auto; font-size: 18px; }
+@keyframes mx-resume-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255,235,102,0.7); }
+    100% { box-shadow: 0 0 0 10px rgba(255,235,102,0); }
+}

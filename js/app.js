@@ -157,6 +157,41 @@ let turnTimer = null;
 let turnTimerStart = 0;
 let turnTimeLimit = 45;
 let loggedInAccount = null; // { name, email }
+const AUTH_SESSION_KEY = 'poker10mix_auth_session'; // { token, name, email }
+const LAST_ACCOUNT_KEY  = 'poker10mix_last_account'; // { name, email, avatar } — survives logout
+let resumingSession = false;
+let resumeTimeoutHandle = null;
+
+function loadAuthSession() {
+    try {
+        const raw = localStorage.getItem(AUTH_SESSION_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj.token === 'string' && obj.token.length > 0) return obj;
+    } catch (e) {}
+    return null;
+}
+function saveAuthSession(session) {
+    try { localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session)); } catch (e) {}
+}
+function clearAuthSession() {
+    try { localStorage.removeItem(AUTH_SESSION_KEY); } catch (e) {}
+}
+function loadLastAccount() {
+    try {
+        const raw = localStorage.getItem(LAST_ACCOUNT_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (obj && obj.email) return obj;
+    } catch (e) {}
+    return null;
+}
+function saveLastAccount(info) {
+    try { localStorage.setItem(LAST_ACCOUNT_KEY, JSON.stringify(info)); } catch (e) {}
+}
+function clearLastAccount() {
+    try { localStorage.removeItem(LAST_ACCOUNT_KEY); } catch (e) {}
+}
 let myFollowing = new Set(); // names this user follows
 let myFollowers = new Set(); // names that follow this user
 let lastOnlineUsers = []; // cached for re-render after follow change
@@ -609,11 +644,17 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPresetSettingsModal();
     setupFocusMode();
     setupAddTableModal();
+    setupBottomNav();
+    setupResumePill();
 
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
+
+    // Kick off the session resume BEFORE connecting. client.send() queues
+    // messages that are dispatched before the socket opens, so this is safe.
+    tryResumeSession();
 
     client.connect();
 
@@ -621,6 +662,14 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('connected', () => {
         document.getElementById('connection-status').textContent = '';
         document.getElementById('connection-status').classList.add('hidden');
+        // On reconnect (not the first open), if we're still logged in the
+        // server has forgotten our auth state — re-attach it silently.
+        if (!resumingSession && loggedInAccount) {
+            const saved = loadAuthSession();
+            if (saved && saved.token) {
+                client.send({ type: 'auth_resume', token: saved.token });
+            }
+        }
     });
     client.on('disconnected', () => {
         document.getElementById('connection-status').textContent = '接続中...';
@@ -880,7 +929,10 @@ function showScreen(name) {
     });
     const target = document.getElementById(name + '-screen');
     if (target) target.classList.remove('hidden');
-    if (name === 'sns') initSNSScreen();
+    if (name === 'sns') {
+        initSNSScreen();
+        if (typeof updateResumePill === 'function') updateResumePill();
+    }
 }
 
 // ==========================================
@@ -916,7 +968,17 @@ function setupLoginScreen() {
         document.getElementById('tab-guest').classList.remove('active');
         document.getElementById('login-account-form').classList.remove('hidden');
         document.getElementById('login-guest-form').classList.add('hidden');
+        renderWelcomeBackCard();
     });
+
+    // Returning user: open straight on the account tab with the welcome-back card.
+    if (loadLastAccount()) {
+        document.getElementById('tab-account').classList.add('active');
+        document.getElementById('tab-guest').classList.remove('active');
+        document.getElementById('login-account-form').classList.remove('hidden');
+        document.getElementById('login-guest-form').classList.add('hidden');
+        renderWelcomeBackCard();
+    }
 
     // Logout (wired directly on main-screen header button)
     const headerLogoutBtn = document.getElementById('sns-header-logout');
@@ -933,12 +995,28 @@ function doLogout() {
         localStorage.removeItem(RAW_ZOOM_STATS_KEY);
         localStorage.removeItem(STATS_HISTORY_KEY);
         lastSessionRaw = {};
+    } else {
+        // Revoke the persistent session token on the server and locally.
+        const saved = loadAuthSession();
+        if (saved && saved.token) {
+            client.send({ type: 'logout', token: saved.token });
+        }
+        clearAuthSession();
     }
     loggedInAccount = null;
     // Clear the in-memory hand history so the next person on this device
     // doesn't briefly see the previous identity's hands before they re-enter.
     handHistory = [];
     showScreen('login');
+    // If we have a remembered account, surface the welcome-back card on
+    // the account tab so re-login is one click + password.
+    if (loadLastAccount()) {
+        document.getElementById('tab-account')?.classList.add('active');
+        document.getElementById('tab-guest')?.classList.remove('active');
+        document.getElementById('login-account-form')?.classList.remove('hidden');
+        document.getElementById('login-guest-form')?.classList.add('hidden');
+        renderWelcomeBackCard();
+    }
 }
 
 function enterLobby(displayName) {
@@ -953,12 +1031,64 @@ function enterLobby(displayName) {
 let accountMode = 'login'; // 'login' or 'register'
 let authTimeoutHandle = null;
 
+function renderWelcomeBackCard() {
+    const card = document.getElementById('welcome-back-card');
+    const body = document.getElementById('account-form-body');
+    if (!card || !body) return;
+    const last = loadLastAccount();
+    if (!last) {
+        card.classList.add('hidden');
+        body.classList.remove('hidden');
+        return;
+    }
+    const avEl = document.getElementById('wb-av');
+    const nameEl = document.getElementById('wb-name');
+    const emailEl = document.getElementById('wb-email');
+    if (avEl) {
+        const src = getAvatarSrc(last.avatar);
+        if (src) { avEl.src = src; avEl.alt = last.name || ''; avEl.classList.remove('hidden'); }
+        else avEl.classList.add('hidden');
+    }
+    if (nameEl) nameEl.textContent = last.name || '';
+    if (emailEl) emailEl.textContent = last.email || '';
+    card.classList.remove('hidden');
+    body.classList.add('hidden');
+}
+function dismissWelcomeBackCard() {
+    const card = document.getElementById('welcome-back-card');
+    const body = document.getElementById('account-form-body');
+    if (card) card.classList.add('hidden');
+    if (body) body.classList.remove('hidden');
+}
+
 function setupAccountLogin() {
     const nameInput = document.getElementById('account-name');
     const emailInput = document.getElementById('account-email');
     const passInput = document.getElementById('account-password');
     const submitBtn = document.getElementById('btn-account-submit');
     const errorEl = document.getElementById('login-error');
+
+    // Welcome-back card actions
+    const wbContinue = document.getElementById('btn-wb-continue');
+    const wbSwitch = document.getElementById('btn-wb-switch');
+    if (wbContinue) wbContinue.addEventListener('click', () => {
+        const last = loadLastAccount();
+        dismissWelcomeBackCard();
+        if (last && last.email && emailInput) emailInput.value = last.email;
+        // Force login mode (not register) for returning users.
+        accountMode = 'login';
+        document.getElementById('tab-login')?.classList.add('active');
+        document.getElementById('tab-register')?.classList.remove('active');
+        nameInput?.classList.add('hidden');
+        if (submitBtn) submitBtn.textContent = 'ログイン';
+        if (passInput) { passInput.value = ''; passInput.focus(); }
+    });
+    if (wbSwitch) wbSwitch.addEventListener('click', () => {
+        clearLastAccount();
+        dismissWelcomeBackCard();
+        if (emailInput) emailInput.value = '';
+        if (passInput) passInput.value = '';
+    });
 
     // Login / Register tab switching
     document.getElementById('tab-login').addEventListener('click', () => {
@@ -1028,20 +1158,59 @@ function showLoginError(msg) {
 function onAuthResult(data) {
     // Clear the safety timeout — the server replied.
     if (authTimeoutHandle) { clearTimeout(authTimeoutHandle); authTimeoutHandle = null; }
+    if (resumeTimeoutHandle) { clearTimeout(resumeTimeoutHandle); resumeTimeoutHandle = null; }
+    const wasResuming = resumingSession || !!data.resumed;
+    resumingSession = false;
 
     const submitBtn = document.getElementById('btn-account-submit');
-    submitBtn.disabled = false;
-    submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+    }
 
     if (data.success) {
         loggedInAccount = { name: data.name, email: data.email };
+        if (data.token) {
+            saveAuthSession({ token: data.token, name: data.name, email: data.email });
+        }
+        // Remember the last successful account so we can offer a one-tap re-login
+        // on future visits (Netflix/GitHub style). Kept even after logout *unless*
+        // the user explicitly switches via "他のアカウントでログイン".
+        saveLastAccount({ name: data.name, email: data.email, avatar: selectedAvatar || null });
         client.setName(data.name, selectedAvatar, false);
         // Switch to this account's hand history scope.
         reloadHandHistoryForIdentity();
         enterLobby(data.name);
     } else {
-        showLoginError(data.message || 'エラーが発生しました');
+        // If the failure came from a resume attempt, the stored token is
+        // invalid — drop it so we don't loop trying to resume next reload.
+        if (wasResuming) clearAuthSession();
+        // Silent no-op when resume fails with no interactive form visible.
+        const errorEl = document.getElementById('login-error');
+        if (errorEl) showLoginError(data.message || 'エラーが発生しました');
     }
+}
+
+function tryResumeSession() {
+    const saved = loadAuthSession();
+    if (!saved || !saved.token) return false;
+    resumingSession = true;
+    const errorEl = document.getElementById('login-error');
+    if (errorEl) {
+        errorEl.textContent = 'セッションを復帰中...';
+        errorEl.classList.remove('hidden');
+    }
+    client.send({ type: 'auth_resume', token: saved.token });
+    // Safety timeout — if the server never replies, fall back to the login form.
+    if (resumeTimeoutHandle) clearTimeout(resumeTimeoutHandle);
+    resumeTimeoutHandle = setTimeout(() => {
+        resumeTimeoutHandle = null;
+        if (!resumingSession) return;
+        resumingSession = false;
+        clearAuthSession();
+        if (errorEl) showLoginError('サーバーから応答がありません。再ログインしてください。');
+    }, 10000);
+    return true;
 }
 
 // ==========================================
@@ -4674,6 +4843,7 @@ function renderRailRooms(rooms) {
         if (canJoin) {
             card.addEventListener('click', () => client.joinRoom(r.id));
         }
+        attachTablePreview(card, r);
         rail.appendChild(card);
     }
     // Add "+ create" button at the end
@@ -4682,6 +4852,210 @@ function renderRailRooms(rooms) {
     addBtn.textContent = '＋ 新規ルーム';
     addBtn.addEventListener('click', () => client.createRoom());
     rail.appendChild(addBtn);
+}
+
+// ==========================================
+// Table preview popover (Idea 2: Airbnb/Twitch-style peek)
+// ==========================================
+let _previewShowTimer = null;
+let _previewHideTimer = null;
+let _previewActiveCard = null;
+
+function attachTablePreview(card, room) {
+    const show = () => {
+        clearTimeout(_previewHideTimer);
+        clearTimeout(_previewShowTimer);
+        _previewShowTimer = setTimeout(() => showTablePreview(card, room), 280);
+    };
+    const hide = () => {
+        clearTimeout(_previewShowTimer);
+        clearTimeout(_previewHideTimer);
+        _previewHideTimer = setTimeout(hideTablePreview, 120);
+    };
+    card.addEventListener('mouseenter', show);
+    card.addEventListener('mouseleave', hide);
+    card.addEventListener('focus', show);
+    card.addEventListener('blur', hide);
+
+    // Mobile: long-press (500ms) opens the preview. A short tap still joins.
+    let pressTimer = null;
+    let longPressed = false;
+    card.addEventListener('touchstart', (e) => {
+        longPressed = false;
+        pressTimer = setTimeout(() => {
+            longPressed = true;
+            showTablePreview(card, room);
+        }, 500);
+    }, { passive: true });
+    card.addEventListener('touchend', (e) => {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        // If the preview opened, suppress the tap-to-join that would follow.
+        if (longPressed) {
+            e.preventDefault();
+            // Keep popover visible briefly; user can tap outside to dismiss.
+            setTimeout(hideTablePreview, 2500);
+        }
+    });
+    card.addEventListener('touchmove', () => {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }, { passive: true });
+    card.addEventListener('touchcancel', () => {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    });
+}
+
+function showTablePreview(card, r) {
+    const pop = document.getElementById('mx-table-preview');
+    if (!pop) return;
+    _previewActiveCard = card;
+
+    const statusCls = r.playerCount >= 6 ? 'full' : (r.playing ? 'playing' : 'waiting');
+    const statusText = r.playerCount >= 6 ? '● 満席' : (r.playing ? '● プレイ中' : '● 待機中');
+    const gameName = r.gameName
+        || (r.mergedGames && r.mergedGames[0] != null && typeof GAME_LIST !== 'undefined' && GAME_LIST[r.mergedGames[0]]
+            ? GAME_LIST[r.mergedGames[0]].shortName
+            : '—');
+    const hostAvSrc = getAvatarSrc(r.hostAvatar);
+    const hostAv = hostAvSrc
+        ? `<img src="${hostAvSrc}" alt="">`
+        : `<span>${escapeHtml((r.hostName || '?')[0].toUpperCase())}</span>`;
+
+    const TABLE_SIZE = 6;
+    const seatCells = [];
+    for (let i = 0; i < TABLE_SIZE; i++) {
+        const m = (r.members || [])[i];
+        if (!m) {
+            seatCells.push(`<div class="mx-preview-seat empty" title="空席"></div>`);
+        } else {
+            const src = getAvatarSrc(m.avatar);
+            seatCells.push(src
+                ? `<div class="mx-preview-seat" title="${escapeHtml(m.name)}"><img src="${src}" alt=""></div>`
+                : `<div class="mx-preview-seat" title="${escapeHtml(m.name)}">${escapeHtml((m.name || '?')[0].toUpperCase())}</div>`
+            );
+        }
+    }
+
+    const footerCls = r.locked ? 'mx-preview-footer locked' : 'mx-preview-footer';
+    const footerText = r.playerCount >= 6
+        ? '満席 — 空きが出るまでお待ちください'
+        : (r.locked
+            ? '🔒 承認制 — 参加リクエストが必要です'
+            : 'カードをクリックで参加');
+
+    pop.innerHTML = `
+        <div class="mx-preview-head">
+            <div class="mx-preview-id">${r.locked ? '🔒 ' : ''}${escapeHtml(r.id)}</div>
+            <div class="mx-preview-status ${statusCls}">${statusText}</div>
+        </div>
+        <div class="mx-preview-host">
+            <div class="mx-preview-host-av">${hostAv}</div>
+            <div>
+                <div class="mx-preview-host-name">${escapeHtml(r.hostName || '')}</div>
+                <div class="mx-preview-host-sub">ホスト</div>
+            </div>
+        </div>
+        <div class="mx-preview-game">🎴 ${escapeHtml(gameName)} ・ ${r.playerCount}/${TABLE_SIZE}人</div>
+        <div class="mx-preview-members">${seatCells.join('')}</div>
+        <div class="${footerCls}">${footerText}</div>
+    `;
+
+    // Keep it visible while hovered.
+    pop.onmouseenter = () => { clearTimeout(_previewHideTimer); };
+    pop.onmouseleave = () => { hideTablePreview(); };
+
+    // Position: below the card, clamped to viewport.
+    pop.classList.remove('hidden');
+    // Force layout so we can measure.
+    const rect = card.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    const margin = 8;
+    let top = rect.bottom + margin;
+    let left = rect.left + rect.width / 2 - popRect.width / 2;
+    // Clamp horizontally.
+    left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
+    // Flip above if it would clip the bottom.
+    if (top + popRect.height > window.innerHeight - margin) {
+        const aboveTop = rect.top - popRect.height - margin;
+        if (aboveTop > margin) top = aboveTop;
+    }
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+}
+
+function hideTablePreview() {
+    const pop = document.getElementById('mx-table-preview');
+    if (!pop) return;
+    pop.classList.add('hidden');
+    _previewActiveCard = null;
+}
+
+// ==========================================
+// Mobile bottom nav (Idea 3)
+// ==========================================
+function setupBottomNav() {
+    const nav = document.getElementById('mx-bottom-nav');
+    if (!nav) return;
+    const scrollTo = (el) => {
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const setActive = (name) => {
+        nav.querySelectorAll('.mxbn-tab').forEach(b => {
+            b.classList.toggle('active', b.dataset.target === name);
+        });
+    };
+    nav.querySelectorAll('.mxbn-tab').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            // Stop the event from bubbling to the document-level outside-click
+            // handler that auto-closes the header menu.
+            e.stopPropagation();
+            const target = btn.dataset.target;
+            setActive(target);
+            if (target === 'play') {
+                scrollTo(document.querySelector('#sns-screen .mx-play-rail'));
+            } else if (target === 'feed') {
+                scrollTo(document.querySelector('#sns-screen .mx-feed-wrap'));
+            } else if (target === 'history') {
+                if (typeof renderHandHistory === 'function') renderHandHistory('lobby-hand-history');
+                document.getElementById('history-modal')?.classList.remove('hidden');
+            } else if (target === 'online') {
+                if (typeof openChatModal === 'function') {
+                    openChatModal();
+                    if (typeof switchChatTab === 'function') switchChatTab('online');
+                }
+            } else if (target === 'me') {
+                // Toggle the top-right hamburger menu even when hidden on mobile —
+                // it floats above the nav so users can reach stats / logout etc.
+                const headerMenu = document.getElementById('mx-header-menu');
+                if (headerMenu) headerMenu.classList.toggle('hidden');
+            }
+        });
+    });
+}
+
+function updateResumePill() {
+    const pill = document.getElementById('mx-resume-pill');
+    if (!pill) return;
+    const count = (typeof tables !== 'undefined' && tables) ? tables.size : 0;
+    const countEl = document.getElementById('mx-resume-count');
+    if (countEl) countEl.textContent = String(count);
+    if (count > 0) pill.classList.remove('hidden');
+    else pill.classList.add('hidden');
+}
+
+function setupResumePill() {
+    const pill = document.getElementById('mx-resume-pill');
+    if (!pill) return;
+    const activate = () => {
+        // Jump back to the game screen if we have an active table.
+        if (typeof tables !== 'undefined' && tables && tables.size > 0) {
+            showScreen('game');
+        }
+    };
+    pill.addEventListener('click', activate);
+    pill.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+    });
 }
 
 function setupSNSEvents() {
