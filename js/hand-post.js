@@ -102,6 +102,11 @@ async function submitHandPost() {
     // Also build replay hash so viewers can replay the hand
     const replayHash = await buildReplayHashFromHistory(pendingHandPostIdx);
     client.postHand(handData, caption, replayHash);
+    // Mark this hand as posted so the detail view reveals other players'
+    // cards. Until this flag (or h.revealed) is set, the detail masks
+    // non-self hole cards to avoid spoilers before the user comments.
+    h.posted = true;
+    if (typeof persistHandHistory === 'function') persistHandHistory();
     showToast('タイムラインに投稿しました');
     closeHandPostModal();
     // Close history modal too so user sees the feed

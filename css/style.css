@@ -1412,6 +1412,52 @@ body {
 }
 @keyframes sitout-text-flash { 0%,100%{ opacity:1; transform:scale(1) } 50%{ opacity:0.7; transform:scale(1.05) } }
 
+/* Bust modal — shown when the player's chips reach 0. */
+.bust-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9000;
+}
+.bust-modal-overlay.hidden { display: none; }
+.bust-modal-card {
+    background: #1a1f2e; border: 1px solid #ef4444;
+    border-radius: 10px; padding: 24px 26px;
+    width: min(420px, 90vw);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    text-align: center;
+}
+.bust-modal-title {
+    font-size: 18px; font-weight: bold; color: #ef4444; margin-bottom: 10px;
+}
+.bust-modal-body {
+    font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 16px;
+}
+.bust-modal-timer {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    margin-bottom: 18px;
+}
+.bust-modal-timer-label { font-size: 11px; color: var(--text-dim); }
+.bust-modal-timer-text {
+    font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: #f59e0b; letter-spacing: 1px;
+}
+.bust-modal-bar-outer {
+    width: 100%; height: 6px; background: rgba(255,255,255,0.08);
+    border-radius: 3px; overflow: hidden;
+}
+.bust-modal-bar {
+    height: 100%; background: linear-gradient(90deg, #f59e0b, #eab308);
+    transition: width 1s linear; border-radius: 3px;
+}
+.bust-modal-bar.urgent {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+    animation: sitout-bar-flash 1s ease-in-out infinite;
+}
+.bust-modal-actions {
+    display: flex; gap: 10px; justify-content: center;
+}
+.bust-modal-actions .btn-action { min-width: 140px; }
+
 /* Pending rejoin message in action bar */
 .pending-rejoin-msg {
     color: #4ade80; font-size: 12px;
@@ -1837,6 +1883,42 @@ body {
 .hh-even { color: var(--text-dim); }
 .hh-p-cards { display: flex; gap: 2px; }
 .hh-folded-label { font-size: 10px; color: #666; font-style: italic; }
+
+/* Hidden card back (used in hand-history detail before the user posts/reveals). */
+.mini-card-back {
+    background: linear-gradient(135deg, #2d3548 0%, #1a1f2e 100%);
+    color: #7c8aa3;
+    border: 1px solid #3a4050;
+}
+.hh-visual-card-back {
+    background: linear-gradient(135deg, #2d3548 0%, #1a1f2e 100%);
+    color: #7c8aa3;
+    border: 1px dashed #4a5060;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.04);
+}
+
+/* Banner shown while other players' cards are hidden. */
+.hh-hide-notice {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: rgba(79, 195, 247, 0.08);
+    border: 1px solid rgba(79, 195, 247, 0.25);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+}
+.hh-hide-msg {
+    font-size: 11px; color: var(--text-dim); line-height: 1.4;
+}
+.hh-reveal-btn {
+    flex-shrink: 0;
+    background: #2d3548; color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px; font-weight: bold;
+    cursor: pointer;
+}
+.hh-reveal-btn:hover { background: var(--accent); color: #0b1220; }
 
 /* Card groups in detail (fallback) */
 .hh-detail-cards { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
