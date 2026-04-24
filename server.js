@@ -483,6 +483,73 @@ function hashPassword(password, salt) {
 }
 
 // ============================================
+// Auth Session Tokens (persistent login)
+// Tokens let the browser re-authenticate across page reloads / reconnects
+// without the user re-entering credentials. Stored on disk as a fallback
+// to survive server restarts.
+// ============================================
+const AUTH_TOKENS_FILE = path.join(__dirname, 'auth_tokens.json');
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+let authTokens = {}; // token -> { email, name, expiresAt }
+
+function loadAuthTokens() {
+    try {
+        if (fs.existsSync(AUTH_TOKENS_FILE)) {
+            authTokens = JSON.parse(fs.readFileSync(AUTH_TOKENS_FILE, 'utf8')) || {};
+            const now = Date.now();
+            let pruned = 0;
+            for (const t of Object.keys(authTokens)) {
+                const info = authTokens[t];
+                if (!info || !info.expiresAt || info.expiresAt < now) {
+                    delete authTokens[t];
+                    pruned++;
+                }
+            }
+            if (pruned) console.log(`Auth: pruned ${pruned} expired token(s).`);
+        }
+    } catch (e) { console.error('Failed to load auth_tokens.json:', e && e.message); }
+}
+
+let saveTokensTimer = null;
+function saveAuthTokensDebounced() {
+    if (saveTokensTimer) return;
+    saveTokensTimer = setTimeout(() => {
+        saveTokensTimer = null;
+        try {
+            fs.writeFileSync(AUTH_TOKENS_FILE, JSON.stringify(authTokens, null, 2), 'utf8');
+        } catch (e) { console.error('Failed to save auth_tokens.json:', e && e.message); }
+    }, 500);
+}
+
+function issueAuthToken(email, name) {
+    const token = crypto.randomBytes(32).toString('hex');
+    authTokens[token] = { email, name, expiresAt: Date.now() + TOKEN_TTL_MS };
+    saveAuthTokensDebounced();
+    return token;
+}
+
+function consumeAuthToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const info = authTokens[token];
+    if (!info) return null;
+    if (!info.expiresAt || info.expiresAt < Date.now()) {
+        delete authTokens[token];
+        saveAuthTokensDebounced();
+        return null;
+    }
+    return info;
+}
+
+function revokeAuthToken(token) {
+    if (token && authTokens[token]) {
+        delete authTokens[token];
+        saveAuthTokensDebounced();
+    }
+}
+
+loadAuthTokens();
+
+// ============================================
 // Auth Handlers (async; Supabase preferred, local JSON fallback)
 // ============================================
 // Look up an account by email. Tries Supabase first if configured, then falls
@@ -535,12 +602,11 @@ async function handleRegister(ws, client, msg) {
             }
         }
 
-        // Always mirror to local JSON as a safety net (works offline / mis-configured envs).
-        if (!localAccounts[email]) {
-            localAccounts[email] = { email, name, passwordHash: hash, salt };
-            saveLocalAccounts();
-            savedSomewhere = true;
-        }
+        // Always mirror to local JSON as a safety net (works offline / mis-configured
+        // envs, and lets login fall back if Supabase becomes unreachable later).
+        localAccounts[email] = { email, name, passwordHash: hash, salt };
+        saveLocalAccounts();
+        savedSomewhere = true;
 
         if (!savedSomewhere) {
             send(ws, { type: 'auth_result', success: false, message: '登録に失敗しました' });
@@ -550,8 +616,9 @@ async function handleRegister(ws, client, msg) {
         client.name = name;
         client.email = email;
         client.authenticated = true;
+        const token = issueAuthToken(email, name);
         console.log(`Register: ${name} (${email})`);
-        send(ws, { type: 'auth_result', success: true, name, email });
+        send(ws, { type: 'auth_result', success: true, name, email, token });
     } catch (e) {
         console.error('Register error:', e && e.message);
         send(ws, { type: 'auth_result', success: false, message: 'エラーが発生しました' });
@@ -586,12 +653,49 @@ async function handleLogin(ws, client, msg) {
         client.name = accountName;
         client.email = email;
         client.authenticated = true;
+        const token = issueAuthToken(email, accountName);
         console.log(`Login: ${accountName} (${email})`);
-        send(ws, { type: 'auth_result', success: true, name: accountName, email });
+        send(ws, { type: 'auth_result', success: true, name: accountName, email, token });
     } catch (e) {
-        console.error('Login error:', e.message);
+        console.error('Login error:', e && e.message);
         send(ws, { type: 'auth_result', success: false, message: 'エラーが発生しました' });
     }
+}
+
+// Resume an existing session via a previously-issued token (page reload /
+// reconnect). Mirrors the success shape of handleLogin so the client can
+// reuse onAuthResult.
+async function handleAuthResume(ws, client, msg) {
+    const token = (msg && typeof msg.token === 'string') ? msg.token : '';
+    const info = consumeAuthToken(token);
+    if (!info) {
+        send(ws, { type: 'auth_result', success: false, resumed: true, message: 'セッションが期限切れです。再ログインしてください。' });
+        return;
+    }
+    try {
+        // Confirm the account still exists — an admin could have removed it.
+        const acc = await lookupAccount(info.email);
+        if (!acc) {
+            revokeAuthToken(token);
+            send(ws, { type: 'auth_result', success: false, resumed: true, message: 'アカウントが見つかりません。再ログインしてください。' });
+            return;
+        }
+        client.name = acc.name;
+        client.email = info.email;
+        client.authenticated = true;
+        console.log(`Resume: ${acc.name} (${info.email})`);
+        send(ws, { type: 'auth_result', success: true, resumed: true, name: acc.name, email: info.email, token });
+    } catch (e) {
+        console.error('Resume error:', e && e.message);
+        send(ws, { type: 'auth_result', success: false, resumed: true, message: 'エラーが発生しました' });
+    }
+}
+
+function handleLogout(ws, client, msg) {
+    const token = (msg && typeof msg.token === 'string') ? msg.token : '';
+    if (token) revokeAuthToken(token);
+    client.authenticated = false;
+    client.email = null;
 }
 
 // ============================================
@@ -722,7 +826,9 @@ function broadcastRoomList() {
         gameName: r.game?.gameConfig?.name || '',
         mergedGames: r.getMergedGames(),
         locked: r.locked,
-        pendingCount: r.pendingJoins.length
+        pendingCount: r.pendingJoins.length,
+        // Small member preview — avatars/names only, capped by table size.
+        members: r.members.slice(0, 6).map(m => ({ name: m.name, avatar: m.avatar || null }))
     }));
     for (const [ws] of clients) {
         send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
@@ -954,6 +1060,16 @@ function handleMessage(ws, client, msg) {
 
         case 'login': {
             handleLogin(ws, client, msg);
+            break;
+        }
+
+        case 'auth_resume': {
+            handleAuthResume(ws, client, msg);
+            break;
+        }
+
+        case 'logout': {
+            handleLogout(ws, client, msg);
             break;
         }
 

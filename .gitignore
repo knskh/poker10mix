@@ -3,3 +3,4 @@ node_modules/
 *.jsonl
 test*.js
 accounts.json
+auth_tokens.json
