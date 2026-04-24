@@ -944,6 +944,10 @@ function getStateForPlayer(game, room, playerSeat) {
                 sitoutRemaining: (room.sitout && room.sitout[i] && room.sitoutTime && room.sitoutTime[i])
                     ? Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - room.sitoutTime[i])) / 1000))
                     : null,
+                busted: !!(room.bustedAt && room.bustedAt[i]),
+                bustedRemaining: (room.bustedAt && room.bustedAt[i])
+                    ? Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - room.bustedAt[i])) / 1000))
+                    : null,
                 pendingRejoin: !!(room.pendingRejoin && room.pendingRejoin[i]),
                 hand: showCards ? p.hand : [],
                 upCards: gc.type === 'stud' ? p.upCards : [],
@@ -970,6 +974,18 @@ function getStateForPlayer(game, room, playerSeat) {
         isShowdown: game.isShowdown,
         mySeatIndex: playerSeat,
         mySitout: !!(room.sitout && room.sitout[playerSeat]),
+        myBusted: !!(room.bustedAt && room.bustedAt[playerSeat]),
+        // Solo-wait: the viewer is the last chip-holding player, waiting for
+        // others to join or for the 10-min window to expire. The client uses
+        // this to render the "テーブルに他プレイヤーがいません" modal.
+        mySoloWait: (() => {
+            if (!room.soloWaitSince) return false;
+            const myPlayer = game.players[playerSeat];
+            return !!(myPlayer && myPlayer.connected && myPlayer.chips > 0);
+        })(),
+        soloWaitRemaining: room.soloWaitSince
+            ? Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - room.soloWaitSince)) / 1000))
+            : null,
         turnRemaining: (room.turnStartTime && room.turnTimeLimit)
             ? Math.max(0, room.turnTimeLimit - (Date.now() - room.turnStartTime) / 1000)
             : null,
@@ -1089,7 +1105,22 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'join_room': {
-            if (client.roomIds.includes(msg.roomId)) { send(ws, { type: 'error', message: 'すでに参加しています' }); return; }
+            // Defense-in-depth: if our bookkeeping says the client is in the
+            // room but the room's members list disagrees (e.g., an earlier
+            // auto-kick forgot to call leaveRoom), treat our bookkeeping as
+            // stale and continue the join instead of returning an error.
+            if (client.roomIds.includes(msg.roomId)) {
+                const staleRoom = rooms.get(msg.roomId);
+                const stillMember = !!(staleRoom && staleRoom.members.some(m => m.clientId === client.id));
+                if (stillMember) {
+                    send(ws, { type: 'error', message: 'すでに参加しています' }); return;
+                }
+                // Clean up the stale entry and fall through to a fresh join.
+                client.roomIds = client.roomIds.filter(id => id !== msg.roomId);
+                if (client.roomId === msg.roomId) {
+                    client.roomId = client.roomIds.length > 0 ? client.roomIds[client.roomIds.length - 1] : null;
+                }
+            }
             if (client.roomIds.length >= 3) { send(ws, { type: 'error', message: '最大3テーブルまでです' }); return; }
             const room = rooms.get(msg.roomId);
             if (!room) { send(ws, { type: 'error', message: 'ルームが見つかりません' }); return; }
@@ -1489,6 +1520,62 @@ function handleMessage(ws, client, msg) {
             room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + addedChips;
             broadcastLog(room, `${client.name} がチップを補充しました (+${addedChips.toLocaleString()})`, 'important');
             broadcastGameState(room);
+            break;
+        }
+
+        case 'rebuy_from_bust': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room || !room.game) break;
+            const seat = room.seatMap[client.id];
+            if (seat === undefined) break;
+            if (!room.bustedAt || !room.bustedAt[seat]) break; // not in bust window
+            const p = room.game.players[seat];
+            const REBUY = 10000;
+            const added = REBUY - p.chips;
+            p.chips = REBUY;
+            if (!room.totalRebuys) room.totalRebuys = {};
+            room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + added;
+            // Clear bust + sitout so they're eligible for the next hand.
+            clearBustState(room, seat);
+            if (room.sitout) room.sitout[seat] = false;
+            if (room.sitoutTime) delete room.sitoutTime[seat];
+            if (room.consecutiveTimeouts) room.consecutiveTimeouts[seat] = 0;
+            if (!room.pendingRejoin) room.pendingRejoin = {};
+            room.pendingRejoin[seat] = true;
+            broadcastLog(room, `${client.name} がチップを補充して復帰します (+${added.toLocaleString()})`, 'important');
+            broadcastGameState(room);
+            break;
+        }
+
+        case 'end_table_now': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room || !room.game) break;
+            const seat = room.seatMap[client.id];
+            if (seat === undefined) break;
+            // Only allow when we're actually in a solo-wait state AND the
+            // sender is the solo player. Anyone else spamming this is a no-op.
+            const playable = room.game.players.filter(p => p.connected && p.chips > 0);
+            if (playable.length !== 1) break;
+            const soloPlayer = playable[0];
+            if (soloPlayer.id !== seat) break;
+            broadcastLog(room, `${client.name} がテーブル終了を選択しました`, 'important');
+            if (room.soloWaitSince) delete room.soloWaitSince;
+            room.game.gameOver = true;
+            // The game loop is await-sleeping up to 2s; it'll pick up the
+            // gameOver flag on its next iteration and broadcast game_over.
+            break;
+        }
+
+        case 'leave_from_bust': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room) break;
+            const seat = room.seatMap[client.id];
+            if (seat === undefined) break;
+            if (!room.bustedAt || !room.bustedAt[seat]) break;
+            clearBustState(room, seat);
+            broadcastLog(room, `${client.name} が退室を選択しました`, 'important');
+            leaveRoom(client, room.id);
+            try { send(ws, { type: 'room_left', roomId: room.id }); } catch {}
             break;
         }
 
@@ -1919,6 +2006,71 @@ function deleteRoomAndEvict(room, reason) {
 
 // Apply any pending sitout/leave reservations. Called from onHandEnd hooks,
 // so deferred actions take effect right before the next hand starts.
+// After each hand: any player whose chips reached 0 enters a 10-minute
+// decision window (rebuy to 10000 or leave). While at least one player is
+// in this window, runGameLoop pauses instead of ending the game, so HU-bust
+// doesn't instantly close the table.
+const BUST_WINDOW_MS = 10 * 60 * 1000;
+function detectBust(room) {
+    if (!room || !room.game || !rooms.has(room.id)) return;
+    const game = room.game;
+    for (let seat = 0; seat < game.players.length; seat++) {
+        const p = game.players[seat];
+        if (!p || !p.name) continue;
+        if (p.chips !== 0) continue;
+        if (room.bustedAt[seat]) continue; // already in window
+        // Put them in sitout so they are skipped by the game engine, and
+        // stamp the bust time so the client can render a countdown.
+        if (!room.sitout[seat]) {
+            room.sitout[seat] = true;
+            room.sitoutTime[seat] = Date.now();
+        }
+        room.bustedAt[seat] = Date.now();
+        broadcastLog(room, `${p.name} のチップが 0 になりました（10分以内に補充または退室を選んでください）`, 'important');
+        // Schedule a hard kick if the player doesn't resolve within 10 min.
+        if (room.bustTimers[seat]) clearTimeout(room.bustTimers[seat]);
+        room.bustTimers[seat] = setTimeout(() => {
+            // Re-check: did they rebuy or leave? If so, this timer was already cleared.
+            if (!rooms.has(room.id)) return;
+            if (!room.bustedAt[seat]) return;
+            const member = room.getClientBySeat(seat);
+            const name = member ? member.name : (game.players[seat] && game.players[seat].name) || '';
+            broadcastLog(room, `${name} が10分間チップ補充を選択しなかったため退室しました`, 'important');
+            delete room.bustedAt[seat];
+            delete room.bustTimers[seat];
+            if (member && member.ws) {
+                try { send(member.ws, { type: 'auto_kicked' }); } catch {}
+                // Resolve clientId → client for leaveRoom.
+                let targetClient = null;
+                for (const [, c] of clients) {
+                    if (c.id === member.clientId) { targetClient = c; break; }
+                }
+                if (targetClient) leaveRoom(targetClient, room.id);
+            }
+            broadcastGameState(room);
+        }, BUST_WINDOW_MS);
+    }
+}
+
+function hasPendingBust(room) {
+    if (!room || !room.bustedAt) return false;
+    const now = Date.now();
+    for (const key of Object.keys(room.bustedAt)) {
+        const t = room.bustedAt[key];
+        if (t && now - t < BUST_WINDOW_MS) return true;
+    }
+    return false;
+}
+
+function clearBustState(room, seat) {
+    if (!room) return;
+    if (room.bustTimers && room.bustTimers[seat]) {
+        clearTimeout(room.bustTimers[seat]);
+        delete room.bustTimers[seat];
+    }
+    if (room.bustedAt) delete room.bustedAt[seat];
+}
+
 function applyPendingReservations(room) {
     if (!room || !rooms.has(room.id)) return;
 
@@ -2032,6 +2184,10 @@ function leaveRoom(client, targetRoomId) {
     const rid = targetRoomId || client.roomId;
     const room = rooms.get(rid);
     if (!room) { return; }
+
+    // If they were in a bust-decision window, cancel the pending kick timer.
+    const leavingSeat = room.seatMap ? room.seatMap[client.id] : undefined;
+    if (leavingSeat !== undefined) clearBustState(room, leavingSeat);
 
     room.members = room.members.filter(m => m.clientId !== client.id);
     delete room.playerGames[client.id];
@@ -2159,6 +2315,11 @@ function startGame(room) {
     room.consecutiveTimeouts = {};
     room.sitout = {};        // seat -> true if sitting out
     room.sitoutTime = {};    // seat -> timestamp when sitout started
+    // Busted: a player whose chips reached 0. They enter sitout and get a
+    // 10-minute window to choose rebuy or leave. bustTimers[seat] holds the
+    // setTimeout handle so rebuy/leave can cancel it. See detectBust().
+    room.bustedAt = {};
+    room.bustTimers = {};
 
     // Stats
     room.stats = new StatsTracker();
@@ -2305,10 +2466,18 @@ function startGame(room) {
                     room.sitout[seat] = false;
                     delete room.sitoutTime[seat];
                     broadcastLog(room, `${p.name} が10分間離席のため退室しました`, 'important');
-                    // Disconnect the player's ws
+                    // Notify the player's client AND actually remove them from
+                    // the room on the server. Without the leaveRoom call,
+                    // client.roomIds stayed out of sync and join_room
+                    // rejected a subsequent rejoin with "すでに参加しています".
                     const member = room.getClientBySeat(seat);
                     if (member && member.ws) {
                         send(member.ws, { type: 'auto_kicked' });
+                        let targetClient = null;
+                        for (const [, c] of clients) {
+                            if (c.id === member.clientId) { targetClient = c; break; }
+                        }
+                        if (targetClient) leaveRoom(targetClient, room.id);
                     }
                 }
             }
@@ -2414,6 +2583,9 @@ function startGame(room) {
         // sitout/leave reservations, then evaluate auto-close.
         setTimeout(() => {
             applyPendingReservations(room);
+            // Convert any chips-0 players into a 10-minute rebuy/leave window.
+            detectBust(room);
+            broadcastGameState(room);
             maybeAutoCloseRoom(room);
         }, 50);
     };
@@ -2443,25 +2615,76 @@ async function runGameLoop(room) {
     const game = room.game;
 
     while (!game.gameOver && room.playing && room.members.length > 0) {
-        try {
-            await game.playHand();
-        } catch (e) {
-            console.error('Hand error:', e);
-            broadcastLog(room, 'エラーが発生しました。次のハンドに進みます。', 'important');
+        const playable = () => game.players.filter(p => p.connected && p.chips > 0);
+
+        if (playable().length >= 2) {
+            // Recovering from solo-wait (another player joined). Clear the state.
+            if (room.soloWaitSince) {
+                delete room.soloWaitSince;
+                broadcastLog(room, 'プレイヤーが揃ったためゲームを再開します', 'important');
+                broadcastGameState(room);
+            }
+
+            try {
+                await game.playHand();
+            } catch (e) {
+                console.error('Hand error:', e);
+                broadcastLog(room, 'エラーが発生しました。次のハンドに進みます。', 'important');
+            }
+
+            broadcastGameState(room);
+            await new Promise(r => setTimeout(r, 2500));
+
+            // Reset actions
+            for (const p of game.players) p.lastAction = '';
         }
 
-        broadcastGameState(room);
-        await new Promise(r => setTimeout(r, 2500));
-
-        // Reset actions
-        for (const p of game.players) p.lastAction = '';
-
-        // Check connected players
-        const connected = game.players.filter(p => p.connected && p.chips > 0);
-        if (connected.length <= 1) {
+        // Not enough players to play a hand.
+        if (playable().length <= 1) {
+            // A busted player still within their 10-minute decision window takes
+            // precedence — keep the table alive so they can rebuy without a
+            // HU bust slamming the table shut instantly.
+            if (hasPendingBust(room)) {
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+            }
+            // Solo player: give them a 10-minute window to wait for another
+            // player to join or to explicitly end the table. On timeout, auto
+            // kick them and close the table.
+            if (playable().length === 1) {
+                if (!room.soloWaitSince) {
+                    room.soloWaitSince = Date.now();
+                    broadcastLog(room, '他プレイヤーがいないため待機状態です（10分以内に参加者が来ない場合はテーブル終了）', 'important');
+                    broadcastGameState(room);
+                }
+                if (Date.now() - room.soloWaitSince >= BUST_WINDOW_MS) {
+                    const soloSeat = game.players.findIndex(p => p.connected && p.chips > 0);
+                    const member = soloSeat >= 0 ? room.getClientBySeat(soloSeat) : null;
+                    if (member && member.ws) {
+                        try { send(member.ws, { type: 'auto_kicked' }); } catch {}
+                        // Also remove them from the server-side room state so
+                        // client.roomIds stays consistent and a future join_room
+                        // isn't rejected with "すでに参加しています".
+                        let targetClient = null;
+                        for (const [, c] of clients) {
+                            if (c.id === member.clientId) { targetClient = c; break; }
+                        }
+                        if (targetClient) leaveRoom(targetClient, room.id);
+                    }
+                    broadcastLog(room, '10分間他プレイヤーが参加しなかったためテーブルを終了します', 'important');
+                    delete room.soloWaitSince;
+                    game.gameOver = true;
+                    continue;
+                }
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+            }
+            // 0 playable players — nothing left to wait for.
             game.gameOver = true;
         }
     }
+    // Clean up solo-wait state regardless of how the loop exited.
+    if (room.soloWaitSince) delete room.soloWaitSince;
 
     // Game over
     room.playing = false;

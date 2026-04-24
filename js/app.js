@@ -1007,6 +1007,12 @@ function doLogout() {
     // Clear the in-memory hand history so the next person on this device
     // doesn't briefly see the previous identity's hands before they re-enter.
     handHistory = [];
+    // Reset the account form back to login mode. Without this, a user who
+    // just registered will find the form stuck in 'register' mode, and
+    // re-submitting the same credentials triggers a register request that
+    // fails with "このメールアドレスは既に登録されています" — which reads as
+    // "login is broken."
+    resetAccountFormToLogin();
     showScreen('login');
     // If we have a remembered account, surface the welcome-back card on
     // the account tab so re-login is one click + password.
@@ -1017,6 +1023,22 @@ function doLogout() {
         document.getElementById('login-guest-form')?.classList.add('hidden');
         renderWelcomeBackCard();
     }
+}
+
+function resetAccountFormToLogin() {
+    accountMode = 'login';
+    const tabLogin = document.getElementById('tab-login');
+    const tabReg = document.getElementById('tab-register');
+    const nameIn = document.getElementById('account-name');
+    const passIn = document.getElementById('account-password');
+    const submitBtn = document.getElementById('btn-account-submit');
+    const errorEl = document.getElementById('login-error');
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabReg) tabReg.classList.remove('active');
+    if (nameIn) { nameIn.classList.add('hidden'); nameIn.value = ''; }
+    if (passIn) passIn.value = '';
+    if (submitBtn) { submitBtn.textContent = 'ログイン'; submitBtn.disabled = false; }
+    if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('hidden'); }
 }
 
 function enterLobby(displayName) {
@@ -1791,6 +1813,171 @@ function onGameState(state) {
     showFoldedButtons(state);
     // Show pre-action checkboxes when waiting for turn
     updatePreActionVisibility(state);
+    // Busted players get a dedicated modal with a 10-min rebuy/leave choice.
+    updateBustModal(state);
+    // Solo waiting: last chip-holder sees a "waiting for others" modal.
+    updateSoloWaitModal(state);
+}
+
+// Bust modal: shown when this client's chips hit 0. The player has 10 minutes
+// to choose rebuy (+10000) or leave. If they do nothing, the server kicks
+// them automatically, matching the existing sitout timeout behavior.
+let bustCountdownInterval = null;
+let bustCountdownSecondsLeft = null;
+
+function updateBustModal(state) {
+    if (!state || state.mySeatIndex == null) return;
+    const me = state.players && state.players[state.mySeatIndex];
+    const isBusted = !!(me && me.busted) || !!state.myBusted;
+    let modal = document.getElementById('bust-modal');
+
+    if (!isBusted) {
+        if (modal) modal.classList.add('hidden');
+        if (bustCountdownInterval) { clearInterval(bustCountdownInterval); bustCountdownInterval = null; }
+        bustCountdownSecondsLeft = null;
+        return;
+    }
+
+    // Lazy-create the modal so we don't need to edit index.html.
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'bust-modal';
+        modal.className = 'bust-modal-overlay hidden';
+        modal.innerHTML = `
+            <div class="bust-modal-card">
+                <div class="bust-modal-title">💸 チップが 0 になりました</div>
+                <div class="bust-modal-body">
+                    10分以内に「チップ補充」か「退室」を選んでください。<br>
+                    何もしなかった場合は離席扱いで自動退室となります。
+                </div>
+                <div class="bust-modal-timer">
+                    <span class="bust-modal-timer-label">残り時間</span>
+                    <span class="bust-modal-timer-text" id="bust-modal-timer-text">--:--</span>
+                    <div class="bust-modal-bar-outer"><div class="bust-modal-bar" id="bust-modal-bar" style="width:100%"></div></div>
+                </div>
+                <div class="bust-modal-actions">
+                    <button class="btn-action btn-call" id="btn-bust-rebuy">チップ補充 (+10,000)</button>
+                    <button class="btn-action btn-fold" id="btn-bust-leave">退室する</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('#btn-bust-rebuy').addEventListener('click', () => {
+            client.rebuyFromBust(activeTableId);
+        });
+        modal.querySelector('#btn-bust-leave').addEventListener('click', () => {
+            client.leaveFromBust(activeTableId);
+        });
+    }
+
+    // Sync local countdown from server-provided seconds.
+    if (me && typeof me.bustedRemaining === 'number') {
+        bustCountdownSecondsLeft = me.bustedRemaining;
+    } else if (bustCountdownSecondsLeft == null) {
+        bustCountdownSecondsLeft = 600;
+    }
+
+    modal.classList.remove('hidden');
+    renderBustCountdown();
+    if (!bustCountdownInterval) {
+        bustCountdownInterval = setInterval(() => {
+            if (bustCountdownSecondsLeft == null) return;
+            bustCountdownSecondsLeft = Math.max(0, bustCountdownSecondsLeft - 1);
+            renderBustCountdown();
+            if (bustCountdownSecondsLeft <= 0) {
+                clearInterval(bustCountdownInterval);
+                bustCountdownInterval = null;
+            }
+        }, 1000);
+    }
+}
+
+function renderBustCountdown() {
+    const txt = document.getElementById('bust-modal-timer-text');
+    const bar = document.getElementById('bust-modal-bar');
+    if (!txt || !bar) return;
+    const s = bustCountdownSecondsLeft == null ? 0 : bustCountdownSecondsLeft;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    txt.textContent = `${m}:${String(sec).padStart(2, '0')}`;
+    bar.style.width = `${Math.max(0, Math.min(100, (s / 600) * 100))}%`;
+    if (s <= 120) bar.classList.add('urgent'); else bar.classList.remove('urgent');
+}
+
+// Solo-wait modal: the player is the only chip-holder at the table. They can
+// end the table immediately or wait up to 10 minutes for another player to
+// join. Mirrors the bust modal's structure for consistency.
+let soloWaitCountdownInterval = null;
+let soloWaitSecondsLeft = null;
+
+function updateSoloWaitModal(state) {
+    if (!state) return;
+    const isSolo = !!state.mySoloWait;
+    let modal = document.getElementById('solo-wait-modal');
+
+    if (!isSolo) {
+        if (modal) modal.classList.add('hidden');
+        if (soloWaitCountdownInterval) { clearInterval(soloWaitCountdownInterval); soloWaitCountdownInterval = null; }
+        soloWaitSecondsLeft = null;
+        return;
+    }
+
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'solo-wait-modal';
+        modal.className = 'bust-modal-overlay hidden';
+        modal.innerHTML = `
+            <div class="bust-modal-card">
+                <div class="bust-modal-title" style="color:#38bdf8">💭 他プレイヤーを待っています</div>
+                <div class="bust-modal-body">
+                    このテーブルには現在あなたしかいません。<br>
+                    10分以内に他プレイヤーが参加しない場合は自動的にテーブルを終了します。
+                </div>
+                <div class="bust-modal-timer">
+                    <span class="bust-modal-timer-label">残り時間</span>
+                    <span class="bust-modal-timer-text" id="solo-wait-timer-text">--:--</span>
+                    <div class="bust-modal-bar-outer"><div class="bust-modal-bar" id="solo-wait-bar" style="width:100%"></div></div>
+                </div>
+                <div class="bust-modal-actions">
+                    <button class="btn-action btn-fold" id="btn-solo-end">テーブル終了</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('#btn-solo-end').addEventListener('click', () => {
+            client.endTableNow(activeTableId);
+        });
+    }
+
+    if (typeof state.soloWaitRemaining === 'number') {
+        soloWaitSecondsLeft = state.soloWaitRemaining;
+    } else if (soloWaitSecondsLeft == null) {
+        soloWaitSecondsLeft = 600;
+    }
+
+    modal.classList.remove('hidden');
+    renderSoloWaitCountdown();
+    if (!soloWaitCountdownInterval) {
+        soloWaitCountdownInterval = setInterval(() => {
+            if (soloWaitSecondsLeft == null) return;
+            soloWaitSecondsLeft = Math.max(0, soloWaitSecondsLeft - 1);
+            renderSoloWaitCountdown();
+            if (soloWaitSecondsLeft <= 0) {
+                clearInterval(soloWaitCountdownInterval);
+                soloWaitCountdownInterval = null;
+            }
+        }, 1000);
+    }
+}
+
+function renderSoloWaitCountdown() {
+    const txt = document.getElementById('solo-wait-timer-text');
+    const bar = document.getElementById('solo-wait-bar');
+    if (!txt || !bar) return;
+    const s = soloWaitSecondsLeft == null ? 0 : soloWaitSecondsLeft;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    txt.textContent = `${m}:${String(sec).padStart(2, '0')}`;
+    bar.style.width = `${Math.max(0, Math.min(100, (s / 600) * 100))}%`;
+    if (s <= 120) bar.classList.add('urgent'); else bar.classList.remove('urgent');
 }
 
 function onZoomJoined() {
@@ -2014,16 +2201,42 @@ function renderMiniCards(cardObjs) {
     }).join('');
 }
 
+function renderHiddenCards(n) {
+    if (!n || n <= 0) return '<span style="color:var(--text-dim)">--</span>';
+    let out = '';
+    for (let i = 0; i < n; i++) out += `<span class="mini-card mini-card-back">🂠</span>`;
+    return out;
+}
+
+function renderHiddenVisualCards(n) {
+    if (!n || n <= 0) return '';
+    let out = '';
+    for (let i = 0; i < n; i++) out += `<span class="hh-visual-card hh-visual-card-back">🂠</span>`;
+    return out;
+}
+
 function renderHandDetail(h, idx) {
     if (!h) return '';
     const hr = h.handResult;
     const myName = client.name;
+    // Hide other players' private cards until the user either posts this hand
+    // with a comment (sets h.posted) or manually reveals it (sets h.revealed).
+    // Stud up-cards stayed public during play, so we only mask hole/down cards.
+    const hide = !h.posted && !h.revealed;
 
     // Header: game name + time
     let html = `<div class="hh-detail-header">`;
     html += `<span class="hh-detail-title">#${idx + 1} ${h.gameName || ''}</span>`;
     html += `<span class="hh-detail-time">${h.time || ''}</span>`;
     html += `</div>`;
+
+    // Hide-notice banner with manual reveal button.
+    if (hide) {
+        html += `<div class="hh-hide-notice">`;
+        html += `<span class="hh-hide-msg">👁️‍🗨️ 他プレイヤーのカードは非表示です。コメント付きで投稿すると公開されます。</span>`;
+        html += `<button class="hh-reveal-btn" data-hh-reveal-idx="${idx}">表示する</button>`;
+        html += `</div>`;
+    }
 
     // === Player summary table (position, name, result, cards) ===
     if (hr && hr.players) {
@@ -2034,13 +2247,17 @@ function renderHandDetail(h, idx) {
                             diff < 0 ? `<span class="hh-loss">${diff}</span>` :
                             `<span class="hh-even">±0</span>`;
             const isMe = p.name === myName;
+            const maskPrivate = hide && !isMe;
             const nameClass = isMe ? 'hh-p-name hh-p-me' : 'hh-p-name';
             let cards = '';
             const foldTag = p.folded ? '<span class="hh-folded-label">fold</span> ' : '';
             if (hr.gameType === 'stud' && p.downCards && p.downCards.length > 0) {
-                cards = `${foldTag}<span class="hh-stud-down">[${renderMiniCards(p.downCards)}]</span> ${renderMiniCards(p.upCards)}`;
+                const downHtml = maskPrivate
+                    ? renderHiddenCards(p.downCards.length)
+                    : renderMiniCards(p.downCards);
+                cards = `${foldTag}<span class="hh-stud-down">[${downHtml}]</span> ${renderMiniCards(p.upCards)}`;
             } else if (p.cards && p.cards.length > 0) {
-                cards = foldTag + renderMiniCards(p.cards);
+                cards = foldTag + (maskPrivate ? renderHiddenCards(p.cards.length) : renderMiniCards(p.cards));
             } else {
                 cards = foldTag || '';
             }
@@ -2172,6 +2389,9 @@ function renderHandDetail(h, idx) {
             let label;
             if (d.count === 0) {
                 label = 'スタンドパット';
+            } else if (hide && !isMe) {
+                // Mask exact discarded/drawn cards; only show the count.
+                label = `${d.count}枚交換`;
             } else {
                 const discStr = renderMiniCards(d.discarded);
                 const drawnStr = renderMiniCards(d.drawn);
@@ -2191,7 +2411,12 @@ function renderHandDetail(h, idx) {
             const isMe = d.name === myName;
             const cls = isMe ? 'hh-draw-player hh-draw-me' : 'hh-draw-player';
             const upDown = d.up ? 'アップ' : 'ダウン';
-            out += `<div class="${cls}"><span class="hh-draw-pname">${d.name}</span> <span class="hh-stud-deal">${renderMiniCards([d.card])} (${upDown})</span></div>`;
+            // Up-cards were public during the hand — always show them.
+            // Down-cards (7th street) are private; mask for non-self while hidden.
+            const cardHtml = (!d.up && hide && !isMe)
+                ? renderHiddenCards(1)
+                : renderMiniCards([d.card]);
+            out += `<div class="${cls}"><span class="hh-draw-pname">${d.name}</span> <span class="hh-stud-deal">${cardHtml} (${upDown})</span></div>`;
         }
         out += `</div>`;
         return out;
@@ -2272,7 +2497,10 @@ function renderHandDetail(h, idx) {
         if (h.showdownPlayers && h.showdownPlayers.length > 0) {
             for (const p of h.showdownPlayers) {
                 const nameClass = p.isMe ? 'hh-sd-name hh-sd-me' : 'hh-sd-name';
-                html += `<div class="hh-card-group"><span class="${nameClass}">${p.name}</span>${renderVisualCards(p.cards)}</div>`;
+                const cardsHtml = (hide && !p.isMe)
+                    ? renderHiddenVisualCards((p.cards || []).length)
+                    : renderVisualCards(p.cards);
+                html += `<div class="hh-card-group"><span class="${nameClass}">${p.name}</span>${cardsHtml}</div>`;
             }
         }
         html += `</div>`;
@@ -2388,7 +2616,7 @@ function showLoginRequiredToast(featureLabel) {
     showToast(`${featureLabel}はアカウント登録が必要です（ゲストはプレイのみ）`);
 }
 
-// Event delegation for replay/share buttons
+// Event delegation for replay/share/reveal buttons
 document.addEventListener('click', (e) => {
     const replayBtn = e.target.closest('.btn-hh-replay');
     if (replayBtn) {
@@ -2398,6 +2626,18 @@ document.addEventListener('click', (e) => {
     const shareBtn = e.target.closest('.btn-hh-share');
     if (shareBtn) {
         shareReplay(parseInt(shareBtn.dataset.hhIdx));
+        return;
+    }
+    const revealBtn = e.target.closest('.hh-reveal-btn');
+    if (revealBtn) {
+        const idx = parseInt(revealBtn.dataset.hhRevealIdx);
+        const h = handHistory[idx];
+        if (!h) return;
+        h.revealed = true;
+        persistHandHistory();
+        // Re-render the currently open detail pane in place.
+        const detail = revealBtn.closest('.hh-detail');
+        if (detail) detail.innerHTML = renderHandDetail(h, idx);
         return;
     }
 });
