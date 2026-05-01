@@ -1102,7 +1102,10 @@ function setupAccountLogin() {
         document.getElementById('tab-login')?.classList.add('active');
         document.getElementById('tab-register')?.classList.remove('active');
         nameInput?.classList.add('hidden');
-        if (submitBtn) submitBtn.textContent = 'ログイン';
+        if (submitBtn) { submitBtn.textContent = 'ログイン'; submitBtn.disabled = false; }
+        // Clear any leftover error (e.g. "セッションが期限切れです") so the
+        // user starts with a clean form.
+        clearLoginError();
         if (passInput) { passInput.value = ''; passInput.focus(); }
     });
     if (wbSwitch) wbSwitch.addEventListener('click', () => {
@@ -1110,6 +1113,16 @@ function setupAccountLogin() {
         dismissWelcomeBackCard();
         if (emailInput) emailInput.value = '';
         if (passInput) passInput.value = '';
+        // Reset to a clean login form — clear stale errors AND failure counters
+        // so the user starts fresh.
+        clearLoginError();
+        resetLoginFailures();
+        // Reset to login mode by default (most common case).
+        accountMode = 'login';
+        document.getElementById('tab-login')?.classList.add('active');
+        document.getElementById('tab-register')?.classList.remove('active');
+        nameInput?.classList.add('hidden');
+        if (submitBtn) { submitBtn.textContent = 'ログイン'; submitBtn.disabled = false; }
     });
 
     // Login / Register tab switching
@@ -1176,6 +1189,27 @@ function showLoginError(msg) {
     el.textContent = msg;
     el.classList.remove('hidden');
 }
+function clearLoginError() {
+    const el = document.getElementById('login-error');
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
+}
+
+// Track per-email login failure counts so the welcome-back card stops
+// re-suggesting a credential that the server keeps rejecting (typical when
+// localStorage has a stale `last_account` whose email no longer matches any
+// real account, e.g. after a server reset or a failed Supabase migration).
+let loginFailuresByEmail = {};
+function recordLoginFailure(email) {
+    if (!email) return 0;
+    const key = email.toLowerCase();
+    loginFailuresByEmail[key] = (loginFailuresByEmail[key] || 0) + 1;
+    return loginFailuresByEmail[key];
+}
+function resetLoginFailures() {
+    loginFailuresByEmail = {};
+}
 
 function onAuthResult(data) {
     // Clear the safety timeout — the server replied.
@@ -1199,18 +1233,46 @@ function onAuthResult(data) {
         // on future visits (Netflix/GitHub style). Kept even after logout *unless*
         // the user explicitly switches via "他のアカウントでログイン".
         saveLastAccount({ name: data.name, email: data.email, avatar: selectedAvatar || null });
+        // Successful auth: clear any stale error from a previous failed attempt
+        // and forget per-email failure counters.
+        clearLoginError();
+        resetLoginFailures();
         client.setName(data.name, selectedAvatar, false);
         // Switch to this account's hand history scope.
         reloadHandHistoryForIdentity();
         enterLobby(data.name);
-    } else {
-        // If the failure came from a resume attempt, the stored token is
-        // invalid — drop it so we don't loop trying to resume next reload.
-        if (wasResuming) clearAuthSession();
-        // Silent no-op when resume fails with no interactive form visible.
-        const errorEl = document.getElementById('login-error');
-        if (errorEl) showLoginError(data.message || 'エラーが発生しました');
+        return;
     }
+
+    // ----- Failure -----
+    if (wasResuming) {
+        // Stored token is invalid (server restarted, expired, or account
+        // deleted). Drop it so the next reload doesn't loop on it.
+        clearAuthSession();
+    }
+
+    // Detect repeated failures on the SAME email (typical when localStorage
+    // points at a non-existent account from a previous deploy/dev reset).
+    // After 2 strikes, drop the cached `last_account` so the welcome-back
+    // card stops auto-suggesting the broken email and the user gets a clean
+    // form on the next visit.
+    let extraHint = '';
+    const emailInput = document.getElementById('account-email');
+    const failedEmail = emailInput ? emailInput.value.trim() : '';
+    if (failedEmail && /正しくありません/.test(data.message || '')) {
+        const fails = recordLoginFailure(failedEmail);
+        if (fails >= 2) {
+            // Was the welcome-back card pointing at this email?
+            const last = loadLastAccount();
+            if (last && last.email && last.email.toLowerCase() === failedEmail.toLowerCase()) {
+                clearLastAccount();
+                extraHint = '（前回のアカウント情報を消去しました。新規登録するか、別のメールを入力してください）';
+            } else {
+                extraHint = '（パスワードが分からない場合は新規登録してください）';
+            }
+        }
+    }
+    showLoginError((data.message || 'エラーが発生しました') + extraHint);
 }
 
 function tryResumeSession() {
