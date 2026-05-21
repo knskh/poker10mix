@@ -571,6 +571,29 @@ async function lookupAccount(email) {
     return null;
 }
 
+// Look up an account by name. Tries Supabase first, then local JSON.
+// Returns true if the name is already taken, false otherwise.
+async function isNameTaken(name) {
+    const normalizedName = name.trim().toLowerCase();
+    if (supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('accounts')
+                .select('name')
+                .ilike('name', normalizedName)
+                .limit(1);
+            if (!error && data && data.length > 0) return true;
+            if (error) console.warn('Supabase name lookup error:', error.message);
+        } catch (e) {
+            console.warn('Supabase name lookup exception:', e && e.message);
+        }
+    }
+    // Fallback: check local accounts
+    return Object.values(localAccounts).some(
+        acc => (acc.name || '').toLowerCase() === normalizedName
+    );
+}
+
 // Basic email shape check — not RFC-compliant, just to reject obviously
 // wrong inputs like "abc" or "@@". Combined with a length cap to keep DB
 // rows bounded.
@@ -606,6 +629,13 @@ async function handleRegister(ws, client, msg) {
         const existing = await lookupAccount(email);
         if (existing) {
             send(ws, { type: 'auth_result', success: false, message: 'このメールアドレスは既に登録されています' });
+            return;
+        }
+
+        // Refuse if the name is already taken (case-insensitive).
+        const nameTaken = await isNameTaken(name);
+        if (nameTaken) {
+            send(ws, { type: 'auth_result', success: false, message: 'このアカウント名は既に使用されています' });
             return;
         }
 
