@@ -5548,7 +5548,14 @@ function switchCpTab(tab) {
     });
     document.getElementById('cp-view-online').classList.toggle('hidden', tab !== 'list');
     document.getElementById('cp-view-cloud').classList.toggle('hidden', tab !== 'cloud');
-    if (tab === 'cloud') renderPlayerCloud(lastOnlineUsers || []);
+    if (tab === 'cloud') {
+        // サーバーから最新の player_stats を取得してからレンダリング
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'get_player_stats' }));
+        } else {
+            renderPlayerCloud(lastOnlineUsers || []);
+        }
+    }
 }
 
 // ---- プレイヤークラウド描画 ----
@@ -6435,6 +6442,19 @@ client.on('auto_shared', (post) => {
 });
 // footprints / new_footprint: UI removed — handler no longer needed
 // profile_data: UI removed — no handler needed
+
+// player_stats: Player Cloud visualization data
+client.on('player_stats', ({ stats }) => {
+    if (!stats) return;
+    // { [name]: { total_profit, session_count, total_diversity, comment_likes } }
+    window.playerStatsCache = Object.fromEntries(
+        stats.map(s => [s.name, s])
+    );
+    // クラウドタブが開いていれば即レンダリング
+    if (currentCpTab === 'cloud') {
+        renderPlayerCloud(lastOnlineUsers || []);
+    }
+});
 
 // Init
 setupActionRipple();

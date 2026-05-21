@@ -451,6 +451,60 @@ const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 const supabase = (createClient && SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
+// ============================================
+// Player Stats (for Player Cloud visualization)
+// ============================================
+// In-memory cache: { [name]: { total_profit, session_count, total_diversity, comment_likes } }
+const playerStatsMap = {};
+
+async function upsertPlayerStats(name, delta) {
+    if (!name) return;
+    if (!playerStatsMap[name]) {
+        playerStatsMap[name] = { total_profit: 0, session_count: 0, total_diversity: 0, comment_likes: 0 };
+    }
+    const s = playerStatsMap[name];
+    if (delta.profitDelta  !== undefined) s.total_profit   += delta.profitDelta;
+    if (delta.sessionDelta !== undefined) s.session_count  += delta.sessionDelta;
+    if (delta.diversityDelta !== undefined) s.total_diversity += delta.diversityDelta;
+    if (delta.likeDelta    !== undefined) s.comment_likes  = Math.max(0, s.comment_likes + delta.likeDelta);
+
+    if (supabase) {
+        try {
+            await supabase.from('player_stats').upsert({
+                name,
+                total_profit:   s.total_profit,
+                session_count:  s.session_count,
+                total_diversity: s.total_diversity,
+                comment_likes:  s.comment_likes,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'name' });
+        } catch (e) {
+            console.warn('player_stats upsert error:', e && e.message);
+        }
+    }
+}
+
+async function loadAllPlayerStats() {
+    if (!supabase) return;
+    try {
+        const { data, error } = await supabase.from('player_stats').select('*');
+        if (!error && data) {
+            for (const row of data) {
+                playerStatsMap[row.name] = {
+                    total_profit:    row.total_profit    || 0,
+                    session_count:   row.session_count   || 0,
+                    total_diversity: row.total_diversity || 0,
+                    comment_likes:   row.comment_likes   || 0,
+                };
+            }
+            console.log(`player_stats loaded: ${data.length} records`);
+        }
+    } catch (e) {
+        console.warn('player_stats load error:', e && e.message);
+    }
+}
+loadAllPlayerStats();
+
 // Local JSON fallback (used when Supabase is not configured). This restores
 // login on local / unconfigured deployments where the env vars are missing,
 // instead of failing every request with "データベース未設定です".
@@ -1879,7 +1933,14 @@ function handleMessage(ws, client, msg) {
             const commentId = Number(msg.commentId);
             if (!postId || !commentId) break;
             const result = toggleCommentLike(postId, commentId, client.name);
-            if (result) broadcastCommentLike(result.post, result.comment, client.name, result.likedNow);
+            if (result) {
+                broadcastCommentLike(result.post, result.comment, client.name, result.likedNow);
+                // player_stats: コメント作者のいいね数を更新
+                const commentAuthor = result.comment && result.comment.authorName;
+                if (commentAuthor && commentAuthor !== client.name) {
+                    upsertPlayerStats(commentAuthor, { likeDelta: result.likedNow ? 1 : -1 });
+                }
+            }
             break;
         }
 
@@ -1951,6 +2012,19 @@ function handleMessage(ws, client, msg) {
         case 'get_rooms':
             broadcastRoomList();
             break;
+
+        case 'get_player_stats': {
+            // Return all player stats for the Player Cloud visualization
+            const statsArray = Object.entries(playerStatsMap).map(([name, s]) => ({
+                name,
+                total_profit:    s.total_profit    || 0,
+                session_count:   s.session_count   || 0,
+                total_diversity: s.total_diversity || 0,
+                comment_likes:   s.comment_likes   || 0,
+            }));
+            send(ws, { type: 'player_stats', stats: statsArray });
+            break;
+        }
     }
 }
 
@@ -2021,6 +2095,12 @@ function buildSessionSummary(room) {
 function postSessionSummary(room, reason) {
     const summary = buildSessionSummary(room);
     if (!summary || !summary.players || summary.players.length === 0) return;
+    // player_stats: セッション終了時に多様性・セッション回数を記録
+    const gameCount = room.sessionGameIds ? room.sessionGameIds.size : 1;
+    for (const p of summary.players) {
+        if (!p.name) continue;
+        upsertPlayerStats(p.name, { sessionDelta: 1, diversityDelta: gameCount });
+    }
     // Pick the winner as author (the biggest positive diff). If none positive,
     // use the top of the sorted list (smallest loss).
     const top = summary.players[0];
@@ -2585,6 +2665,16 @@ function startGame(room) {
                 room.sessionParticipants[p.name] = { avatar: p.avatar || null };
             }
         }
+
+        // player_stats: 収支を記録
+        for (const p of handResult.players) {
+            if (!p.name) continue;
+            const diff = p.chips - p.startChips;
+            upsertPlayerStats(p.name, { profitDelta: diff });
+        }
+        // player_stats: このセッションでプレイしたゲーム種類を記録
+        if (!room.sessionGameIds) room.sessionGameIds = new Set();
+        if (gc && gc.id) room.sessionGameIds.add(gc.id);
 
         // Big hand detection → broadcast to lobby
         const bigBlind = (gc && gc.bigBlind) || game.bigBlind || 100;
