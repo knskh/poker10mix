@@ -647,6 +647,73 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
 }
 
 /* ==========================================
+   オンラインユーザーモーダル タブ
+   ========================================== */
+#chat-picker-modal .cp-tabs {
+    display: flex; border-bottom: 2px solid #E0ECFA;
+    background: #F5FAFF;
+}
+#chat-picker-modal .cp-tab {
+    flex: 1; padding: 9px 0; font-size: 12px; font-weight: 700;
+    color: #7A99BE; background: transparent; border: none;
+    cursor: pointer; transition: color .15s, border-bottom .15s;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    font-family: inherit;
+}
+#chat-picker-modal .cp-tab.active {
+    color: #2A6BC9; border-bottom-color: #2A6BC9;
+}
+#chat-picker-modal .cp-tab:hover { color: #2A6BC9; }
+
+/* ==========================================
+   プレイヤークラウド（モーダル内）
+   ========================================== */
+#cp-view-cloud {
+    background: #0f1117 !important;
+    padding: 0 !important;
+    display: flex; flex-direction: column;
+}
+.pc-legend {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding: 8px 12px; background: #181d2a;
+    border-bottom: 1px solid #1e2a3a;
+    font-size: 10px; color: #6a7a90;
+}
+.pc-leg-sep { color: #2a3a50; }
+.pc-chart-wrap {
+    flex: 1; position: relative; overflow: hidden;
+}
+#player-cloud-svg {
+    width: 100%; height: 100%;
+    display: block;
+    background: radial-gradient(ellipse at 30% 30%, #111827 60%, #0d1420 100%);
+}
+.pc-axis-labels {
+    text-align: center; padding: 4px 0;
+    font-size: 9px; color: #3a5070;
+    background: #0f1117;
+}
+.pc-axis-x { letter-spacing: 0.03em; }
+.pc-tooltip {
+    position: fixed;
+    background: #1a2235; border: 1px solid #2e4060;
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 11px; color: #c8d8f0;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.15s; z-index: 9999;
+    min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.pc-tooltip.show { opacity: 1; }
+.pc-tooltip .pct-name { font-size: 13px; font-weight: 700; color: #7eb8f7; margin-bottom: 5px; }
+.pc-tooltip .pct-row { display: flex; justify-content: space-between; gap: 12px; margin: 2px 0; }
+.pc-tooltip .pct-val { font-weight: 600; color: #e0e6f0; }
+.pc-no-data {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: #3a5070; font-size: 13px;
+}
+
+/* ==========================================
    Manual hand posting UI
    ========================================== */
 #sns-screen .mx-feed-post-btn {

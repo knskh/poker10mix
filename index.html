@@ -168,8 +168,30 @@
                     <div class="rp-title">👥 オンラインユーザー <span id="cp-online-count"></span></div>
                     <button class="rp-close" id="btn-cp-close">✕</button>
                 </div>
+                <!-- タブ切り替え -->
+                <div class="cp-tabs">
+                    <button class="cp-tab active" data-cp-tab="list">👥 ユーザーリスト</button>
+                    <button class="cp-tab" data-cp-tab="cloud">☁️ プレイヤークラウド</button>
+                </div>
+                <!-- ユーザーリスト -->
                 <div class="cp-online-wrap" id="cp-view-online">
                     <div id="online-user-list" class="online-user-list"></div>
+                </div>
+                <!-- プレイヤークラウド -->
+                <div class="cp-online-wrap hidden" id="cp-view-cloud">
+                    <div class="pc-legend">
+                        <span class="pc-leg-item">文字サイズ＝収支</span>
+                        <span class="pc-leg-sep">／</span>
+                        <span class="pc-leg-item">横＝ゲーム多様性</span>
+                        <span class="pc-leg-sep">／</span>
+                        <span class="pc-leg-item">縦＝いいね数</span>
+                    </div>
+                    <div class="pc-chart-wrap">
+                        <svg id="player-cloud-svg"></svg>
+                    </div>
+                    <div class="pc-axis-labels">
+                        <span class="pc-axis-x">← ゲーム多様性 →</span>
+                    </div>
                 </div>
             </div>
         </div>
