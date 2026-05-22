@@ -1232,28 +1232,7 @@ function onAuthResult(data) {
         clearAuthSession();
     }
 
-    // Detect repeated failures on the SAME email (typical when localStorage
-    // points at a non-existent account from a previous deploy/dev reset).
-    // After 2 strikes, drop the cached `last_account` so the welcome-back
-    // card stops auto-suggesting the broken email and the user gets a clean
-    // form on the next visit.
-    let extraHint = '';
-    const emailInput = document.getElementById('account-email');
-    const failedEmail = emailInput ? emailInput.value.trim() : '';
-    if (failedEmail && /正しくありません/.test(data.message || '')) {
-        const fails = recordLoginFailure(failedEmail);
-        if (fails >= 2) {
-            // Was the welcome-back card pointing at this email?
-            const last = loadLastAccount();
-            if (last && last.email && last.email.toLowerCase() === failedEmail.toLowerCase()) {
-                clearLastAccount();
-                extraHint = '（前回のアカウント情報を消去しました。新規登録するか、別のメールを入力してください）';
-            } else {
-                extraHint = '（パスワードが分からない場合は新規登録してください）';
-            }
-        }
-    }
-    showLoginError((data.message || 'エラーが発生しました') + extraHint);
+    showLoginError(data.message || 'エラーが発生しました');
 }
 
 function tryResumeSession() {
