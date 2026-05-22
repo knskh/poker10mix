@@ -1192,19 +1192,35 @@ function resetLoginFailures() {
 }
 
 function onAuthResult(data) {
-    // Clear the safety timeout — the server replied.
-    if (authTimeoutHandle) { clearTimeout(authTimeoutHandle); authTimeoutHandle = null; }
-    if (resumeTimeoutHandle) { clearTimeout(resumeTimeoutHandle); resumeTimeoutHandle = null; }
-    const wasResuming = resumingSession || !!data.resumed;
-    resumingSession = false;
+    // Is this a response to an automatic session-resume (auth_resume message)?
+    // We use data.resumed flag sent by the server, OR the resumingSession flag
+    // we set ourselves before sending auth_resume.
+    const isResumeResponse = !!data.resumed || resumingSession;
 
-    const submitBtn = document.getElementById('btn-account-submit');
-    if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+    // Clear the appropriate safety timeout.
+    if (resumeTimeoutHandle) { clearTimeout(resumeTimeoutHandle); resumeTimeoutHandle = null; }
+
+    // Only clear the manual-login timeout if this is NOT a resume response
+    // (i.e. the response is actually for the login/register request the user
+    // explicitly submitted). Clearing it for a resume response while a manual
+    // login is still in-flight would leave the button in a broken state.
+    if (!isResumeResponse && authTimeoutHandle) {
+        clearTimeout(authTimeoutHandle);
+        authTimeoutHandle = null;
     }
 
+    const wasResuming = resumingSession;
+    resumingSession = false;
+
     if (data.success) {
+        // Success: regardless of whether it was resume or manual login,
+        // clear everything and enter the lobby.
+        if (authTimeoutHandle) { clearTimeout(authTimeoutHandle); authTimeoutHandle = null; }
+        const submitBtn = document.getElementById('btn-account-submit');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+        }
         loggedInAccount = { name: data.name, email: data.email };
         if (data.token) {
             saveAuthSession({ token: data.token, name: data.name, email: data.email });
@@ -1229,6 +1245,19 @@ function onAuthResult(data) {
         // Stored token is invalid (server restarted, expired, or account
         // deleted). Drop it so the next reload doesn't loop on it.
         clearAuthSession();
+
+        // If the user has already manually submitted login credentials
+        // (authTimeoutHandle is set), don't disrupt their in-progress request
+        // with the resume failure message — they'll see the login result soon.
+        if (authTimeoutHandle) return;
+    }
+
+    // Re-enable the submit button only for non-resume failures (or resume
+    // failures when no manual login is pending).
+    const submitBtn = document.getElementById('btn-account-submit');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
     }
 
     showLoginError(data.message || 'エラーが発生しました');
@@ -1251,6 +1280,9 @@ function tryResumeSession() {
         if (!resumingSession) return;
         resumingSession = false;
         clearAuthSession();
+        // If user has already submitted manual login credentials, don't
+        // clobber their "処理中..." state with this resume-timeout message.
+        if (authTimeoutHandle) return;
         if (errorEl) showLoginError('サーバーから応答がありません。再ログインしてください。');
     }, 10000);
     return true;

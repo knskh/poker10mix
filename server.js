@@ -255,7 +255,13 @@ async function lookupAccount(email) {
         try {
             const { data, error } = await supabase.from('accounts').select('*').eq('email', email).limit(1);
             if (!error && data && data.length > 0) {
-                return { name: data[0].name, salt: data[0].salt, hash: data[0].password_hash };
+                const row = data[0];
+                // Guard: if salt or password_hash is missing the schema is wrong.
+                // Fall through to local JSON so login still works.
+                if (row.salt && row.password_hash) {
+                    return { name: row.name, salt: row.salt, hash: row.password_hash };
+                }
+                console.warn(`lookupAccount: Supabase row for ${email} is missing salt/password_hash — falling back to local JSON`);
             }
             if (error) console.warn('Supabase lookup error (falling back to local):', error.message);
         } catch (e) {
@@ -263,7 +269,13 @@ async function lookupAccount(email) {
         }
     }
     const acc = localAccounts[email];
-    if (acc) return { name: acc.name, salt: acc.salt, hash: acc.passwordHash };
+    if (acc) {
+        if (!acc.salt || !acc.passwordHash) {
+            console.warn(`lookupAccount: local entry for ${email} is missing salt/passwordHash`);
+            return null;
+        }
+        return { name: acc.name, salt: acc.salt, hash: acc.passwordHash };
+    }
     return null;
 }
 
@@ -381,8 +393,10 @@ async function handleLogin(ws, client, msg) {
     }
 
     try {
+        console.log(`Login attempt: ${email}`);
         const acc = await lookupAccount(email);
         if (!acc) {
+            console.log(`Login failed: account not found for ${email}`);
             send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
             return;
         }
@@ -392,6 +406,7 @@ async function handleLogin(ws, client, msg) {
 
         const { hash } = hashPassword(password, accountSalt);
         if (hash !== storedHash) {
+            console.log(`Login failed: wrong password for ${email}`);
             send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
             return;
         }
@@ -400,7 +415,7 @@ async function handleLogin(ws, client, msg) {
         client.email = email;
         client.authenticated = true;
         const token = issueAuthToken(email, accountName);
-        console.log(`Login: ${accountName} (${email})`);
+        console.log(`Login OK: ${accountName} (${email})`);
         send(ws, { type: 'auth_result', success: true, name: accountName, email, token });
     } catch (e) {
         console.error('Login error:', e && e.message);
@@ -415,6 +430,7 @@ async function handleAuthResume(ws, client, msg) {
     const token = (msg && typeof msg.token === 'string') ? msg.token : '';
     const info = consumeAuthToken(token);
     if (!info) {
+        console.log(`Auth resume: token invalid/expired`);
         send(ws, { type: 'auth_result', success: false, resumed: true, message: 'セッションが期限切れです。再ログインしてください。' });
         return;
     }
