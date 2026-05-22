@@ -119,13 +119,7 @@ class PokerClient {
                 break;
             // lobby_chat removed — no lobby chat feature
             case 'online_users':
-                this.emit('online_users', { users: msg.users, following: msg.following || [] });
-                break;
-            case 'follows':
-                this.emit('follows', msg);
-                break;
-            case 'followed_by':
-                this.emit('followed_by', msg);
+                this.emit('online_users', msg.users || []);
                 break;
             case 'timeline':
                 this.emit('timeline', msg.posts || []);
@@ -248,9 +242,6 @@ class PokerClient {
     approveJoin(targetId, roomId) { this.send({ type: 'approve_join', targetId, roomId: roomId || this.roomId }); }
     rejectJoin(targetId, roomId) { this.send({ type: 'reject_join', targetId, roomId: roomId || this.roomId }); }
     cancelJoin(roomId) { this.send({ type: 'cancel_join', roomId }); }
-    follow(target) { this.send({ type: 'follow', target }); }
-    unfollow(target) { this.send({ type: 'unfollow', target }); }
-    getFollows() { this.send({ type: 'get_follows' }); }
     getTimeline() { this.send({ type: 'get_timeline' }); }
     createPost(title, body, mood) { this.send({ type: 'create_post', title, body, mood }); }
     postHand(handData, caption, replayHash) { this.send({ type: 'post_hand', handData, caption: caption || '', replayHash: replayHash || '' }); }

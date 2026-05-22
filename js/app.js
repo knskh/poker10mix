@@ -192,9 +192,7 @@ function saveLastAccount(info) {
 function clearLastAccount() {
     try { localStorage.removeItem(LAST_ACCOUNT_KEY); } catch (e) {}
 }
-let myFollowing = new Set(); // names this user follows
-let myFollowers = new Set(); // names that follow this user
-let lastOnlineUsers = []; // cached for re-render after follow change
+let lastOnlineUsers = []; // cached for re-render
 let isInZoom = false;
 let currentTurnBB = 100; // bigBlind for current turn (for bb display in action buttons)
 let handHistory = loadHandHistory(); // last 30 hands [{gameName, logs:[]}]
@@ -821,37 +819,13 @@ document.addEventListener('DOMContentLoaded', () => {
         onChat(msg);
     });
     // lobby_chat removed — no lobby chat feature
-    client.on('online_users', (data) => {
-        // Backward-compat: data may be array (old) or { users, following } (new)
-        let users;
-        if (Array.isArray(data)) {
-            users = data;
-        } else {
-            if (Array.isArray(data.following)) myFollowing = new Set(data.following);
-            users = data.users || [];
-        }
-        lastOnlineUsers = users;
-        renderOnlineUsers(users);
+    client.on('online_users', (users) => {
+        lastOnlineUsers = Array.isArray(users) ? users : [];
+        renderOnlineUsers(lastOnlineUsers);
         if (typeof updateSNSCTACounts === 'function') updateSNSCTACounts();
         // Update count badge inside chat modal tab
         const ccEl = document.getElementById('cp-online-count');
-        if (ccEl) ccEl.textContent = `(${users.length})`;
-    });
-    client.on('follows', (msg) => {
-        myFollowing = new Set(msg.following || []);
-        myFollowers = new Set(msg.followers || []);
-        renderOnlineUsers(lastOnlineUsers);
-        // マイパネルのフォロー数を更新
-        const fwEl = document.getElementById('mx-me-following');
-        const frEl = document.getElementById('mx-me-followers');
-        if (fwEl) fwEl.textContent = myFollowing.size;
-        if (frEl) frEl.textContent = myFollowers.size;
-    });
-    client.on('followed_by', (msg) => {
-        myFollowers.add(msg.name);
-        showToast(`${msg.name} さんがあなたをフォローしました`);
-        const frEl = document.getElementById('mx-me-followers');
-        if (frEl) frEl.textContent = myFollowers.size;
+        if (ccEl) ccEl.textContent = `(${lastOnlineUsers.length})`;
     });
     client.on('game_over', (msg) => {
         const rid = msg.roomId;
@@ -4454,32 +4428,17 @@ function renderOnlineUsers(users) {
 
     const statusOrder = { lobby: 0, playing: 1, zoom: 2 };
     const statusLabel = { lobby: 'ロビー', playing: 'ゲーム中', zoom: 'Zoom' };
-    const myName = client.name;
-    const iAmGuest = !loggedInAccount;
 
-    // Sort: followed users first, then by status
-    users.sort((a, b) => {
-        const af = myFollowing.has(a.name) ? 0 : 1;
-        const bf = myFollowing.has(b.name) ? 0 : 1;
-        if (af !== bf) return af - bf;
-        return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
-    });
+    // Sort by status
+    users.sort((a, b) => (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0));
 
     for (const u of users) {
         const item = document.createElement('div');
         item.className = 'online-user-item';
-        if (myFollowing.has(u.name)) item.classList.add('is-following');
 
         const avatarHtml = u.avatar
             ? `<img src="avatars/${u.avatar}.svg" alt="">`
             : `<div class="online-user-initial">${(u.name || '?').charAt(0).toUpperCase()}</div>`;
-
-        // Show follow button: only if I'm logged in, target is non-guest, and not self
-        const showFollow = !iAmGuest && !u.isGuest && u.name !== myName;
-        const isFollowing = myFollowing.has(u.name);
-        const followBtnHtml = showFollow
-            ? `<button class="online-user-follow ${isFollowing ? 'following' : ''}" data-follow-target="${u.name}" title="${isFollowing ? 'フォロー解除' : 'フォロー'}">${isFollowing ? '★' : '☆'}</button>`
-            : '';
 
         item.innerHTML = `
             ${avatarHtml}
@@ -4488,22 +4447,7 @@ function renderOnlineUsers(users) {
                 <span class="online-status-dot ${u.status}"></span>
                 ${statusLabel[u.status] || ''}
             </span>
-            ${followBtnHtml}
         `;
-
-        if (showFollow) {
-            item.querySelector('.online-user-follow').addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (myFollowing.has(u.name)) {
-                    client.unfollow(u.name);
-                    myFollowing.delete(u.name);
-                } else {
-                    client.follow(u.name);
-                    myFollowing.add(u.name);
-                }
-                renderOnlineUsers(lastOnlineUsers);
-            });
-        }
 
         container.appendChild(item);
     }
@@ -5345,12 +5289,8 @@ function setupBottomNav() {
     // Populate the マイプロフィール panel with current user data
     const refreshMePanel = () => {
         const name = (client && client.name) ? client.name : 'ゲスト';
-        const avatar = (client && client.avatar) ? client.avatar : '?';
         const el = (id) => document.getElementById(id);
-        if (el('mx-me-av'))       el('mx-me-av').textContent = avatar;
-        if (el('mx-me-name'))     el('mx-me-name').textContent = name;
-        if (el('mx-me-following')) el('mx-me-following').textContent = myFollowing.size;
-        if (el('mx-me-followers')) el('mx-me-followers').textContent = myFollowers.size;
+        if (el('mx-me-name')) el('mx-me-name').textContent = name;
     };
 
     nav.querySelectorAll('.mxbn-tab').forEach(btn => {

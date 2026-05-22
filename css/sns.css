@@ -607,10 +607,7 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     transition: border-color .15s;
 }
 #chat-picker-modal .online-user-item:hover { border-color: #6AA8F0; }
-#chat-picker-modal .online-user-item.is-following {
-    background: linear-gradient(90deg, #EEF5FF, #fff);
-    border-color: #C5DFFA;
-}
+
 #chat-picker-modal .online-user-item img,
 #chat-picker-modal .online-user-item .online-user-initial {
     width: 30px; height: 30px; border-radius: 50%;
@@ -635,16 +632,7 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
 #chat-picker-modal .online-status-dot.lobby { background: #4CAF50; }
 #chat-picker-modal .online-status-dot.playing { background: #FF9800; }
 #chat-picker-modal .online-status-dot.zoom { background: #5B9BF0; }
-#chat-picker-modal .online-user-follow {
-    background: transparent; border: 1px solid #C5DFFA;
-    color: #2A6BC9; border-radius: 6px;
-    padding: 3px 8px; font-size: 12px; cursor: pointer;
-    transition: background .15s;
-}
-#chat-picker-modal .online-user-follow:hover { background: #EEF5FF; }
-#chat-picker-modal .online-user-follow.following {
-    background: #DBE9FA; color: #1E52A3; border-color: #2A6BC9;
-}
+
 
 /* ==========================================
    オンラインユーザーモーダル タブ
@@ -1721,15 +1709,6 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .mx-me-follow-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        color: #566579;
-    }
-    .mx-me-follow-row strong { color: #17202E; font-size: 14px; }
-    .mx-me-follow-sep { color: #C8D4E4; }
     .mx-me-actions {
         display: flex;
         flex-direction: column;

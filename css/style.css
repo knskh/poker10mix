@@ -382,16 +382,6 @@ body {
 .online-status-dot.playing { background: #ff9800; }
 .online-status-dot.zoom { background: #2196f3; }
 
-/* Follow button in user list */
-.online-user-follow {
-    margin-left: auto; background: none; border: none; color: var(--text-dim);
-    cursor: pointer; font-size: 15px; padding: 2px 6px; border-radius: 4px;
-    transition: all 0.15s; flex-shrink: 0; line-height: 1;
-}
-.online-user-follow:hover { color: #ffb84d; background: rgba(255,184,77,0.12); }
-.online-user-follow.following { color: #ffb84d; }
-.online-user-item.is-following { background: rgba(255,184,77,0.06); }
-.online-user-item.is-following .online-user-name { font-weight: 600; }
 
 /* === Stats Modal === */
 /* === Unified Modal System === */
