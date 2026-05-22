@@ -67,7 +67,7 @@
         <div id="big-hand-feed" class="big-hand-feed hidden"></div>
 
         <!-- Main Screen (unified lobby + notable-hand timeline) -->
-        <div id="sns-screen" class="hidden">
+        <div id="sns-screen" class="hidden" data-mb-view="play">
             <!-- Top bar: avatar on the left, hamburger menu on the right -->
             <div class="mx-topbar">
                 <div class="mx-top-user" id="mx-top-user">
@@ -123,6 +123,27 @@
                     <button class="mx-feed-tab" data-feed-tab="all">👑 全期間ランキング</button>
                 </div>
                 <div id="sns-timeline"></div>
+            </div>
+
+            <!-- My Profile panel (mobile view=me) -->
+            <div class="mx-me-panel" id="mx-me-panel">
+                <div class="mx-me-top">
+                    <div class="mx-me-av" id="mx-me-av">?</div>
+                    <div class="mx-me-info">
+                        <div class="mx-me-name" id="mx-me-name">-</div>
+                        <div class="mx-me-follow-row">
+                            <span class="mx-me-follow-item"><strong id="mx-me-following">0</strong> フォロー中</span>
+                            <span class="mx-me-follow-sep">｜</span>
+                            <span class="mx-me-follow-item"><strong id="mx-me-followers">0</strong> フォロワー</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mx-me-actions">
+                    <button class="mx-me-btn" id="mx-me-btn-stats">📊 スタッツ</button>
+                    <button class="mx-me-btn" id="mx-me-btn-history">📋 ハンド履歴</button>
+                    <button class="mx-me-btn" id="mx-me-btn-online">👥 オンラインユーザー</button>
+                    <button class="mx-me-btn mx-me-btn-logout" id="mx-me-btn-logout">🚪 ログアウト</button>
+                </div>
             </div>
 
             <!-- Mobile bottom nav -->

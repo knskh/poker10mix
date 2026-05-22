@@ -841,10 +841,17 @@ document.addEventListener('DOMContentLoaded', () => {
         myFollowing = new Set(msg.following || []);
         myFollowers = new Set(msg.followers || []);
         renderOnlineUsers(lastOnlineUsers);
+        // マイパネルのフォロー数を更新
+        const fwEl = document.getElementById('mx-me-following');
+        const frEl = document.getElementById('mx-me-followers');
+        if (fwEl) fwEl.textContent = myFollowing.size;
+        if (frEl) frEl.textContent = myFollowers.size;
     });
     client.on('followed_by', (msg) => {
         myFollowers.add(msg.name);
         showToast(`${msg.name} さんがあなたをフォローしました`);
+        const frEl = document.getElementById('mx-me-followers');
+        if (frEl) frEl.textContent = myFollowers.size;
     });
     client.on('game_over', (msg) => {
         const rid = msg.roomId;
@@ -5103,6 +5110,18 @@ function updateMainTopbarUser() {
             avEl.textContent = (name || '?').charAt(0).toUpperCase();
         }
     }
+    // マイプロフィールパネルも同期
+    const mePanelAv = document.getElementById('mx-me-av');
+    const mePanelName = document.getElementById('mx-me-name');
+    if (mePanelAv) {
+        const avatarSrc = getAvatarSrc(selectedAvatar);
+        if (avatarSrc) {
+            mePanelAv.innerHTML = `<img src="${avatarSrc}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+        } else {
+            mePanelAv.textContent = (name || '?').charAt(0).toUpperCase();
+        }
+    }
+    if (mePanelName) mePanelName.textContent = name;
 }
 
 function updateSNSCTACounts() {
@@ -5305,41 +5324,84 @@ function hideTablePreview() {
 function setupBottomNav() {
     const nav = document.getElementById('mx-bottom-nav');
     if (!nav) return;
-    const scrollTo = (el) => {
-        if (!el) return;
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
+    const screen = document.getElementById('sns-screen');
+
+    // isMobile: only apply view-switching on narrow screens
+    const isMobile = () => window.innerWidth <= 768;
+
     const setActive = (name) => {
         nav.querySelectorAll('.mxbn-tab').forEach(b => {
             b.classList.toggle('active', b.dataset.target === name);
         });
     };
+
+    // Switch the visible section on mobile (data-mb-view attribute drives CSS)
+    const switchMbView = (view) => {
+        if (screen) screen.setAttribute('data-mb-view', view);
+        // Scroll back to top when switching sections
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    };
+
+    // Populate the マイプロフィール panel with current user data
+    const refreshMePanel = () => {
+        const name = (client && client.name) ? client.name : 'ゲスト';
+        const avatar = (client && client.avatar) ? client.avatar : '?';
+        const el = (id) => document.getElementById(id);
+        if (el('mx-me-av'))       el('mx-me-av').textContent = avatar;
+        if (el('mx-me-name'))     el('mx-me-name').textContent = name;
+        if (el('mx-me-following')) el('mx-me-following').textContent = myFollowing.size;
+        if (el('mx-me-followers')) el('mx-me-followers').textContent = myFollowers.size;
+    };
+
     nav.querySelectorAll('.mxbn-tab').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Stop the event from bubbling to the document-level outside-click
-            // handler that auto-closes the header menu.
             e.stopPropagation();
             const target = btn.dataset.target;
             setActive(target);
+
             if (target === 'play') {
-                scrollTo(document.querySelector('#sns-screen .mx-play-rail'));
+                if (isMobile()) {
+                    switchMbView('play');
+                } else {
+                    document.querySelector('#sns-screen .mx-play-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             } else if (target === 'feed') {
-                scrollTo(document.querySelector('#sns-screen .mx-feed-wrap'));
+                if (isMobile()) {
+                    switchMbView('feed');
+                } else {
+                    document.querySelector('#sns-screen .mx-feed-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             } else if (target === 'history') {
                 if (typeof renderHandHistory === 'function') renderHandHistory('lobby-hand-history');
                 document.getElementById('history-modal')?.classList.remove('hidden');
             } else if (target === 'online') {
-                if (typeof openChatModal === 'function') {
-                    openChatModal();
-                    if (typeof switchChatTab === 'function') switchChatTab('online');
-                }
+                if (typeof openChatModal === 'function') openChatModal();
             } else if (target === 'me') {
-                // Toggle the top-right hamburger menu even when hidden on mobile —
-                // it floats above the nav so users can reach stats / logout etc.
-                const headerMenu = document.getElementById('mx-header-menu');
-                if (headerMenu) headerMenu.classList.toggle('hidden');
+                if (isMobile()) {
+                    refreshMePanel();
+                    switchMbView('me');
+                } else {
+                    const headerMenu = document.getElementById('mx-header-menu');
+                    if (headerMenu) headerMenu.classList.toggle('hidden');
+                }
             }
         });
+    });
+
+    // Wire up マイパネル buttons
+    document.getElementById('mx-me-btn-stats')?.addEventListener('click', () => {
+        renderStatsFromStorage();
+        document.getElementById('stats-modal')?.classList.remove('hidden');
+    });
+    document.getElementById('mx-me-btn-history')?.addEventListener('click', () => {
+        if (typeof renderHandHistory === 'function') renderHandHistory('lobby-hand-history');
+        document.getElementById('history-modal')?.classList.remove('hidden');
+    });
+    document.getElementById('mx-me-btn-online')?.addEventListener('click', () => {
+        if (typeof openChatModal === 'function') openChatModal();
+    });
+    document.getElementById('mx-me-btn-logout')?.addEventListener('click', () => {
+        if (typeof doLogout === 'function') doLogout();
     });
 }
 
