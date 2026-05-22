@@ -95,18 +95,20 @@ const supabase = (createClient && SUPABASE_URL && SUPABASE_KEY) ? createClient(S
 // ============================================
 // Player Stats (for Player Cloud visualization)
 // ============================================
-// In-memory cache: { [name]: { total_profit, session_count, total_diversity } }
+// In-memory cache: { [name]: { total_profit, session_count, total_diversity, total_hands } }
+// Note: total_hands is stored in the comment_likes column of player_stats (repurposed)
 const playerStatsMap = {};
 
 async function upsertPlayerStats(name, delta) {
     if (!name) return;
     if (!playerStatsMap[name]) {
-        playerStatsMap[name] = { total_profit: 0, session_count: 0, total_diversity: 0 };
+        playerStatsMap[name] = { total_profit: 0, session_count: 0, total_diversity: 0, total_hands: 0 };
     }
     const s = playerStatsMap[name];
     if (delta.profitDelta    !== undefined) s.total_profit    += delta.profitDelta;
     if (delta.sessionDelta   !== undefined) s.session_count   += delta.sessionDelta;
     if (delta.diversityDelta !== undefined) s.total_diversity += delta.diversityDelta;
+    if (delta.handsDelta     !== undefined) s.total_hands     += delta.handsDelta;
 
     if (supabase) {
         try {
@@ -115,6 +117,7 @@ async function upsertPlayerStats(name, delta) {
                 total_profit:    s.total_profit,
                 session_count:   s.session_count,
                 total_diversity: s.total_diversity,
+                comment_likes:   s.total_hands,   // reuse comment_likes column for total_hands
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'name' });
         } catch (e) {
@@ -133,6 +136,7 @@ async function loadAllPlayerStats() {
                     total_profit:    row.total_profit    || 0,
                     session_count:   row.session_count   || 0,
                     total_diversity: row.total_diversity || 0,
+                    total_hands:     row.comment_likes   || 0,  // stored in comment_likes column
                 };
             }
             console.log(`player_stats loaded: ${data.length} records`);
@@ -1444,6 +1448,7 @@ function handleMessage(ws, client, msg) {
                 total_profit:    s.total_profit    || 0,
                 session_count:   s.session_count   || 0,
                 total_diversity: s.total_diversity || 0,
+                total_hands:     s.total_hands     || 0,
             }));
             send(ws, { type: 'player_stats', stats: statsArray });
             break;
@@ -1484,7 +1489,8 @@ function recordSessionStats(room) {
         const invested = startingChips + rebuyAmount;
         const endChips = (name in finalByName) ? finalByName[name] : 0;
         const diff = endChips - invested;
-        upsertPlayerStats(name, { profitDelta: diff, sessionDelta: 1, diversityDelta: gameCount });
+        const handsPlayed = room.handsPlayed || 0;
+        upsertPlayerStats(name, { profitDelta: diff, sessionDelta: 1, diversityDelta: gameCount, handsDelta: handsPlayed });
     }
 }
 

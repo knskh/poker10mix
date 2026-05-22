@@ -5443,13 +5443,13 @@ function _renderPlayerCloudToSvg(svg, users) {
             avatar: u.avatar,
             profit:       ps ? ps.total_profit    : Math.round(pseudo(u.name, 'p', -50000, 100000)),
             avgDiversity: ps ? (ps.session_count > 0 ? ps.total_diversity / ps.session_count : 1) : pseudo(u.name, 'd', 1, 10),
-            sessionCount: ps ? ps.session_count   : Math.round(pseudo(u.name, 'l', 0, 50)),
+            handCount:    ps ? ps.total_hands      : Math.round(pseudo(u.name, 'l', 0, 200)),
         };
     });
 
     // 相対スケール
     const maxDiv   = Math.max(...stats.map(s => s.avgDiversity), 1);
-    const maxLikes = Math.max(...stats.map(s => s.sessionCount), 1);
+    const maxLikes = Math.max(...stats.map(s => s.handCount), 1);
     const maxProfit = Math.max(...stats.map(s => Math.abs(s.profit)), 1);
     const MIN_FONT = 10, MAX_FONT = 36;
 
@@ -5484,7 +5484,7 @@ function _renderPlayerCloudToSvg(svg, users) {
     yLbl.setAttribute('text-anchor', 'middle'); yLbl.setAttribute('fill', '#2a3a50');
     yLbl.setAttribute('font-size', '9');
     yLbl.setAttribute('transform', `rotate(-90, 10, ${PAD.top + plotH / 2})`);
-    yLbl.textContent = 'セッション↑'; svg.appendChild(yLbl);
+    yLbl.textContent = 'ハンド↑'; svg.appendChild(yLbl);
 
     // プレイヤー配置（重なり回避）
     const placed = [];
@@ -5506,7 +5506,7 @@ function _renderPlayerCloudToSvg(svg, users) {
 
     stats.forEach((s, idx) => {
         const relX = s.avgDiversity / maxDiv;
-        const relY = s.sessionCount / maxLikes;
+        const relY = s.handCount / maxLikes;
         const bx = PAD.left + relX * plotW;
         const by = PAD.top  + (1 - relY) * plotH;
         const absP = Math.abs(s.profit);
@@ -5550,7 +5550,7 @@ function _renderPlayerCloudToSvg(svg, users) {
             tt.innerHTML = `<div class="pct-name">${escapeHtml(s.name)}</div>
                 <div class="pct-row"><span>収支</span><span class="pct-val">${sign}${s.profit.toLocaleString()}</span></div>
                 <div class="pct-row"><span>ゲーム多様性</span><span class="pct-val">${s.avgDiversity.toFixed(1)}</span></div>
-                <div class="pct-row"><span>セッション数</span><span class="pct-val">${s.sessionCount}</span></div>`;
+                <div class="pct-row"><span>ハンド数</span><span class="pct-val">${s.handCount}</span></div>`;
             tt.classList.add('show');
             tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 180) + 'px';
             tt.style.top  = Math.min(e.clientY - 8,  window.innerHeight - 130) + 'px';
@@ -5579,7 +5579,7 @@ function renderSNSSelf() {
 // player_stats: Player Cloud visualization data
 client.on('player_stats', ({ stats }) => {
     if (!stats) return;
-    // { [name]: { total_profit, session_count, total_diversity } }
+    // { [name]: { total_profit, session_count, total_diversity, total_hands } }
     window.playerStatsCache = Object.fromEntries(
         stats.map(s => [s.name, s])
     );
