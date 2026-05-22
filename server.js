@@ -24,7 +24,8 @@ const { StatsTracker } = require('./js/stats');
 // ============================================
 // Timeline / Posts / Comments (SNS feed)
 // ============================================
-const TIMELINE_FILE = path.join(FOLLOWS_DIR, 'timeline.json');
+const DATA_DIR = path.join(__dirname, 'data');
+const TIMELINE_FILE = path.join(DATA_DIR, 'timeline.json');
 const timelineList = []; // array of posts, newest first, capped at 200
 // post = { id, authorName, authorAvatar, type, title, body, handData?, createdAt, comments: [] }
 // comment = { id, authorName, authorAvatar, body, createdAt }
@@ -65,7 +66,7 @@ function saveTimelineDebounced() {
     saveTimelineTimer = setTimeout(() => {
         saveTimelineTimer = null;
         try {
-            if (!fs.existsSync(FOLLOWS_DIR)) fs.mkdirSync(FOLLOWS_DIR, { recursive: true });
+            if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
             const obj = { posts: timelineList, nextPostId, nextCommentId };
             fs.writeFileSync(TIMELINE_FILE, JSON.stringify(obj, null, 2), 'utf8');
         } catch (e) {
@@ -225,7 +226,7 @@ function broadcastCommentUpdate(postId, comment, postAuthor) {
 // ============================================
 // Footprints (profile view tracking)
 // ============================================
-const FOOTPRINTS_FILE = path.join(FOLLOWS_DIR, 'footprints.json');
+const FOOTPRINTS_FILE = path.join(DATA_DIR, 'footprints.json');
 const footprintsMap = new Map(); // viewedName -> [{viewer, viewerAvatar, timestamp}]
 
 function loadFootprints() {
@@ -247,7 +248,7 @@ function saveFootprintsDebounced() {
     saveFootprintsTimer = setTimeout(() => {
         saveFootprintsTimer = null;
         try {
-            if (!fs.existsSync(FOLLOWS_DIR)) fs.mkdirSync(FOLLOWS_DIR, { recursive: true });
+            if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
             const obj = {};
             for (const [k, v] of footprintsMap) obj[k] = v;
             fs.writeFileSync(FOOTPRINTS_FILE, JSON.stringify(obj, null, 2), 'utf8');
