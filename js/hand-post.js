@@ -3,7 +3,6 @@
 // showToast, renderHandHistory, escapeHtml (from utils.js).
 
 let pendingHandPostIdx = -1;
-let handPostFromReveal = false; // true = 「投稿して公開する」経由の投稿
 
 function buildHandDataFromHistory(h, myName) {
     if (!h) return null;
@@ -33,7 +32,7 @@ function buildHandDataFromHistory(h, myName) {
     };
 }
 
-function openHandPostModal(idx, fromReveal = false) {
+function openHandPostModal(idx) {
     // Guests are restricted to table play only; posting a hand is disallowed.
     if (typeof loggedInAccount !== 'undefined' && !loggedInAccount) {
         if (typeof showLoginRequiredToast === 'function') showLoginRequiredToast('ハンド投稿');
@@ -42,7 +41,6 @@ function openHandPostModal(idx, fromReveal = false) {
     const h = handHistory[idx];
     if (!h) return;
     pendingHandPostIdx = idx;
-    handPostFromReveal = fromReveal;
     const data = buildHandDataFromHistory(h, client.name);
     const preview = document.getElementById('hp-preview');
     if (preview) {
@@ -69,7 +67,6 @@ function openHandPostModal(idx, fromReveal = false) {
 function closeHandPostModal() {
     document.getElementById('hand-post-modal').classList.add('hidden');
     pendingHandPostIdx = -1;
-    handPostFromReveal = false;
 }
 
 async function buildReplayHashFromHistory(idx) {
@@ -105,31 +102,16 @@ async function submitHandPost() {
     // Also build replay hash so viewers can replay the hand
     const replayHash = await buildReplayHashFromHistory(pendingHandPostIdx);
     client.postHand(handData, caption, replayHash);
-    // Mark this hand as posted so the detail view reveals other players' cards.
+    // Mark this hand as posted so the detail view reveals other players'
+    // cards. Until this flag (or h.revealed) is set, the detail masks
+    // non-self hole cards to avoid spoilers before the user comments.
     h.posted = true;
     if (typeof persistHandHistory === 'function') persistHandHistory();
-
-    // closeHandPostModal() が pendingHandPostIdx をリセットする前に保存
-    const postedIdx = pendingHandPostIdx;
-    const wasFromReveal = handPostFromReveal;
+    showToast('タイムラインに投稿しました');
     closeHandPostModal();
-
-    if (wasFromReveal) {
-        // 「投稿して公開する」経由：履歴モーダルを開いたままdetailを再レンダリングして相手カードを公開
-        showToast('投稿しました！相手のカードが公開されました 🃏');
-        if (typeof renderHandDetail === 'function') {
-            document.querySelectorAll('.hh-detail').forEach(detail => {
-                if (detail.dataset.activeIdx === String(postedIdx)) {
-                    detail.innerHTML = renderHandDetail(h, postedIdx);
-                }
-            });
-        }
-    } else {
-        // 通常の「📢 投稿」ボタン経由：フィードに移動
-        showToast('タイムラインに投稿しました');
-        const histModal = document.getElementById('history-modal');
-        if (histModal) histModal.classList.add('hidden');
-    }
+    // Close history modal too so user sees the feed
+    const histModal = document.getElementById('history-modal');
+    if (histModal) histModal.classList.add('hidden');
 }
 
 function setupHandPostModal() {

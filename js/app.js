@@ -2273,11 +2273,11 @@ function renderHandDetail(h, idx) {
     html += `<span class="hh-detail-time">${h.time || ''}</span>`;
     html += `</div>`;
 
-    // Hide-notice banner: 投稿して公開するボタン
+    // Hide-notice banner with manual reveal button.
     if (hide) {
         html += `<div class="hh-hide-notice">`;
-        html += `<span class="hh-hide-msg">🂠 他プレイヤーのカードは非表示です。コメント付きで投稿すると公開されます。</span>`;
-        html += `<button class="hh-post-reveal-btn" data-hh-post-reveal-idx="${idx}">📢 投稿して公開する</button>`;
+        html += `<span class="hh-hide-msg">👁️‍🗨️ 他プレイヤーのカードは非表示です。コメント付きで投稿すると公開されます。</span>`;
+        html += `<button class="hh-reveal-btn" data-hh-reveal-idx="${idx}">表示する</button>`;
         html += `</div>`;
     }
 
@@ -2671,11 +2671,16 @@ document.addEventListener('click', (e) => {
         shareReplay(parseInt(shareBtn.dataset.hhIdx));
         return;
     }
-    const postRevealBtn = e.target.closest('.hh-post-reveal-btn');
-    if (postRevealBtn) {
-        const idx = parseInt(postRevealBtn.dataset.hhPostRevealIdx);
-        // 投稿モーダルを開く（fromReveal=true で投稿後にdetailを再レンダリング）
-        if (typeof openHandPostModal === 'function') openHandPostModal(idx, true);
+    const revealBtn = e.target.closest('.hh-reveal-btn');
+    if (revealBtn) {
+        const idx = parseInt(revealBtn.dataset.hhRevealIdx);
+        const h = handHistory[idx];
+        if (!h) return;
+        h.revealed = true;
+        persistHandHistory();
+        // Re-render the currently open detail pane in place.
+        const detail = revealBtn.closest('.hh-detail');
+        if (detail) detail.innerHTML = renderHandDetail(h, idx);
         return;
     }
 });
