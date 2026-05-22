@@ -1,4 +1,4 @@
-// js/app.js - Multiplayer Application Controller
+﻿// js/app.js - Multiplayer Application Controller
 const client = new PokerClient();
 const ui = new PokerUI();
 
@@ -633,7 +633,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLoginScreen();
     setupAccountLogin();
     setupLobbyScreen();
-    setupHandPostModal();
     setupRoomScreen();
     setupGameScreen();
     setupStatsModal();
@@ -2170,8 +2169,6 @@ function renderHandHistory(containerId) {
             }
         }
         html += `<span class="hh-time-label">${h.time || ''}</span>`;
-        // 📢 投稿 button (post to timeline) — available for win or loss
-        html += `<button class="hh-post-btn" data-hh-post-idx="${i}" title="タイムラインに投稿">📢 投稿</button>`;
         html += `</div>`;
     }
     html += '</div>';
@@ -2182,8 +2179,6 @@ function renderHandHistory(containerId) {
     // Click handlers
     container.querySelectorAll('.hh-row').forEach(row => {
         row.addEventListener('click', (e) => {
-            // Ignore clicks that originated from the post button
-            if (e.target.closest('.hh-post-btn')) return;
             const idx = parseInt(row.dataset.hhIdx);
             const detail = container.querySelector('.hh-detail');
             // Toggle: if same hand, hide
@@ -2200,17 +2195,8 @@ function renderHandHistory(containerId) {
         });
     });
 
-    // Post-to-timeline button handlers
-    container.querySelectorAll('.hh-post-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const idx = parseInt(btn.dataset.hhPostIdx);
-            openHandPostModal(idx);
-        });
-    });
 }
 
-// Manual hand post modal — extracted to js/hand-post.js
 
 function renderMiniCards(cardObjs) {
     if (!cardObjs || cardObjs.length === 0) return '<span style="color:var(--text-dim)">--</span>';
@@ -3347,109 +3333,8 @@ function onGameOver(data) {
     });
 
     if (isInZoom) return;
-
-    // Show session summary overlay instead of confirm dialog
-    setTimeout(() => showSessionSummary(ranking), 1500);
 }
 
-function showSessionSummary(ranking) {
-    const overlay = document.getElementById('session-summary');
-    if (!overlay) return;
-    overlay.classList.remove('hidden');
-
-    const myName = client.name;
-
-    // === Ranking section ===
-    const rankContainer = document.getElementById('ss-ranking');
-    let rankHtml = '';
-    const medals = ['🥇', '🥈', '🥉'];
-    ranking.forEach((p, i) => {
-        const rowCls = i < 3 ? `ss-rank-${i + 1}` : 'ss-rank-other';
-        const pos = i < 3 ? medals[i] : `${i + 1}`;
-        const isMe = p.name === myName;
-        const diff = p.netProfit !== undefined ? p.netProfit : p.totalWin;
-        let diffCls, diffStr;
-        if (diff > 0) { diffCls = 'ss-rank-plus'; diffStr = `+${diff.toLocaleString()}`; }
-        else if (diff < 0) { diffCls = 'ss-rank-minus'; diffStr = diff.toLocaleString(); }
-        else { diffCls = 'ss-rank-zero'; diffStr = '±0'; }
-        const rebuyStr = p.totalRebuys ? `<span class="ss-rank-rebuy">補充: +${p.totalRebuys.toLocaleString()}</span>` : '';
-
-        rankHtml += `<div class="ss-rank-row ${rowCls}">`;
-        rankHtml += `<span class="ss-rank-pos">${pos}</span>`;
-        rankHtml += `<span class="ss-rank-name${isMe ? ' ss-rank-me' : ''}">${p.name}${isMe ? ' (自分)' : ''}${rebuyStr}</span>`;
-        rankHtml += `<span class="ss-rank-diff ${diffCls}">${diffStr}</span>`;
-        rankHtml += `</div>`;
-    });
-    rankContainer.innerHTML = rankHtml;
-
-    // === Highlights section ===
-    const hlContainer = document.getElementById('ss-highlights');
-    const highlights = generateHighlights(ranking);
-    let hlHtml = '<div class="ss-highlight-list">';
-    for (const hl of highlights) {
-        hlHtml += `<div class="ss-highlight">`;
-        hlHtml += `<span class="ss-hl-icon">${hl.icon}</span>`;
-        hlHtml += `<div class="ss-hl-body"><div class="ss-hl-title">${hl.title}</div><div class="ss-hl-name">${hl.name}</div></div>`;
-        hlHtml += `</div>`;
-    }
-    hlHtml += '</div>';
-    hlContainer.innerHTML = hlHtml;
-
-    // === Actions ===
-    const lobbyBtn = document.getElementById('btn-ss-lobby');
-    lobbyBtn.disabled = true;
-    // Enable after 3 seconds
-    setTimeout(() => { lobbyBtn.disabled = false; }, 3000);
-
-    lobbyBtn.onclick = () => {
-        overlay.classList.add('hidden');
-        // Table is already removed by game_over handler
-        if (tables.size === 0) showScreen('sns');
-    };
-
-    const shareBtn = document.getElementById('btn-ss-share');
-    shareBtn.onclick = () => {
-        const lines = ['【セッションサマリー】'];
-        ranking.forEach((p, i) => {
-            const profit = p.netProfit !== undefined ? p.netProfit : p.totalWin;
-            const sign = profit >= 0 ? '+' : '';
-            const rebuy = p.totalRebuys ? ` (補充: +${p.totalRebuys})` : '';
-            lines.push(`${i + 1}位 ${p.name}: ${sign}${profit}${rebuy}`);
-        });
-        highlights.forEach(hl => {
-            lines.push(`${hl.icon} ${hl.title}: ${hl.name}`);
-        });
-        const text = lines.join('\n');
-        if (navigator.share) {
-            navigator.share({ text }).catch(() => {});
-        } else if (navigator.clipboard) {
-            navigator.clipboard.writeText(text).then(() => {
-                shareBtn.textContent = 'コピー済み!';
-                setTimeout(() => { shareBtn.textContent = '共有'; }, 2000);
-            });
-        }
-    };
-}
-
-function generateHighlights(ranking) {
-    const highlights = [];
-    if (ranking.length === 0) return highlights;
-
-    // Biggest winner
-    const bigWinner = ranking.reduce((a, b) => a.totalWin > b.totalWin ? a : b);
-    if (bigWinner.totalWin > 0) {
-        highlights.push({ icon: '👑', title: '最大勝者', name: `${bigWinner.name} (+${bigWinner.totalWin.toLocaleString()})` });
-    }
-
-    // Total hands played
-    if (handHistory.length > 0) {
-        highlights.push({ icon: '🃏', title: '総ハンド数', name: `${handHistory.length}ハンド` });
-    }
-
-    return highlights;
-}
-
-// ==========================================
 // Stats Modal & localStorage Persistence
 // ==========================================
 const STATS_STORAGE_KEY = 'poker10mix_stats';
@@ -5003,8 +4888,6 @@ function setupSidePanel() {
 // ==========================================
 // SNS (mixi-style) Screen
 // ==========================================
-let snsTimeline = [];
-let snsLastAutoShare = null;
 let snsInitialized = false;
 
 function initSNSScreen() {
@@ -5015,9 +4898,10 @@ function initSNSScreen() {
     // Update user display in topbar
     updateMainTopbarUser();
     client.getRooms();
-    client.getTimeline();
     updateSNSCTACounts();
     renderRailRooms(window.lastRoomList || []);
+    // Render the main-screen Player Cloud with current online users
+    if (typeof renderPlayerCloud === 'function') renderPlayerCloud(lastOnlineUsers || []);
 }
 
 function updateMainTopbarUser() {
@@ -5284,11 +5168,11 @@ function setupBottomNav() {
                 } else {
                     document.querySelector('#sns-screen .mx-play-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-            } else if (target === 'feed') {
+            } else if (target === 'cloud') {
                 if (isMobile()) {
-                    switchMbView('feed');
+                    switchMbView('cloud');
                 } else {
-                    document.querySelector('#sns-screen .mx-feed-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.querySelector('#sns-screen .mx-cloud-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             } else if (target === 'history') {
                 if (typeof renderHandHistory === 'function') renderHandHistory('lobby-hand-history');
@@ -5352,9 +5236,6 @@ function setupResumePill() {
 function setupSNSEvents() {
     // sns-header-stats / sns-header-history / sns-header-logout are wired directly in
     // setupStatsModal / setupLobbyScreen / setupLoginScreen.
-
-    // Feed tabs (最新 / 週間 / 全期間)
-    setupFeedTabs();
 
     // Header hamburger menu (toggle + outside click close + close on item click)
     const hamburger = document.getElementById('btn-mx-hamburger');
@@ -5436,23 +5317,6 @@ function setupSNSEvents() {
         btn.addEventListener('click', () => switchCpTab(btn.dataset.cpTab));
     });
 
-    // Auto-share modal handlers
-    const btnAsComment = document.getElementById('btn-auto-share-comment');
-    if (btnAsComment) btnAsComment.addEventListener('click', () => {
-        if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
-        const txt = document.getElementById('auto-share-comment').value.trim();
-        if (txt && snsLastAutoShare) {
-            client.addComment(snsLastAutoShare.id, txt);
-        }
-        hideAutoShareModal();
-    });
-    const btnAsSkip = document.getElementById('btn-auto-share-skip');
-    if (btnAsSkip) btnAsSkip.addEventListener('click', hideAutoShareModal);
-    const btnAsView = document.getElementById('btn-auto-share-view');
-    if (btnAsView) btnAsView.addEventListener('click', () => {
-        hideAutoShareModal();
-        showScreen('sns');
-    });
 }
 
 // ---- Room picker modal ----
@@ -5541,7 +5405,16 @@ function switchCpTab(tab) {
 
 // ---- プレイヤークラウド描画 ----
 function renderPlayerCloud(users) {
-    const svg = document.getElementById('player-cloud-svg');
+    // Render to both the modal SVG and the main-screen SVG (if present)
+    const svgs = [
+        document.getElementById('player-cloud-svg'),
+        document.getElementById('player-cloud-main-svg'),
+    ].filter(Boolean);
+    if (svgs.length === 0) return;
+    for (const svg of svgs) _renderPlayerCloudToSvg(svg, users);
+}
+
+function _renderPlayerCloudToSvg(svg, users) {
     if (!svg) return;
 
     // ゲスト除外・自分以外も含め全員表示
@@ -5570,13 +5443,13 @@ function renderPlayerCloud(users) {
             avatar: u.avatar,
             profit:       ps ? ps.total_profit    : Math.round(pseudo(u.name, 'p', -50000, 100000)),
             avgDiversity: ps ? (ps.session_count > 0 ? ps.total_diversity / ps.session_count : 1) : pseudo(u.name, 'd', 1, 10),
-            commentLikes: ps ? ps.comment_likes   : Math.round(pseudo(u.name, 'l', 0, 100)),
+            sessionCount: ps ? ps.session_count   : Math.round(pseudo(u.name, 'l', 0, 50)),
         };
     });
 
     // 相対スケール
     const maxDiv   = Math.max(...stats.map(s => s.avgDiversity), 1);
-    const maxLikes = Math.max(...stats.map(s => s.commentLikes), 1);
+    const maxLikes = Math.max(...stats.map(s => s.sessionCount), 1);
     const maxProfit = Math.max(...stats.map(s => Math.abs(s.profit)), 1);
     const MIN_FONT = 10, MAX_FONT = 36;
 
@@ -5611,7 +5484,7 @@ function renderPlayerCloud(users) {
     yLbl.setAttribute('text-anchor', 'middle'); yLbl.setAttribute('fill', '#2a3a50');
     yLbl.setAttribute('font-size', '9');
     yLbl.setAttribute('transform', `rotate(-90, 10, ${PAD.top + plotH / 2})`);
-    yLbl.textContent = 'いいね↑'; svg.appendChild(yLbl);
+    yLbl.textContent = 'セッション↑'; svg.appendChild(yLbl);
 
     // プレイヤー配置（重なり回避）
     const placed = [];
@@ -5633,7 +5506,7 @@ function renderPlayerCloud(users) {
 
     stats.forEach((s, idx) => {
         const relX = s.avgDiversity / maxDiv;
-        const relY = s.commentLikes / maxLikes;
+        const relY = s.sessionCount / maxLikes;
         const bx = PAD.left + relX * plotW;
         const by = PAD.top  + (1 - relY) * plotH;
         const absP = Math.abs(s.profit);
@@ -5677,7 +5550,7 @@ function renderPlayerCloud(users) {
             tt.innerHTML = `<div class="pct-name">${escapeHtml(s.name)}</div>
                 <div class="pct-row"><span>収支</span><span class="pct-val">${sign}${s.profit.toLocaleString()}</span></div>
                 <div class="pct-row"><span>ゲーム多様性</span><span class="pct-val">${s.avgDiversity.toFixed(1)}</span></div>
-                <div class="pct-row"><span>いいね数</span><span class="pct-val">${s.commentLikes}</span></div>`;
+                <div class="pct-row"><span>セッション数</span><span class="pct-val">${s.sessionCount}</span></div>`;
             tt.classList.add('show');
             tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 180) + 'px';
             tt.style.top  = Math.min(e.clientY - 8,  window.innerHeight - 130) + 'px';
@@ -5700,734 +5573,13 @@ function renderSNSSelf() {
     updateMainTopbarUser();
 }
 
-let activeFeedTab = 'latest'; // 'latest' | 'weekly' | 'all'
-let rankingsCache = { weekly: null, all: null };
-
-function renderTimeline(posts) {
-    const container = document.getElementById('sns-timeline');
-    if (!container) return;
-    container.innerHTML = '';
-    // Show hand posts (notable hands / manual) and session summary posts.
-    const visible = (posts || []).filter(p =>
-        (p.type === 'hand' && p.handData) ||
-        (p.type === 'session' && p.sessionData)
-    );
-    if (visible.length === 0) {
-        container.innerHTML = '<div class="mx-empty">まだ投稿がありません。<br>ゲームに参加すると注目ハンドが自動投稿されます。<br>ハンド履歴から「📢 投稿」で手動投稿もできます。</div>';
-        return;
-    }
-    for (const post of visible) {
-        container.appendChild(renderPostEntry(post));
-    }
-}
-
-function renderRankings(period, posts) {
-    const container = document.getElementById('sns-timeline');
-    if (!container) return;
-    container.innerHTML = '';
-    const handPosts = (posts || []).filter(p =>
-        (p.type === 'hand' && p.handData) ||
-        (p.type === 'session' && p.sessionData)
-    );
-    if (handPosts.length === 0) {
-        const label = period === 'weekly' ? '今週' : '全期間';
-        container.innerHTML = `<div class="mx-empty">${label}のランキングがまだありません。<br>ハンドにいいね❤️を押してランキングを作りましょう！</div>`;
-        return;
-    }
-    // Header
-    const head = document.createElement('div');
-    head.className = 'mx-rank-head';
-    head.textContent = period === 'weekly' ? '🏆 週間ランキング TOP 20' : '👑 全期間ランキング TOP 20';
-    container.appendChild(head);
-    // Rank entries
-    handPosts.forEach((post, i) => {
-        const entry = renderPostEntry(post);
-        entry.classList.add('mx-post-ranked');
-        // Insert rank badge at the head
-        const rank = i + 1;
-        const badge = document.createElement('div');
-        badge.className = 'mx-rank-badge rank-' + (rank <= 3 ? String(rank) : 'other');
-        if (rank === 1) badge.textContent = '🥇 1位';
-        else if (rank === 2) badge.textContent = '🥈 2位';
-        else if (rank === 3) badge.textContent = '🥉 3位';
-        else badge.textContent = `${rank}位`;
-        entry.insertBefore(badge, entry.firstChild);
-        container.appendChild(entry);
-    });
-}
-
-function switchFeedTab(tab) {
-    activeFeedTab = tab;
-    document.querySelectorAll('#mx-feed-tabs .mx-feed-tab').forEach(el => {
-        el.classList.toggle('active', el.dataset.feedTab === tab);
-    });
-    if (tab === 'latest') {
-        renderTimeline(snsTimeline);
-    } else {
-        // Always re-fetch to get fresh rankings
-        client.getRankings(tab);
-        const cached = rankingsCache[tab];
-        if (cached) renderRankings(tab, cached);
-        else {
-            const container = document.getElementById('sns-timeline');
-            if (container) container.innerHTML = '<div class="mx-empty">読み込み中...</div>';
-        }
-    }
-}
-
-function setupFeedTabs() {
-    document.querySelectorAll('#mx-feed-tabs .mx-feed-tab').forEach(el => {
-        el.addEventListener('click', () => switchFeedTab(el.dataset.feedTab));
-    });
-}
-
-function renderPostEntry(post) {
-    // Session summary posts have their own compact card layout.
-    if (post.type === 'session' && post.sessionData) {
-        return renderSessionPostEntry(post);
-    }
-
-    const wrap = document.createElement('div');
-    wrap.className = 'mx-post';
-    wrap.dataset.postId = post.id;
-
-    const initial = (post.authorName || '?').charAt(0).toUpperCase();
-    const avatarHtml = post.authorAvatar
-        ? `<img src="avatars/${post.authorAvatar}.svg" alt="">`
-        : escapeHtml(initial);
-
-    const h = post.handData || {};
-    const cardsHtml = (h.winnerCards || []).map(c => renderMiniCard(c)).join('');
-    const ccHtml = (h.communityCards || []).map(c => renderMiniCard(c)).join('');
-    const pot = h.pot || 0;
-    const bb = h.bigBlind || 100;
-    const bbNum = Math.round(pot / bb);
-    const handRank = h.handRank || '';
-    const isManual = !!post.manualShared || post.autoShared === false;
-    const isLoss = h.result === 'loss' || pot < 0;
-    const badge = isLoss
-        ? { cls: 'loss', label: '😔 敗北' }
-        : pickBadge(handRank, Math.abs(bbNum));
-
-    const sourceLabel = isManual ? '📝 手動投稿' : '⚡ 自動共有';
-    const sign = pot >= 0 ? '+' : '';
-    const amountCls = pot >= 0 ? '' : 'mx-win-amount-neg';
-    const labelText = handRank
-        ? `${handRank} · ${Math.abs(bbNum)}BB ${isLoss ? '喪失' : '獲得'}`
-        : `${Math.abs(bbNum)}BB ${isLoss ? '喪失' : '獲得'}`;
-
-    const captionHtml = post.body
-        ? `<div class="mx-post-caption">${linkifyBody(post.body)}</div>`
-        : '';
-
-    const commentCount = (post.comments || []).length;
-    const commentsHtml = `
-        <div class="mx-comments" data-post-id="${post.id}">
-            ${renderCommentsTree(post.comments || [])}
-            <div class="mx-comment-input mx-comment-top-input" data-parent="">
-                <input type="text" placeholder="コメントする…" maxlength="500">
-                <button>送信</button>
-            </div>
-        </div>
-    `;
-
-    const replayCtaHtml = post.replayHash
-        ? `<button class="mx-replay-cta" type="button">
-               <span class="mx-replay-cta-icon">▶</span>
-               <span class="mx-replay-cta-label">リプレイを見る</span>
-               <span class="mx-replay-cta-hint">ハンドをもう一度</span>
-           </button>`
-        : '';
-
-    const likeCount = post.likeCount != null ? post.likeCount : ((post.likes || []).length);
-    const likedByMe = Array.isArray(post.likes) && client.name && post.likes.includes(client.name);
-
-    wrap.innerHTML = `
-        <div class="mx-post-head">
-            <div class="mx-post-avatar">${avatarHtml}</div>
-            <div class="mx-post-meta">
-                <div class="mx-post-name">${escapeHtml(post.authorName)}</div>
-                <div class="mx-post-date">${timeAgo(post.createdAt)}${h.gameName ? ' / ' + escapeHtml(h.gameName) : ''} · <span class="mx-post-source">${sourceLabel}</span></div>
-            </div>
-            <div class="mx-post-badge ${badge.cls}">${badge.label}</div>
-        </div>
-        ${captionHtml}
-        <div class="mx-hand-body ${isLoss ? 'mx-hand-body-loss' : ''}">
-            <div class="mx-hand-top">
-                <div class="mx-win-amount ${amountCls}">${sign}${pot.toLocaleString()}<span class="u">chips</span></div>
-                <span class="mx-game-tag">${escapeHtml(h.gameName || 'Poker')}</span>
-            </div>
-            ${cardsHtml ? `<div class="mx-cards">${cardsHtml}</div>` : ''}
-            <div class="mx-hand-label">${escapeHtml(labelText)}</div>
-            ${ccHtml ? `<div class="mx-cc-row">コミュニティ: <span class="mx-cards" style="display:inline-flex">${ccHtml}</span></div>` : ''}
-        </div>
-        ${replayCtaHtml}
-        <div class="mx-post-actions">
-            <button type="button" class="act-like ${likedByMe ? 'liked' : ''}">
-                <span class="like-heart">${likedByMe ? '❤️' : '🤍'}</span>
-                <span class="like-count">${likeCount}</span>
-            </button>
-            <span class="act-comments">💬 ${commentCount}</span>
-            ${post.replayHash ? `<span class="act-share">🔗 共有</span>` : ''}
-        </div>
-        ${commentsHtml}
-    `;
-
-    // Like button for post
-    const likeBtn = wrap.querySelector('.act-like');
-    if (likeBtn) {
-        likeBtn.addEventListener('click', () => {
-            if (!loggedInAccount) { showLoginRequiredToast('いいね'); return; }
-            if (!client.name) { showToast('名前を設定するといいねできます'); return; }
-            client.likePost(post.id);
-            // Optimistic UI: toggle
-            const now = !likeBtn.classList.contains('liked');
-            likeBtn.classList.toggle('liked', now);
-            const heart = likeBtn.querySelector('.like-heart');
-            if (heart) heart.textContent = now ? '❤️' : '🤍';
-            const cntEl = likeBtn.querySelector('.like-count');
-            if (cntEl) {
-                const cur = parseInt(cntEl.textContent, 10) || 0;
-                cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
-            }
-            if (now) likeBtn.classList.add('pop');
-            setTimeout(() => likeBtn.classList.remove('pop'), 320);
-        });
-    }
-
-    // Top-level comment send
-    const topInput = wrap.querySelector('.mx-comment-top-input input');
-    const topSend = wrap.querySelector('.mx-comment-top-input button');
-    const bindCommentSend = (inputEl, sendEl, parentId) => {
-        sendEl.addEventListener('click', () => {
-            if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
-            const body = inputEl.value.trim();
-            if (!body) return;
-            client.addComment(post.id, body, parentId);
-            inputEl.value = '';
-            // If this was a reply composer, hide it after send
-            if (parentId != null) {
-                const wrapEl = inputEl.closest('.mx-reply-compose');
-                if (wrapEl) wrapEl.classList.add('hidden');
-            }
-        });
-        inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendEl.click();
-        });
-    };
-    if (topInput && topSend) bindCommentSend(topInput, topSend, null);
-
-    // Comment interactions (like, reply)
-    wrap.querySelectorAll('.mx-comment').forEach(cEl => {
-        const commentId = Number(cEl.dataset.commentId);
-        const comment = (post.comments || []).find(c => c.id === commentId);
-        if (!comment) return;
-        const cLike = cEl.querySelector('.c-like');
-        if (cLike) {
-            cLike.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!loggedInAccount) { showLoginRequiredToast('いいね'); return; }
-                if (!client.name) { showToast('名前を設定するといいねできます'); return; }
-                client.likeComment(post.id, comment.id);
-                const now = !cLike.classList.contains('liked');
-                cLike.classList.toggle('liked', now);
-                const heart = cLike.querySelector('.like-heart');
-                if (heart) heart.textContent = now ? '❤️' : '🤍';
-                const cntEl = cLike.querySelector('.like-count');
-                if (cntEl) {
-                    const cur = parseInt(cntEl.textContent, 10) || 0;
-                    cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
-                }
-            });
-        }
-        const cReply = cEl.querySelector('.c-reply');
-        if (cReply) {
-            cReply.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Toggle reply composer for this comment
-                let composer = cEl.querySelector(':scope > .mx-reply-compose');
-                if (!composer) {
-                    composer = document.createElement('div');
-                    composer.className = 'mx-reply-compose mx-comment-input';
-                    composer.innerHTML = `<input type="text" placeholder="@${escapeHtml(comment.authorName)} に返信…" maxlength="500"><button>送信</button>`;
-                    cEl.appendChild(composer);
-                    const inp = composer.querySelector('input');
-                    const snd = composer.querySelector('button');
-                    inp.value = `@${comment.authorName} `;
-                    const parentId = comment.parentCommentId != null ? comment.parentCommentId : comment.id;
-                    bindCommentSend(inp, snd, parentId);
-                    setTimeout(() => { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 30);
-                } else {
-                    composer.classList.toggle('hidden');
-                    if (!composer.classList.contains('hidden')) {
-                        const inp = composer.querySelector('input');
-                        if (inp) setTimeout(() => inp.focus(), 30);
-                    }
-                }
-            });
-        }
-    });
-
-    // Replay button: open replay.html in a new tab with the post's compressed hash.
-    const replayBtn = wrap.querySelector('.mx-replay-cta');
-    if (replayBtn && post.replayHash) {
-        replayBtn.addEventListener('click', () => {
-            const url = buildReplayUrlFromHash(post.replayHash);
-            if (url) window.open(url, '_blank', 'noopener');
-        });
-    }
-    // Share button: copy the replay URL to clipboard
-    const shareBtn = wrap.querySelector('.act-share');
-    if (shareBtn && post.replayHash) {
-        shareBtn.addEventListener('click', async () => {
-            const url = buildReplayUrlFromHash(post.replayHash);
-            if (!url) return;
-            try {
-                await navigator.clipboard.writeText(url);
-                showToast('リプレイURLをコピーしました');
-            } catch (e) {
-                // Fallback: open a prompt
-                window.prompt('リプレイURL（Ctrl+C でコピー）', url);
-            }
-        });
-    }
-
-    return wrap;
-}
-
-// Render comments as a 1-level nested tree (replies grouped under their parent)
-function renderCommentsTree(comments) {
-    if (!comments || comments.length === 0) return '';
-    const topLevel = comments.filter(c => c.parentCommentId == null);
-    const repliesByParent = new Map();
-    for (const c of comments) {
-        if (c.parentCommentId != null) {
-            if (!repliesByParent.has(c.parentCommentId)) repliesByParent.set(c.parentCommentId, []);
-            repliesByParent.get(c.parentCommentId).push(c);
-        }
-    }
-    // Keep chronological order within each group
-    const byId = new Map(comments.map(c => [c.id, c]));
-    return topLevel.map(c => {
-        const replies = repliesByParent.get(c.id) || [];
-        return renderCommentHtml(c) + (replies.length > 0
-            ? `<div class="mx-replies">${replies.map(r => renderCommentHtml(r, true)).join('')}</div>`
-            : '');
-    }).join('');
-}
-
-function buildReplayUrlFromHash(hash) {
-    if (!hash) return '';
-    const base = window.location.href.replace(/\/[^/]*$/, '/');
-    return base + 'replay.html#' + hash;
-}
-
-// Render a session-summary post (type: 'session').
-// Shows hand count, duration, and all participants' chip P/L, ranked.
-function renderSessionPostEntry(post) {
-    const wrap = document.createElement('div');
-    wrap.className = 'mx-post mx-session-post';
-    wrap.dataset.postId = post.id;
-
-    const sd = post.sessionData || {};
-    const players = Array.isArray(sd.players) ? sd.players : [];
-    const handsPlayed = sd.handsPlayed || 0;
-    const durationMin = Math.max(1, Math.round((sd.durationMs || 0) / 60000));
-
-    // Commenting/like wiring reuses the same helpers as hand posts.
-    const commentCount = (post.comments || []).length;
-    const likeCount = post.likeCount != null ? post.likeCount : ((post.likes || []).length);
-    const likedByMe = Array.isArray(post.likes) && client.name && post.likes.includes(client.name);
-
-    const playerRowsHtml = players.map((p, i) => {
-        const sign = p.diff >= 0 ? '+' : '';
-        const diffCls = p.diff > 0 ? 'diff-win' : p.diff < 0 ? 'diff-loss' : 'diff-even';
-        const rankLabelStr = (i === 0 && p.diff > 0) ? '🏆'
-                          : (i === players.length - 1 && p.diff < 0) ? '😔'
-                          : `${i + 1}`;
-        const avatarHtml = p.avatar
-            ? `<img src="avatars/${p.avatar}.svg" alt="">`
-            : escapeHtml((p.name || '?').charAt(0).toUpperCase());
-        const tag = p.leftEarly ? '<span class="sess-tag">途中退室</span>' : '';
-        // Show breakdown of investment (initial 10k + rebuys → final) so players
-        // can see that rebuys are subtracted from the displayed P/L.
-        const rebuy = Number(p.rebuyAmount || 0);
-        const invested = Number(p.invested != null ? p.invested : 10000);
-        const end = Number(p.endChips != null ? p.endChips : 0);
-        const breakdownHtml = (rebuy > 0)
-            ? `<div class="sess-breakdown">投入 ${invested.toLocaleString()}（補充 +${rebuy.toLocaleString()}）→ 最終 ${end.toLocaleString()}</div>`
-            : `<div class="sess-breakdown">投入 ${invested.toLocaleString()} → 最終 ${end.toLocaleString()}</div>`;
-        return `
-            <div class="sess-row ${diffCls}">
-                <div class="sess-row-top">
-                    <span class="sess-rank">${rankLabelStr}</span>
-                    <span class="sess-avatar">${avatarHtml}</span>
-                    <span class="sess-name">${escapeHtml(p.name)}${tag}</span>
-                    <span class="sess-diff" title="ゲーム純損益（補充額を差し引き）">${sign}${Number(p.diff || 0).toLocaleString()}</span>
-                </div>
-                ${breakdownHtml}
-            </div>
-        `;
-    }).join('');
-
-    const commentsHtml = `
-        <div class="mx-comments" data-post-id="${post.id}">
-            ${renderCommentsTree(post.comments || [])}
-            <div class="mx-comment-input mx-comment-top-input" data-parent="">
-                <input type="text" placeholder="コメントする…" maxlength="500">
-                <button>送信</button>
-            </div>
-        </div>
-    `;
-
-    wrap.innerHTML = `
-        <div class="mx-post-head">
-            <div class="mx-post-avatar sess-avatar-big">🎲</div>
-            <div class="mx-post-meta">
-                <div class="mx-post-name">テーブル ${escapeHtml(sd.tableId || '')} 終了</div>
-                <div class="mx-post-date">${timeAgo(post.createdAt)} · ${escapeHtml(sd.gameName || '')}</div>
-            </div>
-            <div class="mx-post-badge pot">📊 セッション</div>
-        </div>
-        <div class="mx-session-body">
-            <div class="sess-meta">
-                <span><b>${handsPlayed}</b> ハンド</span>
-                <span>·</span>
-                <span><b>${durationMin}</b> 分</span>
-                <span>·</span>
-                <span><b>${players.length}</b> 人参加</span>
-            </div>
-            <div class="sess-rows">${playerRowsHtml}</div>
-            <div class="sess-footnote">※ 損益は「最終チップ − 投入総額（初期+補充）」の純損益です</div>
-        </div>
-        <div class="mx-post-actions">
-            <button type="button" class="act-like ${likedByMe ? 'liked' : ''}">
-                <span class="like-heart">${likedByMe ? '❤️' : '🤍'}</span>
-                <span class="like-count">${likeCount}</span>
-            </button>
-            <span class="act-comments">💬 ${commentCount}</span>
-        </div>
-        ${commentsHtml}
-    `;
-
-    // Like button
-    const likeBtn = wrap.querySelector('.act-like');
-    if (likeBtn) {
-        likeBtn.addEventListener('click', () => {
-            if (!loggedInAccount) { showLoginRequiredToast('いいね'); return; }
-            if (!client.name) { showToast('名前を設定するといいねできます'); return; }
-            client.likePost(post.id);
-            const now = !likeBtn.classList.contains('liked');
-            likeBtn.classList.toggle('liked', now);
-            const heart = likeBtn.querySelector('.like-heart');
-            if (heart) heart.textContent = now ? '❤️' : '🤍';
-            const cntEl = likeBtn.querySelector('.like-count');
-            if (cntEl) {
-                const cur = parseInt(cntEl.textContent, 10) || 0;
-                cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
-            }
-            if (now) likeBtn.classList.add('pop');
-            setTimeout(() => likeBtn.classList.remove('pop'), 320);
-        });
-    }
-
-    // Top-level comment send (reuses same pattern as hand post)
-    const topInput = wrap.querySelector('.mx-comment-top-input input');
-    const topSend = wrap.querySelector('.mx-comment-top-input button');
-    if (topInput && topSend) {
-        topSend.addEventListener('click', () => {
-            if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
-            const body = topInput.value.trim();
-            if (!body) return;
-            client.addComment(post.id, body, null);
-            topInput.value = '';
-        });
-        topInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') topSend.click();
-        });
-    }
-
-    // Wire comment interactions for existing comments
-    wrap.querySelectorAll('.mx-comment').forEach(cEl => {
-        const commentId = Number(cEl.dataset.commentId);
-        const comment = (post.comments || []).find(c => c.id === commentId);
-        if (comment) wireCommentInteractions(cEl, post, comment);
-    });
-
-    return wrap;
-}
-
-function pickBadge(handRank, bbNum) {
-    const r = (handRank || '').toLowerCase();
-    if (r.includes('royal')) return { cls: '', label: '🏆 ロイヤル' };
-    if (r.includes('straight flush') || r.includes('straight-flush') || r.includes('ストレートフラッシュ')) return { cls: '', label: '🏆 ストフラ' };
-    if (r.includes('four') || r.includes('quads') || r.includes('クワッズ') || r.includes('フォーカード')) return { cls: 'quads', label: '♣ クワッズ' };
-    if (r.includes('full house') || r.includes('フルハウス')) return { cls: 'quads', label: '♥ フルハウス' };
-    if (bbNum >= 50) return { cls: 'pot', label: '💰 ビッグポット' };
-    return { cls: 'pot', label: '🎉 大勝' };
-}
-
-function renderMiniCard(c) {
-    // Accept both {rank,suit} and {r,s} forms via normalizeCard (utils.js)
-    const n = normalizeCard(c);
-    if (!n) return '';
-    const isRed = n.suit === 'h' || n.suit === 'd';
-    return `<span class="mx-card ${isRed ? 'red' : 'black'}">${escapeHtml(rankLabel(n.rank))}${suitSymbol(n.suit)}</span>`;
-}
-
-function renderCommentHtml(c, isReply) {
-    const initial = (c.authorName || '?').charAt(0).toUpperCase();
-    const avatarHtml = c.authorAvatar
-        ? `<img src="avatars/${c.authorAvatar}.svg" alt="">`
-        : escapeHtml(initial);
-    const likeCount = c.likeCount != null ? c.likeCount : ((c.likes || []).length);
-    const likedByMe = Array.isArray(c.likes) && client.name && c.likes.includes(client.name);
-    return `
-        <div class="mx-comment ${isReply ? 'mx-comment-reply' : ''}" data-comment-id="${c.id}">
-            <div class="mx-c-avatar">${avatarHtml}</div>
-            <div class="mx-c-body">
-                <div class="mx-c-text"><b>${escapeHtml(c.authorName)}</b>${linkifyMentions(c.body)}<span class="mx-c-time">${timeAgo(c.createdAt)}</span></div>
-                <div class="mx-c-actions">
-                    <button type="button" class="c-like ${likedByMe ? 'liked' : ''}">
-                        <span class="like-heart">${likedByMe ? '❤️' : '🤍'}</span>
-                        <span class="like-count">${likeCount}</span>
-                    </button>
-                    <button type="button" class="c-reply">↪️ 返信</button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// linkifyMentions / escapeHtml / linkifyBody / formatDateJP / timeAgo
-// are provided by js/utils.js (loaded before this script).
-
-function showAutoShareModal(post) {
-    snsLastAutoShare = post;
-    const body = document.getElementById('auto-share-body');
-    const h = post.handData || {};
-    body.innerHTML = `
-        <div style="margin-bottom:8px"><b>${escapeHtml(post.title || '')}</b></div>
-        ${h.handRank ? `<div>ハンド: ${escapeHtml(h.handRank)}</div>` : ''}
-        <div>ポット: ${(h.pot || 0).toLocaleString()} チップ</div>
-        <div style="margin-top:8px;color:#888;font-size:11px">この勝利を仲間に知らせました。コメントを残しますか？</div>
-    `;
-    document.getElementById('auto-share-comment').value = '';
-    document.getElementById('auto-share-modal').classList.remove('hidden');
-}
-
-function hideAutoShareModal() {
-    document.getElementById('auto-share-modal').classList.add('hidden');
-    snsLastAutoShare = null;
-}
-
-// ---- Wire up SNS events to the websocket client ----
-client.on('timeline', (posts) => {
-    snsTimeline = posts || [];
-    if (document.getElementById('sns-screen') && !document.getElementById('sns-screen').classList.contains('hidden')) {
-        if (activeFeedTab === 'latest') renderTimeline(snsTimeline);
-        renderSNSSelf();
-    }
-});
-client.on('timeline_post', (post) => {
-    if (!post) return;
-    // Prepend if not already present
-    if (!snsTimeline.find(p => p.id === post.id)) {
-        snsTimeline.unshift(post);
-        if (snsTimeline.length > 100) snsTimeline.length = 100;
-    }
-    if (document.getElementById('sns-screen') && !document.getElementById('sns-screen').classList.contains('hidden')) {
-        if (activeFeedTab === 'latest') renderTimeline(snsTimeline);
-        // Ranking tabs can stay stable; user can refresh by re-tapping tab
-    }
-});
-client.on('timeline_comment', ({ postId, comment }) => {
-    const post = snsTimeline.find(p => p.id === postId);
-    if (post) {
-        post.comments = post.comments || [];
-        if (post.comments.find(c => c.id === comment.id)) return; // already have it
-        post.comments.push(comment);
-    }
-    // Partial update: insert the new comment into the existing thread, preserving
-    // reply composers, input focus, scroll position and other ephemeral state.
-    const wrap = document.querySelector(`.mx-post[data-post-id="${postId}"]`);
-    if (!wrap || !post) return;
-    const commentsRoot = wrap.querySelector('.mx-comments');
-    if (!commentsRoot) return;
-
-    // Build the comment HTML as a standalone element, then insert in the right spot.
-    const isReply = comment.parentCommentId != null;
-    const tmp = document.createElement('div');
-    tmp.innerHTML = renderCommentHtml(comment, isReply);
-    const newNode = tmp.firstElementChild;
-    if (!newNode) return;
-
-    if (isReply) {
-        // Find the parent comment element. The thread root is the comment whose
-        // id equals comment.parentCommentId (server flattens to 1 level).
-        const parentEl = commentsRoot.querySelector(`.mx-comment[data-comment-id="${comment.parentCommentId}"]`);
-        if (parentEl) {
-            // parent node structure: <comment/> followed by sibling <.mx-replies> (if any)
-            let repliesGroup = parentEl.nextElementSibling;
-            if (!repliesGroup || !repliesGroup.classList.contains('mx-replies')) {
-                repliesGroup = document.createElement('div');
-                repliesGroup.className = 'mx-replies';
-                parentEl.after(repliesGroup);
-            }
-            repliesGroup.appendChild(newNode);
-        } else {
-            // Parent not rendered for some reason → append to root just before input
-            const topInput = commentsRoot.querySelector('.mx-comment-top-input');
-            if (topInput) topInput.before(newNode);
-            else commentsRoot.appendChild(newNode);
-        }
-    } else {
-        // Top-level comment → insert before the top-level composer
-        const topInput = commentsRoot.querySelector('.mx-comment-top-input');
-        if (topInput) topInput.before(newNode);
-        else commentsRoot.appendChild(newNode);
-    }
-
-    // Wire the new comment's like / reply buttons without touching others.
-    wireCommentInteractions(newNode, post, comment);
-
-    // Update comment counter on the post
-    const counter = wrap.querySelector('.act-comments');
-    if (counter) counter.textContent = `💬 ${post.comments.length}`;
-});
-
-// Helper: wire like/reply handlers for a single newly-inserted comment element.
-function wireCommentInteractions(cEl, post, comment) {
-    const cLike = cEl.querySelector('.c-like');
-    if (cLike) {
-        cLike.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!client.name) { showToast('名前を設定するといいねできます'); return; }
-            client.likeComment(post.id, comment.id);
-            const now = !cLike.classList.contains('liked');
-            cLike.classList.toggle('liked', now);
-            const heart = cLike.querySelector('.like-heart');
-            if (heart) heart.textContent = now ? '❤️' : '🤍';
-            const cntEl = cLike.querySelector('.like-count');
-            if (cntEl) {
-                const cur = parseInt(cntEl.textContent, 10) || 0;
-                cntEl.textContent = String(Math.max(0, cur + (now ? 1 : -1)));
-            }
-        });
-    }
-    const cReply = cEl.querySelector('.c-reply');
-    if (cReply) {
-        cReply.addEventListener('click', (e) => {
-            e.stopPropagation();
-            let composer = cEl.querySelector(':scope > .mx-reply-compose');
-            if (!composer) {
-                composer = document.createElement('div');
-                composer.className = 'mx-reply-compose mx-comment-input';
-                composer.innerHTML = `<input type="text" placeholder="@${escapeHtml(comment.authorName)} に返信…" maxlength="500"><button>送信</button>`;
-                cEl.appendChild(composer);
-                const inp = composer.querySelector('input');
-                const snd = composer.querySelector('button');
-                inp.value = `@${comment.authorName} `;
-                const parentId = comment.parentCommentId != null ? comment.parentCommentId : comment.id;
-                snd.addEventListener('click', () => {
-                    if (!loggedInAccount) { showLoginRequiredToast('コメント投稿'); return; }
-                    const body = inp.value.trim();
-                    if (!body) return;
-                    client.addComment(post.id, body, parentId);
-                    inp.value = '';
-                    composer.classList.add('hidden');
-                });
-                inp.addEventListener('keydown', (e2) => {
-                    if (e2.key === 'Enter') snd.click();
-                });
-                setTimeout(() => { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 30);
-            } else {
-                composer.classList.toggle('hidden');
-                if (!composer.classList.contains('hidden')) {
-                    const inp = composer.querySelector('input');
-                    if (inp) setTimeout(() => inp.focus(), 30);
-                }
-            }
-        });
-    }
-}
-
-client.on('post_liked', ({ postId, userName, likeCount, liked }) => {
-    const post = snsTimeline.find(p => p.id === postId);
-    if (post) {
-        post.likes = post.likes || [];
-        const idx = post.likes.indexOf(userName);
-        if (liked && idx < 0) post.likes.push(userName);
-        if (!liked && idx >= 0) post.likes.splice(idx, 1);
-        post.likeCount = typeof likeCount === 'number' ? likeCount : post.likes.length;
-    }
-    // Update all rendered instances of this post (latest or ranking)
-    document.querySelectorAll(`.mx-post[data-post-id="${postId}"]`).forEach(wrap => {
-        const likeBtn = wrap.querySelector('.act-like');
-        if (!likeBtn) return;
-        const cntEl = likeBtn.querySelector('.like-count');
-        if (cntEl) cntEl.textContent = String(likeCount);
-        // If the actor is me, sync the button state (in case of multi-tab)
-        if (userName === client.name) {
-            likeBtn.classList.toggle('liked', !!liked);
-            const heart = likeBtn.querySelector('.like-heart');
-            if (heart) heart.textContent = liked ? '❤️' : '🤍';
-        }
-    });
-});
-
-client.on('comment_liked', ({ postId, commentId, userName, likeCount, liked }) => {
-    const post = snsTimeline.find(p => p.id === postId);
-    if (post) {
-        const c = (post.comments || []).find(x => x.id === commentId);
-        if (c) {
-            c.likes = c.likes || [];
-            const idx = c.likes.indexOf(userName);
-            if (liked && idx < 0) c.likes.push(userName);
-            if (!liked && idx >= 0) c.likes.splice(idx, 1);
-            c.likeCount = typeof likeCount === 'number' ? likeCount : c.likes.length;
-        }
-    }
-    document.querySelectorAll(`.mx-post[data-post-id="${postId}"] .mx-comment[data-comment-id="${commentId}"]`).forEach(cEl => {
-        const cLike = cEl.querySelector('.c-like');
-        if (!cLike) return;
-        const cntEl = cLike.querySelector('.like-count');
-        if (cntEl) cntEl.textContent = String(likeCount);
-        if (userName === client.name) {
-            cLike.classList.toggle('liked', !!liked);
-            const heart = cLike.querySelector('.like-heart');
-            if (heart) heart.textContent = liked ? '❤️' : '🤍';
-        }
-    });
-});
-
-client.on('rankings', ({ period, posts }) => {
-    rankingsCache[period] = posts || [];
-    if (activeFeedTab === period) {
-        renderRankings(period, posts || []);
-    }
-});
-client.on('post_created', (post) => {
-    if (!post) return;
-    if (!snsTimeline.find(p => p.id === post.id)) snsTimeline.unshift(post);
-    if (!document.getElementById('sns-screen').classList.contains('hidden')) {
-        renderTimeline(snsTimeline);
-    } else {
-        showToast('タイムラインに投稿しました');
-    }
-});
-client.on('auto_shared', (post) => {
-    if (!post) return;
-    if (!snsTimeline.find(p => p.id === post.id)) snsTimeline.unshift(post);
-    showAutoShareModal(post);
-});
 // footprints / new_footprint: UI removed — handler no longer needed
 // profile_data: UI removed — no handler needed
 
 // player_stats: Player Cloud visualization data
 client.on('player_stats', ({ stats }) => {
     if (!stats) return;
-    // { [name]: { total_profit, session_count, total_diversity, comment_likes } }
+    // { [name]: { total_profit, session_count, total_diversity } }
     window.playerStatsCache = Object.fromEntries(
         stats.map(s => [s.name, s])
     );

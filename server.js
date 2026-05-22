@@ -1,4 +1,4 @@
-// server.js - Multiplayer Poker Server (HTTP + WebSocket)
+﻿// server.js - Multiplayer Poker Server (HTTP + WebSocket)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -22,206 +22,9 @@ const { GAME_LIST, GameState } = require('./js/game');
 const { StatsTracker } = require('./js/stats');
 
 // ============================================
-// Timeline / Posts / Comments (SNS feed)
+// Data directory (footprints etc.)
 // ============================================
 const DATA_DIR = path.join(__dirname, 'data');
-const TIMELINE_FILE = path.join(DATA_DIR, 'timeline.json');
-const timelineList = []; // array of posts, newest first, capped at 200
-// post = { id, authorName, authorAvatar, type, title, body, handData?, createdAt, comments: [] }
-// comment = { id, authorName, authorAvatar, body, createdAt }
-let nextPostId = 1;
-let nextCommentId = 1;
-
-function loadTimeline() {
-    try {
-        if (!fs.existsSync(TIMELINE_FILE)) return;
-        const data = JSON.parse(fs.readFileSync(TIMELINE_FILE, 'utf8'));
-        if (Array.isArray(data.posts)) {
-            timelineList.push(...data.posts);
-            nextPostId = (data.nextPostId || 1);
-            nextCommentId = (data.nextCommentId || 1);
-        }
-        // Migration: ensure likes fields exist on posts and comments
-        for (const p of timelineList) {
-            if (!Array.isArray(p.likes)) p.likes = [];
-            p.likeCount = p.likes.length;
-            if (!Array.isArray(p.comments)) p.comments = [];
-            for (const c of p.comments) {
-                if (!Array.isArray(c.likes)) c.likes = [];
-                c.likeCount = c.likes.length;
-                if (!('parentCommentId' in c)) c.parentCommentId = null;
-                if (!Array.isArray(c.mentions)) c.mentions = [];
-            }
-        }
-        console.log(`Loaded ${timelineList.length} timeline posts`);
-    } catch (e) {
-        console.warn('Failed to load timeline.json:', e.message);
-    }
-}
-
-let saveTimelineTimer = null;
-function saveTimelineDebounced() {
-    if (saveTimelineTimer) return;
-    // 3000ms debounce: aggregates bursts of likes/comments into fewer writes.
-    saveTimelineTimer = setTimeout(() => {
-        saveTimelineTimer = null;
-        try {
-            if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-            const obj = { posts: timelineList, nextPostId, nextCommentId };
-            fs.writeFileSync(TIMELINE_FILE, JSON.stringify(obj, null, 2), 'utf8');
-        } catch (e) {
-            console.warn('Failed to save timeline.json:', e.message);
-        }
-    }, 3000);
-}
-
-function createPost(post) {
-    const p = {
-        id: nextPostId++,
-        authorName: post.authorName || '',
-        authorAvatar: post.authorAvatar || null,
-        type: post.type || 'diary', // 'hand' | 'diary' | 'community' | 'session'
-        title: (post.title || '').slice(0, 100),
-        body: (post.body || '').slice(0, 2000),
-        handData: post.handData || null,
-        sessionData: post.sessionData || null,
-        mood: post.mood || null,
-        autoShared: !!post.autoShared,
-        manualShared: !!post.manualShared,
-        replayHash: post.replayHash || '',
-        createdAt: Date.now(),
-        comments: [],
-        likes: [],
-        likeCount: 0
-    };
-    timelineList.unshift(p);
-    if (timelineList.length > 200) timelineList.length = 200;
-    saveTimelineDebounced();
-    return p;
-}
-
-function addCommentToPost(postId, comment) {
-    const post = timelineList.find(p => p.id === postId);
-    if (!post) return null;
-    const c = {
-        id: nextCommentId++,
-        authorName: comment.authorName || '',
-        authorAvatar: comment.authorAvatar || null,
-        body: (comment.body || '').slice(0, 500),
-        parentCommentId: (comment.parentCommentId != null) ? Number(comment.parentCommentId) : null,
-        mentions: Array.isArray(comment.mentions) ? comment.mentions.slice(0, 10).map(s => String(s).slice(0, 40)) : [],
-        likes: [],
-        likeCount: 0,
-        createdAt: Date.now()
-    };
-    post.comments.push(c);
-    saveTimelineDebounced();
-    return { post, comment: c };
-}
-
-function togglePostLike(postId, userName) {
-    if (!userName) return null;
-    const post = timelineList.find(p => p.id === postId);
-    if (!post) return null;
-    if (!Array.isArray(post.likes)) post.likes = [];
-    const idx = post.likes.indexOf(userName);
-    let likedNow;
-    if (idx >= 0) {
-        post.likes.splice(idx, 1);
-        likedNow = false;
-    } else {
-        post.likes.push(userName);
-        likedNow = true;
-    }
-    post.likeCount = post.likes.length;
-    saveTimelineDebounced();
-    return { post, likedNow };
-}
-
-function toggleCommentLike(postId, commentId, userName) {
-    if (!userName) return null;
-    const post = timelineList.find(p => p.id === postId);
-    if (!post) return null;
-    const comment = (post.comments || []).find(c => c.id === commentId);
-    if (!comment) return null;
-    if (!Array.isArray(comment.likes)) comment.likes = [];
-    const idx = comment.likes.indexOf(userName);
-    let likedNow;
-    if (idx >= 0) {
-        comment.likes.splice(idx, 1);
-        likedNow = false;
-    } else {
-        comment.likes.push(userName);
-        likedNow = true;
-    }
-    comment.likeCount = comment.likes.length;
-    saveTimelineDebounced();
-    return { post, comment, likedNow };
-}
-
-function getRankings(period) {
-    // period: 'weekly' | 'all'
-    const now = Date.now();
-    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    let pool = timelineList;
-    if (period === 'weekly') {
-        pool = timelineList.filter(p => p.createdAt >= weekAgo);
-    }
-    // Sort by like count descending; tie-break by recency
-    const sorted = [...pool]
-        .filter(p => (p.likeCount || 0) > 0)  // only posts with at least 1 like appear
-        .sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0) || (b.createdAt - a.createdAt));
-    return sorted.slice(0, 20);
-}
-
-function broadcastPostLike(post, actorName, likedNow) {
-    for (const [ws, c] of clients) {
-        if (!c.name) continue;
-        send(ws, {
-            type: 'post_liked',
-            postId: post.id,
-            userName: actorName,
-            likeCount: post.likeCount || 0,
-            liked: likedNow
-        });
-    }
-}
-
-function broadcastCommentLike(post, comment, actorName, likedNow) {
-    for (const [ws, c] of clients) {
-        if (!c.name) continue;
-        send(ws, {
-            type: 'comment_liked',
-            postId: post.id,
-            commentId: comment.id,
-            userName: actorName,
-            likeCount: comment.likeCount || 0,
-            liked: likedNow
-        });
-    }
-}
-
-function getTimelineForUser(name) {
-    // Global timeline: all users (including guests) see the same feed.
-    // The `name` argument is kept for API compatibility but no longer filters.
-    return timelineList.slice(0, 50);
-}
-
-function broadcastTimelineUpdate(post) {
-    // Broadcast to every connected client with a name (authenticated or guest).
-    for (const [ws, c] of clients) {
-        if (!c.name) continue;
-        send(ws, { type: 'timeline_post', post });
-    }
-}
-
-function broadcastCommentUpdate(postId, comment, postAuthor) {
-    // Broadcast to every connected client with a name (authenticated or guest).
-    for (const [ws, c] of clients) {
-        if (!c.name) continue;
-        send(ws, { type: 'timeline_comment', postId, comment });
-    }
-}
 
 // ============================================
 // Footprints (profile view tracking)
@@ -275,121 +78,8 @@ function getFootprints(name) {
     return footprintsMap.get(name) || [];
 }
 
-loadTimeline();
 loadFootprints();
 
-// ============================================
-// Notable Hand Detection (for auto-share)
-// ============================================
-function isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBet) {
-    // Trigger 1: pot >= 50 BB OR pot >= 25 big bets
-    const bbThreshold = (bigBlind || 100) * 50;
-    const bigBetThreshold = (bigBet || (bigBlind || 100) * 2) * 25;
-    const bigPot = totalPot >= bbThreshold || totalPot >= bigBetThreshold;
-    // Trigger 2: strong hand rank (royal flush, straight flush, 4 of a kind)
-    let strongHand = false;
-    let handRank = '';
-    try {
-        const winner = (handResult.players || []).find(p => p.name === winnerName);
-        if (winner && winner.cards && winner.cards.length > 0) {
-            const evalCards = winner.cards.map(c => ({ rank: c.rank, suit: c.suit }));
-            const cc = (handResult.communityCards || []).map(c => ({ rank: c.rank, suit: c.suit }));
-            const allCards = [...evalCards, ...cc];
-            if (allCards.length >= 5) {
-                const result = bestHighHand(allCards);
-                if (result && result.desc) {
-                    handRank = result.desc;
-                    const rankStr = handRank.toLowerCase();
-                    if (rankStr.includes('royal') || rankStr.includes('straight flush') ||
-                        rankStr.includes('four of a kind') || rankStr.includes('quads')) {
-                        strongHand = true;
-                    }
-                }
-            }
-        }
-    } catch (e) {}
-    return { notable: bigPot || strongHand, handRank, reason: strongHand ? 'strong' : (bigPot ? 'bigpot' : '') };
-}
-
-// Build a compact replay object matching buildReplayURL in app.js, then
-// compress with deflate-raw and base64url-encode so replay.html can consume it.
-const zlib = require('zlib');
-function buildReplayHash(handResult, handLogs) {
-    try {
-        if (!handResult) return '';
-        const data = {
-            g: handResult.gameName || '',
-            t: handResult.gameType || '',
-            c: handResult.communityCards || [],
-            d: handResult.dealerSeat,
-            p: (handResult.players || []).map(p => ({
-                n: p.name, o: p.position,
-                f: p.folded ? 1 : 0,
-                c: p.chips, s: p.startChips,
-                h: p.cards || [],
-                u: p.upCards || [],
-                w: p.downCards || [],
-            })),
-            l: Array.isArray(handLogs) ? handLogs : [],
-            ds: handResult.drawSnapshots || [],
-        };
-        const json = JSON.stringify(data);
-        // deflate-raw (no zlib wrapper) to match client CompressionStream('deflate-raw')
-        const buf = zlib.deflateRawSync(Buffer.from(json, 'utf8'));
-        // base64url
-        return buf.toString('base64')
-            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    } catch (e) {
-        console.warn('buildReplayHash failed:', e && e.message);
-        return '';
-    }
-}
-
-function autoSharePokerHand(winnerName, handResult, totalPot, handRank, reason, gameName, handLogs) {
-    // Find winner's avatar, and skip auto-share for guest accounts entirely.
-    let authorAvatar = null;
-    let isGuestAuthor = false;
-    for (const [, c] of clients) {
-        if (c.name === winnerName) {
-            authorAvatar = c.avatar || null;
-            isGuestAuthor = !!c.isGuest;
-            break;
-        }
-    }
-    if (isGuestAuthor) return; // guests cannot post to the timeline
-    const winnerP = (handResult.players || []).find(p => p.name === winnerName);
-    const reasonLabel = reason === 'strong' ? '🎉 強力なハンド達成' : '💰 大きなポット獲得';
-    const title = `${reasonLabel}: ${handRank || 'ポットを獲得'}`;
-    const bodyLines = [
-        `${gameName || 'ポーカー'} にて ${handRank || '勝利'}！`,
-        `ポット: ${totalPot.toLocaleString()} チップ`,
-        ''
-    ];
-    const replayHash = buildReplayHash(handResult, handLogs);
-    const post = createPost({
-        authorName: winnerName,
-        authorAvatar,
-        type: 'hand',
-        title,
-        body: bodyLines.join('\n'),
-        handData: {
-            gameName,
-            handRank,
-            pot: totalPot,
-            winnerCards: winnerP ? winnerP.cards : [],
-            communityCards: handResult.communityCards || []
-        },
-        replayHash,
-        autoShared: true
-    });
-    broadcastTimelineUpdate(post);
-    // Notify the winner with auto-share alert (so they can add a comment)
-    for (const [ws, c] of clients) {
-        if (c.name === winnerName) {
-            send(ws, { type: 'auto_shared', post });
-        }
-    }
-}
 
 // ============================================
 // Account System (Supabase with local JSON fallback)
@@ -405,28 +95,26 @@ const supabase = (createClient && SUPABASE_URL && SUPABASE_KEY) ? createClient(S
 // ============================================
 // Player Stats (for Player Cloud visualization)
 // ============================================
-// In-memory cache: { [name]: { total_profit, session_count, total_diversity, comment_likes } }
+// In-memory cache: { [name]: { total_profit, session_count, total_diversity } }
 const playerStatsMap = {};
 
 async function upsertPlayerStats(name, delta) {
     if (!name) return;
     if (!playerStatsMap[name]) {
-        playerStatsMap[name] = { total_profit: 0, session_count: 0, total_diversity: 0, comment_likes: 0 };
+        playerStatsMap[name] = { total_profit: 0, session_count: 0, total_diversity: 0 };
     }
     const s = playerStatsMap[name];
-    if (delta.profitDelta  !== undefined) s.total_profit   += delta.profitDelta;
-    if (delta.sessionDelta !== undefined) s.session_count  += delta.sessionDelta;
+    if (delta.profitDelta    !== undefined) s.total_profit    += delta.profitDelta;
+    if (delta.sessionDelta   !== undefined) s.session_count   += delta.sessionDelta;
     if (delta.diversityDelta !== undefined) s.total_diversity += delta.diversityDelta;
-    if (delta.likeDelta    !== undefined) s.comment_likes  = Math.max(0, s.comment_likes + delta.likeDelta);
 
     if (supabase) {
         try {
             await supabase.from('player_stats').upsert({
                 name,
-                total_profit:   s.total_profit,
-                session_count:  s.session_count,
+                total_profit:    s.total_profit,
+                session_count:   s.session_count,
                 total_diversity: s.total_diversity,
-                comment_likes:  s.comment_likes,
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'name' });
         } catch (e) {
@@ -445,7 +133,6 @@ async function loadAllPlayerStats() {
                     total_profit:    row.total_profit    || 0,
                     session_count:   row.session_count   || 0,
                     total_diversity: row.total_diversity || 0,
-                    comment_likes:   row.comment_likes   || 0,
                 };
             }
             console.log(`player_stats loaded: ${data.length} records`);
@@ -1691,159 +1378,6 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
-        case 'get_timeline': {
-            if (!client.name) break;
-            const posts = getTimelineForUser(client.name);
-            send(ws, { type: 'timeline', posts });
-            break;
-        }
-
-        case 'create_post': {
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントでは投稿できません' }); break; }
-            if (!client.name) break;
-            const title = (msg.title || '').trim();
-            const body = (msg.body || '').trim();
-            const mood = (msg.mood || '').trim();
-            if (!body && !title) break;
-            const post = createPost({
-                authorName: client.name,
-                authorAvatar: client.avatar,
-                type: 'diary',
-                title, body, mood,
-                autoShared: false
-            });
-            broadcastTimelineUpdate(post);
-            send(ws, { type: 'post_created', post });
-            break;
-        }
-
-        case 'post_hand': {
-            // Manual post of a hand from user's hand history (win or loss)
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではハンドを投稿できません' }); break; }
-            if (!client.name) break;
-            const caption = typeof msg.caption === 'string' ? msg.caption.trim().slice(0, 500) : '';
-            // replayHash is a pre-compressed base64url string produced by the client.
-            // Size cap: ~8 KB (generous for compressed JSON ~500b–1.5KB typical).
-            const rawReplayHash = typeof msg.replayHash === 'string' ? msg.replayHash.slice(0, 8192) : '';
-            const replayHash = /^[A-Za-z0-9\-_]*$/.test(rawReplayHash) ? rawReplayHash : '';
-            const raw = msg.handData || {};
-            // Basic validation/sanitization
-            const sanitizeCard = (c) => {
-                if (!c || typeof c !== 'object') return null;
-                const rank = typeof c.rank === 'string' ? c.rank.slice(0, 3) : (typeof c.r === 'string' ? c.r.slice(0, 3) : '');
-                const suit = typeof c.suit === 'string' ? c.suit.slice(0, 2) : (typeof c.s === 'string' ? c.s.slice(0, 2) : '');
-                if (!rank || !suit) return null;
-                return { rank, suit };
-            };
-            const clampCards = (arr, max) => {
-                if (!Array.isArray(arr)) return [];
-                return arr.slice(0, max).map(sanitizeCard).filter(Boolean);
-            };
-            const handData = {
-                gameName: typeof raw.gameName === 'string' ? raw.gameName.slice(0, 40) : 'ポーカー',
-                handRank: typeof raw.handRank === 'string' ? raw.handRank.slice(0, 60) : '',
-                pot: Math.max(-1e9, Math.min(1e9, Number(raw.pot) || 0)),
-                bigBlind: Math.max(1, Math.min(1e7, Number(raw.bigBlind) || 100)),
-                winnerCards: clampCards(raw.winnerCards || raw.myCards, 10),
-                communityCards: clampCards(raw.communityCards, 10),
-                result: raw.result === 'loss' ? 'loss' : 'win',
-            };
-            const reasonLabel = handData.result === 'loss' ? '📝 ハンド共有（敗北）' : '📝 ハンド共有';
-            const title = handData.handRank ? `${reasonLabel}: ${handData.handRank}` : reasonLabel;
-            const post = createPost({
-                authorName: client.name,
-                authorAvatar: client.avatar,
-                type: 'hand',
-                title,
-                body: caption,
-                handData,
-                replayHash,
-                autoShared: false,
-                manualShared: true
-            });
-            broadcastTimelineUpdate(post);
-            send(ws, { type: 'post_created', post });
-            break;
-        }
-
-        case 'add_comment': {
-            // Timeline is visible to everyone (including guests), but only
-            // registered accounts can comment.
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではコメントできません' }); break; }
-            if (!client.name) break;
-            const postId = Number(msg.postId);
-            const body = (msg.body || '').trim();
-            if (!postId || !body) break;
-            // Optional parentCommentId for replies (flattened: a reply to a reply still
-            // targets the top-level comment of the thread).
-            let parentCommentId = null;
-            if (msg.parentCommentId != null) {
-                const pid = Number(msg.parentCommentId);
-                const post = timelineList.find(p => p.id === postId);
-                if (post) {
-                    const parent = (post.comments || []).find(c => c.id === pid);
-                    if (parent) {
-                        // Normalize: reply-to-reply gets re-parented to the thread root
-                        parentCommentId = parent.parentCommentId != null ? parent.parentCommentId : parent.id;
-                    }
-                }
-            }
-            // Extract @mentions from body for display/validation
-            const mentions = [];
-            const mentionRe = /@([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)/g;
-            let m;
-            while ((m = mentionRe.exec(body)) !== null) {
-                if (mentions.length >= 10) break;
-                if (!mentions.includes(m[1])) mentions.push(m[1]);
-            }
-            const result = addCommentToPost(postId, {
-                authorName: client.name,
-                authorAvatar: client.avatar,
-                body,
-                parentCommentId,
-                mentions
-            });
-            if (result) {
-                broadcastCommentUpdate(postId, result.comment, result.post.authorName);
-            }
-            break;
-        }
-
-        case 'like_post': {
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではいいねできません' }); break; }
-            if (!client.name) break;
-            const postId = Number(msg.postId);
-            if (!postId) break;
-            const result = togglePostLike(postId, client.name);
-            if (result) broadcastPostLike(result.post, client.name, result.likedNow);
-            break;
-        }
-
-        case 'like_comment': {
-            if (client.isGuest) { send(ws, { type: 'error', message: 'ゲストアカウントではいいねできません' }); break; }
-            if (!client.name) break;
-            const postId = Number(msg.postId);
-            const commentId = Number(msg.commentId);
-            if (!postId || !commentId) break;
-            const result = toggleCommentLike(postId, commentId, client.name);
-            if (result) {
-                broadcastCommentLike(result.post, result.comment, client.name, result.likedNow);
-                // player_stats: コメント作者のいいね数を更新
-                const commentAuthor = result.comment && result.comment.authorName;
-                if (commentAuthor && commentAuthor !== client.name) {
-                    upsertPlayerStats(commentAuthor, { likeDelta: result.likedNow ? 1 : -1 });
-                }
-            }
-            break;
-        }
-
-        case 'get_rankings': {
-            if (!client.name) break;
-            const period = (msg.period === 'weekly') ? 'weekly' : 'all';
-            const posts = getRankings(period);
-            send(ws, { type: 'rankings', period, posts });
-            break;
-        }
 
         case 'view_profile': {
             if (!client.name) break;
@@ -1856,7 +1390,6 @@ function handleMessage(ws, client, msg) {
                 isOnline: false,
                 avatar: null,
                 status: 'offline',
-                posts: timelineList.filter(p => p.authorName === target).slice(0, 20)
             };
             for (const [, c] of clients) {
                 if (c.name === target) {
@@ -1911,7 +1444,6 @@ function handleMessage(ws, client, msg) {
                 total_profit:    s.total_profit    || 0,
                 session_count:   s.session_count   || 0,
                 total_diversity: s.total_diversity || 0,
-                comment_likes:   s.comment_likes   || 0,
             }));
             send(ws, { type: 'player_stats', stats: statsArray });
             break;
@@ -1934,86 +1466,34 @@ function hasActiveMemberInRoom(room) {
     return false;
 }
 
-// Build a session summary for a room at close time.
-// Returns null if no hands were played (e.g. game never started).
-function buildSessionSummary(room) {
-    if (!room || !room.handsPlayed) return null;
+// Record session stats (profit, session count, game diversity) on room close.
+function recordSessionStats(room) {
+    if (!room || !room.handsPlayed) return;
     const startingChips = (room.settings && room.settings.startingChips) || 10000;
-    const gameName = (room.game && room.game.gameConfig && room.game.gameConfig.name) || 'ポーカー';
     const rebuys = room.totalRebuys || {};
     const participants = room.sessionParticipants || {};
-    // Collect final chip totals. Primary source: game.players (still seated).
-    // For players who left mid-session we rely on participants but can't know their final chips,
-    // so they're recorded as "退室" with invested only (diff = -invested relative to their stake left on the table).
     const finalByName = {};
     if (room.game && room.game.players) {
         for (const p of room.game.players) {
             if (p.name) finalByName[p.name] = p.chips;
         }
     }
-    const players = [];
+    const gameCount = room.sessionGameIds ? room.sessionGameIds.size : 1;
     for (const name of Object.keys(participants)) {
         const rebuyAmount = rebuys[name] || 0;
-        const invested = startingChips + rebuyAmount;      // 10,000 + 補充総額
+        const invested = startingChips + rebuyAmount;
         const endChips = (name in finalByName) ? finalByName[name] : 0;
-        // diff は「プレイ中の純損益」= 最終チップ − 投入総額
-        // 補充分は「投資」として差し引かれるので、表示される損益は純粋に
-        // ゲーム内での勝ち負けを表します。
         const diff = endChips - invested;
-        players.push({
-            name,
-            avatar: (participants[name] && participants[name].avatar) || null,
-            startingChips,                                  // 10,000
-            rebuyAmount,                                    // 補充総額
-            invested,                                       // 投入総額 = startingChips + rebuyAmount
-            endChips,                                       // 最終チップ
-            diff,                                           // 純損益
-            leftEarly: !(name in finalByName),
-        });
+        upsertPlayerStats(name, { profitDelta: diff, sessionDelta: 1, diversityDelta: gameCount });
     }
-    // Sort: biggest winners first, biggest losers last
-    players.sort((a, b) => b.diff - a.diff);
-    return {
-        tableId: room.id,
-        gameName,
-        handsPlayed: room.handsPlayed || 0,
-        durationMs: room.sessionStart ? Date.now() - room.sessionStart : 0,
-        players,
-    };
-}
-
-// Create a session-summary post on the timeline and broadcast it.
-function postSessionSummary(room, reason) {
-    const summary = buildSessionSummary(room);
-    if (!summary || !summary.players || summary.players.length === 0) return;
-    // player_stats: セッション終了時に多様性・セッション回数を記録
-    const gameCount = room.sessionGameIds ? room.sessionGameIds.size : 1;
-    for (const p of summary.players) {
-        if (!p.name) continue;
-        upsertPlayerStats(p.name, { sessionDelta: 1, diversityDelta: gameCount });
-    }
-    // Pick the winner as author (the biggest positive diff). If none positive,
-    // use the top of the sorted list (smallest loss).
-    const top = summary.players[0];
-    const post = createPost({
-        authorName: top.name,
-        authorAvatar: top.avatar || null,
-        type: 'session',
-        title: `テーブル ${room.id} セッション終了`,
-        body: '',
-        sessionData: summary,
-        autoShared: true,
-    });
-    broadcastTimelineUpdate(post);
 }
 
 // Delete a room: clear timers, evict remaining members, remove from map,
-// broadcast lobby update. Also posts the session summary to the timeline if
-// at least one hand was played.
+// broadcast lobby update. Also records player stats if hands were played.
 function deleteRoomAndEvict(room, reason) {
     if (!room) return;
-    // Post session summary before tearing down so buildSessionSummary sees room state.
-    try { postSessionSummary(room, reason); } catch (e) { console.warn('postSessionSummary failed:', e && e.message); }
+    // Record session stats before tearing down so we still have room state.
+    try { recordSessionStats(room); } catch (e) { console.warn('recordSessionStats failed:', e && e.message); }
     if (room.pending) { try { clearTimeout(room.pending.timer); } catch {} room.pending = null; }
     if (room.idleCloseTimer) { try { clearTimeout(room.idleCloseTimer); } catch {} room.idleCloseTimer = null; }
     // Notify + detach any remaining members (sitout players stay in room until this runs)
@@ -2604,15 +2084,6 @@ function startGame(room) {
             }
         }
 
-        // Auto-share notable hand to SNS timeline
-        if (winnerName) {
-            const bigBetVal = (gc && gc.bigBet) || bigBlind * 2;
-            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBetVal);
-            if (notable.notable) {
-                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name, room.currentHandLogs || []);
-            }
-        }
-
         // Close the table if every remaining member is on sitout (checked on next
         // tick so the hand's result broadcast settles first).
         // After the hand's result broadcast settles, apply any pending
@@ -2996,14 +2467,6 @@ function createZoomTable(members) {
             }
         }
 
-        // Auto-share notable hand to SNS timeline (Zoom)
-        if (winnerName) {
-            const bigBetVal = (gc && gc.bigBet) || bigBlind * 2;
-            const notable = isNotableHand(handResult, winnerName, totalPot, bigBlind, bigBetVal);
-            if (notable.notable) {
-                autoSharePokerHand(winnerName, handResult, totalPot, notable.handRank, notable.reason, gc.name, table.currentHandLogs || []);
-            }
-        }
     };
 
     game.onGetPlayerAction = (actions, player) => {

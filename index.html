@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=66">
-    <link rel="stylesheet" href="css/sns.css?v=8">
+    <link rel="stylesheet" href="css/style.css?v=67">
+    <link rel="stylesheet" href="css/sns.css?v=9">
 </head>
 <body>
     <div id="app">
@@ -66,7 +66,7 @@
         <!-- Big hand feed (global overlay, not tied to lobby) -->
         <div id="big-hand-feed" class="big-hand-feed hidden"></div>
 
-        <!-- Main Screen (unified lobby + notable-hand timeline) -->
+        <!-- Main Screen (unified lobby + player cloud) -->
         <div id="sns-screen" class="hidden" data-mb-view="play">
             <!-- Top bar: avatar on the left, hamburger menu on the right -->
             <div class="mx-topbar">
@@ -110,19 +110,17 @@
                 <span class="mx-resume-arrow">→</span>
             </div>
 
-            <!-- Feed -->
-            <div class="mx-feed-wrap">
-                <div class="mx-feed-head">
-                    <h2>タイムライン</h2>
-                    <span class="mx-feed-live">LIVE</span>
-                    <button id="mx-btn-post-hand" class="mx-feed-post-btn">📝 ハンド投稿</button>
+            <!-- Player Cloud -->
+            <div class="mx-cloud-wrap">
+                <div class="mx-cloud-head">
+                    <h2>プレイヤークラウド</h2>
                 </div>
-                <div class="mx-feed-tabs" id="mx-feed-tabs">
-                    <button class="mx-feed-tab active" data-feed-tab="latest">🕒 最新</button>
-                    <button class="mx-feed-tab" data-feed-tab="weekly">🏆 週間ランキング</button>
-                    <button class="mx-feed-tab" data-feed-tab="all">👑 全期間ランキング</button>
+                <div class="cp-cloud-legend">
+                    <span>文字サイズ = 収支</span>
+                    <span>X軸 = ゲーム多様性</span>
+                    <span>Y軸 = セッション数</span>
                 </div>
-                <div id="sns-timeline"></div>
+                <svg id="player-cloud-main-svg" class="cp-cloud-svg" viewBox="0 0 360 320" preserveAspectRatio="xMidYMid meet"></svg>
             </div>
 
             <!-- My Profile panel (mobile view=me) -->
@@ -144,7 +142,7 @@
             <!-- Mobile bottom nav -->
             <nav id="mx-bottom-nav" class="mx-bottom-nav" aria-label="メインナビ">
                 <button class="mxbn-tab active" data-target="play"><span class="mxbn-ic">🎰</span><span class="mxbn-label">プレイ</span></button>
-                <button class="mxbn-tab" data-target="feed"><span class="mxbn-ic">📰</span><span class="mxbn-label">フィード</span></button>
+                <button class="mxbn-tab" data-target="cloud"><span class="mxbn-ic">☁️</span><span class="mxbn-label">クラウド</span></button>
                 <button class="mxbn-tab" data-target="history"><span class="mxbn-ic">📋</span><span class="mxbn-label">履歴</span></button>
                 <button class="mxbn-tab" data-target="online"><span class="mxbn-ic">👥</span><span class="mxbn-label">オンライン</span></button>
                 <button class="mxbn-tab" data-target="me"><span class="mxbn-ic">👤</span><span class="mxbn-label">マイ</span></button>
@@ -200,7 +198,7 @@
                         <span class="pc-leg-sep">／</span>
                         <span class="pc-leg-item">横＝ゲーム多様性</span>
                         <span class="pc-leg-sep">／</span>
-                        <span class="pc-leg-item">縦＝いいね数</span>
+                        <span class="pc-leg-item">縦＝セッション数</span>
                     </div>
                     <div class="pc-chart-wrap">
                         <svg id="player-cloud-svg"></svg>
@@ -212,40 +210,6 @@
             </div>
         </div>
 
-        <!-- Caption input modal (manual hand post) -->
-        <div id="hand-post-modal" class="rp-modal hidden">
-            <div class="rp-backdrop"></div>
-            <div class="rp-content hp-content">
-                <div class="rp-header">
-                    <div class="rp-title">📝 このハンドをタイムラインに投稿</div>
-                    <button class="rp-close" id="btn-hp-close">✕</button>
-                </div>
-                <div class="hp-body" id="hp-preview"></div>
-                <div class="hp-actions">
-                    <textarea id="hp-caption" placeholder="一言コメント（任意・500文字まで）" maxlength="500"></textarea>
-                    <div class="hp-buttons">
-                        <button id="btn-hp-cancel" class="btn-small">キャンセル</button>
-                        <button id="btn-hp-submit" class="btn-mixi">📢 投稿する</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Auto-share notification modal -->
-        <div id="auto-share-modal" class="auto-share-modal hidden">
-            <div class="auto-share-content">
-                <div class="auto-share-header">🎉 ハンドをタイムラインへ自動共有しました！</div>
-                <div class="auto-share-body" id="auto-share-body"></div>
-                <div class="auto-share-actions">
-                    <textarea id="auto-share-comment" placeholder="この勝利について一言コメントしますか？（任意）" maxlength="500"></textarea>
-                    <div class="auto-share-buttons">
-                        <button id="btn-auto-share-comment" class="btn-mixi">コメント投稿</button>
-                        <button id="btn-auto-share-skip" class="btn-small">スキップ</button>
-                        <button id="btn-auto-share-view" class="btn-small">タイムラインを見る</button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Room Screen (Waiting Room) -->
         <div id="room-screen" class="hidden">
@@ -514,18 +478,6 @@
                 </div>
             </div>
 
-            <!-- Session Summary Overlay -->
-            <div id="session-summary" class="hidden">
-                <div class="ss-inner">
-                    <h2 class="ss-title">セッションサマリー</h2>
-                    <div id="ss-ranking" class="ss-section"></div>
-                    <div id="ss-highlights" class="ss-section"></div>
-                    <div class="ss-actions">
-                        <button id="btn-ss-share" class="btn-small">共有</button>
-                        <button id="btn-ss-lobby" class="btn-primary" disabled>ロビーに戻る</button>
-                    </div>
-                </div>
-            </div>
 
         </div>
 
@@ -534,11 +486,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=3"></script>
+    <script src="js/client.js?v=4"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=68"></script>
-    <script src="js/hand-post.js?v=2"></script>
+    <script src="js/app.js?v=69"></script>
+
 </body>
 </html>
