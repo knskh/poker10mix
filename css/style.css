@@ -1890,25 +1890,31 @@ body {
 /* Banner shown while other players' cards are hidden. */
 .hh-hide-notice {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    background: rgba(79, 195, 247, 0.08);
-    border: 1px solid rgba(79, 195, 247, 0.25);
-    border-radius: 6px;
-    padding: 6px 10px;
-    margin-bottom: 8px;
+    background: rgba(79, 195, 247, 0.06);
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
 }
 .hh-hide-msg {
-    font-size: 11px; color: var(--text-dim); line-height: 1.4;
+    font-size: 11px; color: var(--text-dim); line-height: 1.5;
 }
-.hh-reveal-btn {
+/* 「投稿して公開する」ボタン */
+.hh-post-reveal-btn {
     flex-shrink: 0;
-    background: #2d3548; color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    padding: 4px 10px;
+    background: linear-gradient(135deg, #2A6BC9, #1E52A3);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
     font-size: 11px; font-weight: bold;
     cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(42,107,201,0.35);
+    transition: opacity .15s, transform .1s;
 }
-.hh-reveal-btn:hover { background: var(--accent); color: #0b1220; }
+.hh-post-reveal-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.hh-post-reveal-btn:active { transform: translateY(0); opacity: 1; }
 
 /* Card groups in detail (fallback) */
 .hh-detail-cards { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
