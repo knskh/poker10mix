@@ -1015,7 +1015,12 @@ function resetAccountFormToLogin() {
     const errorEl = document.getElementById('login-error');
     if (tabLogin) tabLogin.classList.add('active');
     if (tabReg) tabReg.classList.remove('active');
-    if (nameIn) { nameIn.classList.add('hidden'); nameIn.value = ''; }
+    if (nameIn) {
+        nameIn.classList.remove('hidden');
+        nameIn.readOnly = true;
+        const last = loadLastAccount();
+        nameIn.value = last ? (last.name || '') : '';
+    }
     if (passIn) passIn.value = '';
     if (submitBtn) { submitBtn.textContent = 'ログイン'; submitBtn.disabled = false; }
     if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('hidden'); }
@@ -1073,15 +1078,24 @@ function setupAccountLogin() {
     // Welcome-back card actions
     const wbContinue = document.getElementById('btn-wb-continue');
     const wbSwitch = document.getElementById('btn-wb-switch');
+    // ログインフォームを lastAccount の情報で埋める共通ヘルパー
+    function prefillFromLastAccount() {
+        const last = loadLastAccount();
+        if (!last) return;
+        if (last.name  && nameInput)  nameInput.value  = last.name;
+        if (last.email && emailInput) emailInput.value = last.email;
+    }
+
     if (wbContinue) wbContinue.addEventListener('click', () => {
         const last = loadLastAccount();
         dismissWelcomeBackCard();
-        if (last && last.email && emailInput) emailInput.value = last.email;
         // Force login mode (not register) for returning users.
         accountMode = 'login';
         document.getElementById('tab-login')?.classList.add('active');
         document.getElementById('tab-register')?.classList.remove('active');
-        nameInput?.classList.add('hidden');
+        // アカウント名とメールを前回値で埋める
+        if (nameInput)  { nameInput.classList.remove('hidden'); nameInput.readOnly = true; nameInput.value  = last ? (last.name  || '') : ''; }
+        if (emailInput) { emailInput.value = last ? (last.email || '') : ''; }
         if (submitBtn) { submitBtn.textContent = 'ログイン'; submitBtn.disabled = false; }
         // Clear any leftover error (e.g. "セッションが期限切れです") so the
         // user starts with a clean form.
@@ -1091,6 +1105,7 @@ function setupAccountLogin() {
     if (wbSwitch) wbSwitch.addEventListener('click', () => {
         clearLastAccount();
         dismissWelcomeBackCard();
+        if (nameInput)  { nameInput.classList.remove('hidden'); nameInput.readOnly = false; nameInput.value = ''; }
         if (emailInput) emailInput.value = '';
         if (passInput) passInput.value = '';
         // Reset to a clean login form — clear stale errors AND failure counters
@@ -1101,8 +1116,8 @@ function setupAccountLogin() {
         accountMode = 'login';
         document.getElementById('tab-login')?.classList.add('active');
         document.getElementById('tab-register')?.classList.remove('active');
-        nameInput?.classList.add('hidden');
         if (submitBtn) { submitBtn.textContent = 'ログイン'; submitBtn.disabled = false; }
+        if (nameInput) nameInput.focus();
     });
 
     // Login / Register tab switching
@@ -1110,7 +1125,9 @@ function setupAccountLogin() {
         accountMode = 'login';
         document.getElementById('tab-login').classList.add('active');
         document.getElementById('tab-register').classList.remove('active');
-        nameInput.classList.add('hidden');
+        nameInput.classList.remove('hidden');
+        nameInput.readOnly = true;   // ログインでは表示のみ（変更不可）
+        prefillFromLastAccount();
         submitBtn.textContent = 'ログイン';
         errorEl.classList.add('hidden');
     });
@@ -1119,12 +1136,15 @@ function setupAccountLogin() {
         document.getElementById('tab-register').classList.add('active');
         document.getElementById('tab-login').classList.remove('active');
         nameInput.classList.remove('hidden');
+        nameInput.readOnly = false;  // 新規登録では編集可
         submitBtn.textContent = '新規登録';
         errorEl.classList.add('hidden');
     });
 
-    // Default: login mode hides name field
-    nameInput.classList.add('hidden');
+    // 初期状態: ログインモードでも名前フィールドを表示し前回値を反映
+    nameInput.classList.remove('hidden');
+    nameInput.readOnly = true;
+    prefillFromLastAccount();
 
     // Submit
     submitBtn.addEventListener('click', () => {

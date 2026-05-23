@@ -199,6 +199,14 @@ body {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .login-box input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(56,189,248,0.3); }
+/* ログインモードの名前フィールドは読み取り専用 — 少し暗くしてクリック不可を示す */
+.login-box input[readonly] {
+    background: rgba(0,0,0,0.15);
+    color: var(--text-dim);
+    cursor: default;
+    border-color: transparent;
+}
+.login-box input[readonly]:focus { border-color: transparent; box-shadow: none; }
 .login-box .btn-primary { width: 100%; }
 
 .login-tabs {
