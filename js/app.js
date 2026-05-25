@@ -1212,30 +1212,18 @@ function resetLoginFailures() {
 }
 
 function onAuthResult(data) {
-    // Is this a response to an automatic session-resume (auth_resume message)?
-    // We use data.resumed flag sent by the server, OR the resumingSession flag
-    // we set ourselves before sending auth_resume.
-    const isResumeResponse = !!data.resumed || resumingSession;
-
-    // Clear the appropriate safety timeout.
-    if (resumeTimeoutHandle) { clearTimeout(resumeTimeoutHandle); resumeTimeoutHandle = null; }
-
-    // Only clear the manual-login timeout if this is NOT a resume response
-    // (i.e. the response is actually for the login/register request the user
-    // explicitly submitted). Clearing it for a resume response while a manual
-    // login is still in-flight would leave the button in a broken state.
-    if (!isResumeResponse && authTimeoutHandle) {
-        clearTimeout(authTimeoutHandle);
-        authTimeoutHandle = null;
-    }
-
-    const wasResuming = resumingSession;
-    resumingSession = false;
+    // CRITICAL: distinguish resume responses from manual login responses
+    // by data.resumed ONLY. The resumingSession flag can be stale because
+    // both requests may be in-flight at the same time (e.g. auth_resume from
+    // page load + login from button click). Using the flag would mis-classify
+    // a manual-login response as a resume response and silently swallow it.
+    const isResumeResponse = !!data.resumed;
 
     if (data.success) {
-        // Success: regardless of whether it was resume or manual login,
-        // clear everything and enter the lobby.
-        if (authTimeoutHandle) { clearTimeout(authTimeoutHandle); authTimeoutHandle = null; }
+        // Success path — clear ALL timers, re-enable button, enter lobby.
+        if (resumeTimeoutHandle) { clearTimeout(resumeTimeoutHandle); resumeTimeoutHandle = null; }
+        if (authTimeoutHandle)   { clearTimeout(authTimeoutHandle);   authTimeoutHandle = null; }
+        resumingSession = false;
         const submitBtn = document.getElementById('btn-account-submit');
         if (submitBtn) {
             submitBtn.disabled = false;
@@ -1261,25 +1249,35 @@ function onAuthResult(data) {
     }
 
     // ----- Failure -----
-    if (wasResuming) {
-        // Stored token is invalid (server restarted, expired, or account
-        // deleted). Drop it so the next reload doesn't loop on it.
+    if (isResumeResponse) {
+        // This is a response to the auto auth_resume — clear the resume timer
+        // and stored token. If the user is in the middle of a manual login,
+        // suppress this resume failure so it doesn't disrupt them.
+        if (resumeTimeoutHandle) { clearTimeout(resumeTimeoutHandle); resumeTimeoutHandle = null; }
+        resumingSession = false;
         clearAuthSession();
 
-        // If the user has already manually submitted login credentials
-        // (authTimeoutHandle is set), don't disrupt their in-progress request
-        // with the resume failure message — they'll see the login result soon.
+        // If user has already submitted manual login (authTimeoutHandle is
+        // still pending), let that flow drive the UI.
         if (authTimeoutHandle) return;
+
+        const submitBtn = document.getElementById('btn-account-submit');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
+        }
+        showLoginError(data.message || 'エラーが発生しました');
+        return;
     }
 
-    // Re-enable the submit button only for non-resume failures (or resume
-    // failures when no manual login is pending).
+    // Manual login/register failure — clear manual timer, re-enable button,
+    // and ALWAYS show the error so the user knows their attempt failed.
+    if (authTimeoutHandle) { clearTimeout(authTimeoutHandle); authTimeoutHandle = null; }
     const submitBtn = document.getElementById('btn-account-submit');
     if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
     }
-
     showLoginError(data.message || 'エラーが発生しました');
 }
 
