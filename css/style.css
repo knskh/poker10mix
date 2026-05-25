@@ -264,7 +264,16 @@ body {
     background: rgba(229,57,53,0.15); border: 1px solid rgba(229,57,53,0.3);
     color: #ef5350; padding: 8px 12px; border-radius: 6px;
     font-size: 13px; margin-bottom: 12px; text-align: center;
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
 }
+.login-error-action {
+    background: rgba(56,189,248,0.12);
+    border: 1px solid rgba(56,189,248,0.4);
+    color: #7eb8f7; padding: 6px 12px; border-radius: 6px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s ease;
+}
+.login-error-action:hover { background: rgba(56,189,248,0.22); }
 
 /* === Room Screen === */
 #room-screen {

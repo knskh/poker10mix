@@ -1184,14 +1184,29 @@ function setupAccountLogin() {
     });
 }
 
-function showLoginError(msg) {
+function showLoginError(msg, options) {
     const el = document.getElementById('login-error');
-    el.textContent = msg;
+    if (!el) return;
+    el.innerHTML = '';
+    const text = document.createElement('div');
+    text.textContent = msg;
+    el.appendChild(text);
+
+    // Optional inline action button (e.g. "新規登録に切り替える")
+    if (options && options.actionLabel && typeof options.onAction === 'function') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'login-error-action';
+        btn.textContent = options.actionLabel;
+        btn.addEventListener('click', options.onAction);
+        el.appendChild(btn);
+    }
     el.classList.remove('hidden');
 }
 function clearLoginError() {
     const el = document.getElementById('login-error');
     if (!el) return;
+    el.innerHTML = '';
     el.textContent = '';
     el.classList.add('hidden');
 }
@@ -1278,6 +1293,25 @@ function onAuthResult(data) {
         submitBtn.disabled = false;
         submitBtn.textContent = accountMode === 'register' ? '新規登録' : 'ログイン';
     }
+
+    // アカウントが未登録の場合は、新規登録タブへワンクリックで切替できる
+    // アクションボタンを併せて表示する。
+    if (data.errorCode === 'account_not_found') {
+        const emailInput = document.getElementById('account-email');
+        const nameInput  = document.getElementById('account-name');
+        const emailVal   = emailInput ? emailInput.value.trim() : '';
+        showLoginError(data.message || 'アカウントが見つかりません', {
+            actionLabel: 'このメールで新規登録する →',
+            onAction: () => {
+                document.getElementById('tab-register')?.click();
+                if (nameInput)  { nameInput.value = ''; nameInput.focus(); }
+                if (emailInput) emailInput.value = emailVal;
+                clearLoginError();
+            },
+        });
+        return;
+    }
+
     showLoginError(data.message || 'エラーが発生しました');
 }
 

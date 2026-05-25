@@ -443,7 +443,13 @@ async function handleLogin(ws, client, msg) {
         const acc = await lookupAccount(email);
         if (!acc) {
             console.log(`Login failed: account not found for ${email}`);
-            send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+            // Distinguish "no such account" from "wrong password" so the
+            // client can guide the user to the register tab.
+            send(ws, {
+                type: 'auth_result', success: false,
+                errorCode: 'account_not_found',
+                message: 'このメールアドレスのアカウントは登録されていません。新規登録してください。'
+            });
             return;
         }
         const accountName = acc.name;
@@ -453,7 +459,11 @@ async function handleLogin(ws, client, msg) {
         const { hash } = hashPassword(password, accountSalt);
         if (hash !== storedHash) {
             console.log(`Login failed: wrong password for ${email}`);
-            send(ws, { type: 'auth_result', success: false, message: 'メールアドレスまたはパスワードが正しくありません' });
+            send(ws, {
+                type: 'auth_result', success: false,
+                errorCode: 'wrong_password',
+                message: 'パスワードが正しくありません。'
+            });
             return;
         }
 
