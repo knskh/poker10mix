@@ -503,6 +503,8 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
 .pc-tooltip .pct-name { font-size: 13px; font-weight: 700; color: #7eb8f7; margin-bottom: 5px; }
 .pc-tooltip .pct-row { display: flex; justify-content: space-between; gap: 12px; margin: 2px 0; }
 .pc-tooltip .pct-val { font-weight: 600; color: #e0e6f0; }
+.pc-tooltip .pct-online  { font-size: 10px; font-weight: 600; color: #4ade80; margin-left: 6px; }
+.pc-tooltip .pct-offline { font-size: 10px; font-weight: 500; color: #6b7280; margin-left: 6px; }
 .pc-no-data {
     display: flex; align-items: center; justify-content: center;
     height: 100%; color: #3a5070; font-size: 13px;

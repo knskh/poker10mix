@@ -99,6 +99,41 @@ const supabase = (createClient && SUPABASE_URL && SUPABASE_KEY) ? createClient(S
 // Note: total_hands is stored in the comment_likes column of player_stats (repurposed)
 const playerStatsMap = {};
 
+// Local JSON persistence — works without Supabase, and acts as a safety net
+// when Supabase IS configured (so a Supabase outage doesn't lose data).
+const PLAYER_STATS_FILE = path.join(__dirname, 'player_stats.json');
+
+function loadLocalPlayerStats() {
+    try {
+        if (!fs.existsSync(PLAYER_STATS_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(PLAYER_STATS_FILE, 'utf8')) || {};
+        for (const [name, s] of Object.entries(data)) {
+            playerStatsMap[name] = {
+                total_profit:    (s && s.total_profit)    || 0,
+                session_count:   (s && s.session_count)   || 0,
+                total_diversity: (s && s.total_diversity) || 0,
+                total_hands:     (s && s.total_hands)     || 0,
+            };
+        }
+        console.log(`player_stats loaded from local JSON: ${Object.keys(data).length} records`);
+    } catch (e) {
+        console.warn('Failed to load player_stats.json:', e && e.message);
+    }
+}
+
+let savePlayerStatsTimer = null;
+function savePlayerStatsDebounced() {
+    if (savePlayerStatsTimer) return;
+    savePlayerStatsTimer = setTimeout(() => {
+        savePlayerStatsTimer = null;
+        try {
+            fs.writeFileSync(PLAYER_STATS_FILE, JSON.stringify(playerStatsMap, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Failed to save player_stats.json:', e && e.message);
+        }
+    }, 500);
+}
+
 async function upsertPlayerStats(name, delta) {
     if (!name) return;
     if (!playerStatsMap[name]) {
@@ -109,6 +144,10 @@ async function upsertPlayerStats(name, delta) {
     if (delta.sessionDelta   !== undefined) s.session_count   += delta.sessionDelta;
     if (delta.diversityDelta !== undefined) s.total_diversity += delta.diversityDelta;
     if (delta.handsDelta     !== undefined) s.total_hands     += delta.handsDelta;
+
+    // Always persist locally — works without Supabase and protects against
+    // a Supabase outage. Debounced so rapid updates batch into one write.
+    savePlayerStatsDebounced();
 
     if (supabase) {
         try {
@@ -127,6 +166,11 @@ async function upsertPlayerStats(name, delta) {
 }
 
 async function loadAllPlayerStats() {
+    // Always load local JSON first as the baseline.
+    loadLocalPlayerStats();
+
+    // If Supabase is configured, overlay its data (it's the source of truth
+    // when present). Local entries that don't exist in Supabase are kept.
     if (!supabase) return;
     try {
         const { data, error } = await supabase.from('player_stats').select('*');
@@ -139,7 +183,9 @@ async function loadAllPlayerStats() {
                     total_hands:     row.comment_likes   || 0,  // stored in comment_likes column
                 };
             }
-            console.log(`player_stats loaded: ${data.length} records`);
+            // Re-save the merged view to local JSON for safety.
+            savePlayerStatsDebounced();
+            console.log(`player_stats loaded from Supabase: ${data.length} records`);
         }
     } catch (e) {
         console.warn('player_stats load error:', e && e.message);
@@ -1458,14 +1504,33 @@ function handleMessage(ws, client, msg) {
             break;
 
         case 'get_player_stats': {
-            // Return all player stats for the Player Cloud visualization
-            const statsArray = Object.entries(playerStatsMap).map(([name, s]) => ({
-                name,
-                total_profit:    s.total_profit    || 0,
-                session_count:   s.session_count   || 0,
-                total_diversity: s.total_diversity || 0,
-                total_hands:     s.total_hands     || 0,
-            }));
+            // Build a roster of REGISTERED accounts only (guests excluded).
+            // Players who registered but never played are included with zero
+            // stats so the Player Cloud still shows their name.
+            const registeredNames = new Set();
+            for (const acc of Object.values(localAccounts)) {
+                if (acc && acc.name) registeredNames.add(acc.name);
+            }
+            // 登録ユーザーのアバター情報 (オンラインクライアントから取得)
+            const avatarByName = {};
+            for (const [, c] of clients) {
+                if (c && c.name && !c.isGuest && registeredNames.has(c.name)) {
+                    avatarByName[c.name] = c.avatar || null;
+                }
+            }
+
+            const statsArray = [];
+            for (const name of registeredNames) {
+                const s = playerStatsMap[name] || {};
+                statsArray.push({
+                    name,
+                    avatar: avatarByName[name] || null,
+                    total_profit:    s.total_profit    || 0,
+                    session_count:   s.session_count   || 0,
+                    total_diversity: s.total_diversity || 0,
+                    total_hands:     s.total_hands     || 0,
+                });
+            }
             send(ws, { type: 'player_stats', stats: statsArray });
             break;
         }

@@ -4950,7 +4950,12 @@ function initSNSScreen() {
     client.getRooms();
     updateSNSCTACounts();
     renderRailRooms(window.lastRoomList || []);
-    // Render the main-screen Player Cloud with current online users
+    // 登録プレイヤー全員のスタッツを取得（プレイヤークラウド用）
+    if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
+        client.send({ type: 'get_player_stats' });
+    }
+    // Render the main-screen Player Cloud with whatever we currently have.
+    // It will be re-rendered when the player_stats response arrives.
     if (typeof renderPlayerCloud === 'function') renderPlayerCloud(lastOnlineUsers || []);
 }
 
@@ -5467,8 +5472,28 @@ function renderPlayerCloud(users) {
 function _renderPlayerCloudToSvg(svg, users) {
     if (!svg) return;
 
-    // ゲスト除外・自分以外も含め全員表示
-    const targets = (users || []).filter(u => u && u.name);
+    // Build the master roster: use the full server-side player list
+    // (every registered account) when available, falling back to the
+    // online-users list otherwise. Online users contribute their live
+    // avatar info.
+    const onlineByName = {};
+    for (const u of (users || [])) {
+        if (u && u.name) onlineByName[u.name] = u.avatar || null;
+    }
+
+    const cache = window.playerStatsCache || {};
+    let targets;
+    if (Object.keys(cache).length > 0) {
+        // 全登録プレイヤーを表示（オンラインユーザーのアバター情報があれば反映）
+        targets = Object.values(cache).map(s => ({
+            name: s.name,
+            avatar: onlineByName[s.name] || s.avatar || null,
+            isOnline: s.name in onlineByName,
+        }));
+    } else {
+        targets = (users || []).filter(u => u && u.name).map(u => ({ ...u, isOnline: true }));
+    }
+
     if (targets.length === 0) {
         svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#3a5070" font-size="13" dominant-baseline="middle">データがありません</text>';
         return;
@@ -5487,10 +5512,11 @@ function _renderPlayerCloudToSvg(svg, users) {
 
     // player_stats があれば使用、なければ仮データ
     const stats = targets.map(u => {
-        const ps = (window.playerStatsCache || {})[u.name];
+        const ps = cache[u.name];
         return {
             name: u.name,
             avatar: u.avatar,
+            isOnline: !!u.isOnline,
             profit:       ps ? ps.total_profit    : Math.round(pseudo(u.name, 'p', -50000, 100000)),
             avgDiversity: ps ? (ps.session_count > 0 ? ps.total_diversity / ps.session_count : 1) : pseudo(u.name, 'd', 1, 10),
             handCount:    ps ? ps.total_hands      : Math.round(pseudo(u.name, 'l', 0, 200)),
@@ -5566,10 +5592,14 @@ function _renderPlayerCloudToSvg(svg, users) {
         const estH = fs * 1.2;
         const [px, py] = tryPlace(bx, by, estW, estH);
 
+        // オフラインプレイヤーは少し透過させて、オンラインと区別
+        const finalOpacity = s.isOnline ? 1 : 0.55;
+
         // ドット
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('cx', bx); dot.setAttribute('cy', by);
-        dot.setAttribute('r', 2.5); dot.setAttribute('fill', color); dot.setAttribute('opacity', '0.5');
+        dot.setAttribute('r', 2.5); dot.setAttribute('fill', color);
+        dot.setAttribute('opacity', s.isOnline ? '0.5' : '0.25');
         svg.appendChild(dot);
 
         // 引き線
@@ -5577,7 +5607,8 @@ function _renderPlayerCloudToSvg(svg, users) {
             const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             ln.setAttribute('x1', bx); ln.setAttribute('y1', by);
             ln.setAttribute('x2', px); ln.setAttribute('y2', py);
-            ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', '0.7'); ln.setAttribute('opacity', '0.3');
+            ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', '0.7');
+            ln.setAttribute('opacity', s.isOnline ? '0.3' : '0.15');
             svg.appendChild(ln);
         }
 
@@ -5590,6 +5621,7 @@ function _renderPlayerCloudToSvg(svg, users) {
         txt.setAttribute('font-weight', '700'); txt.setAttribute('cursor', 'pointer');
         txt.setAttribute('paint-order', 'stroke fill');
         txt.style.opacity = '0';
+        txt.dataset.finalOpacity = String(finalOpacity);
         txt.textContent = s.name;
 
         // ツールチップ
@@ -5597,7 +5629,8 @@ function _renderPlayerCloudToSvg(svg, users) {
             let tt = document.getElementById('pc-tooltip-el');
             if (!tt) { tt = document.createElement('div'); tt.id = 'pc-tooltip-el'; tt.className = 'pc-tooltip'; document.body.appendChild(tt); }
             const sign = s.profit >= 0 ? '+' : '';
-            tt.innerHTML = `<div class="pct-name">${escapeHtml(s.name)}</div>
+            const onlineBadge = s.isOnline ? '<span class="pct-online">● オンライン</span>' : '<span class="pct-offline">○ オフライン</span>';
+            tt.innerHTML = `<div class="pct-name">${escapeHtml(s.name)} ${onlineBadge}</div>
                 <div class="pct-row"><span>収支</span><span class="pct-val">${sign}${s.profit.toLocaleString()}</span></div>
                 <div class="pct-row"><span>ゲーム多様性</span><span class="pct-val">${s.avgDiversity.toFixed(1)}</span></div>
                 <div class="pct-row"><span>ハンド数</span><span class="pct-val">${s.handCount}</span></div>`;
@@ -5614,7 +5647,7 @@ function _renderPlayerCloudToSvg(svg, users) {
             if (tt) tt.classList.remove('show');
         });
         svg.appendChild(txt);
-        setTimeout(() => { txt.style.transition = 'opacity 0.4s'; txt.style.opacity = '1'; }, idx * 40);
+        setTimeout(() => { txt.style.transition = 'opacity 0.4s'; txt.style.opacity = txt.dataset.finalOpacity || '1'; }, idx * 40);
     });
 }
 
@@ -5629,14 +5662,14 @@ function renderSNSSelf() {
 // player_stats: Player Cloud visualization data
 client.on('player_stats', ({ stats }) => {
     if (!stats) return;
-    // { [name]: { total_profit, session_count, total_diversity, total_hands } }
+    // { [name]: { name, avatar, total_profit, session_count, total_diversity, total_hands } }
     window.playerStatsCache = Object.fromEntries(
         stats.map(s => [s.name, s])
     );
-    // クラウドタブが開いていれば即レンダリング
-    if (currentCpTab === 'cloud') {
-        renderPlayerCloud(lastOnlineUsers || []);
-    }
+    // メイン画面のプレイヤークラウド (#player-cloud-main-svg) は常に表示中。
+    // モーダル側 (#player-cloud-svg) はクラウドタブが開いている時だけ更新が
+    // 必要だが、renderPlayerCloud は両方の SVG を見つけて描画してくれる。
+    renderPlayerCloud(lastOnlineUsers || []);
 });
 
 // Init
