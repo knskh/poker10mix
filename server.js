@@ -911,6 +911,52 @@ wss.on('connection', (ws) => {
 // ============================================
 function handleMessage(ws, client, msg) {
     switch (msg.type) {
+        // Temporary diagnostic: report whether Supabase is reachable from this
+        // running server. Returns counts + any error message. Safe to expose
+        // because it only reveals server state, not user data.
+        case 'debug_supabase': {
+            (async () => {
+                const out = {
+                    type: 'debug_result',
+                    supabase_url_set: !!process.env.SUPABASE_URL,
+                    supabase_key_set: !!process.env.SUPABASE_KEY,
+                    supabase_url_prefix: (process.env.SUPABASE_URL || '').slice(0, 35),
+                    supabase_key_prefix: (process.env.SUPABASE_KEY || '').slice(0, 20),
+                    supabase_client_ready: !!supabase,
+                    local_accounts_count: Object.keys(localAccounts).length,
+                };
+                if (supabase) {
+                    try {
+                        const { count, error } = await supabase.from('accounts').select('*', { count: 'exact', head: true });
+                        out.accounts_query_ok = !error;
+                        out.accounts_count = count;
+                        out.accounts_error = error ? error.message : null;
+                    } catch (e) {
+                        out.accounts_query_ok = false;
+                        out.accounts_error = e && e.message;
+                    }
+                    // Try a dry-run insert with a random throwaway row to surface
+                    // any RLS / permission error.
+                    try {
+                        const testEmail = `__dbg_${Date.now()}@test.invalid`;
+                        const { error: insErr } = await supabase.from('accounts').insert({
+                            email: testEmail, name: 'DbgRow', password_hash: 'x', salt: 'x',
+                        });
+                        out.insert_ok = !insErr;
+                        out.insert_error = insErr ? insErr.message : null;
+                        if (!insErr) {
+                            await supabase.from('accounts').delete().eq('email', testEmail);
+                        }
+                    } catch (e) {
+                        out.insert_ok = false;
+                        out.insert_error = e && e.message;
+                    }
+                }
+                send(ws, out);
+            })();
+            break;
+        }
+
         case 'set_name':
             client.name = (msg.name || '').trim().slice(0, 20) || 'Player' + client.id;
             if (msg.avatar && typeof msg.avatar === 'string') {
