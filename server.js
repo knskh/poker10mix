@@ -198,17 +198,73 @@ loadAllPlayerStats();
 // instead of failing every request with "データベース未設定です".
 const ACCOUNTS_FILE = path.join(__dirname, 'accounts.json');
 let localAccounts = {};
+const ACCOUNTS_BACKUP_FILE = ACCOUNTS_FILE + '.backup';
+
 function loadLocalAccounts() {
+    // Primary load.
     try {
         if (fs.existsSync(ACCOUNTS_FILE)) {
-            localAccounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')) || {};
+            const raw = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                localAccounts = parsed;
+                console.log(`Accounts loaded: ${Object.keys(localAccounts).length} entries`);
+                return;
+            }
         }
-    } catch (e) { console.error('Failed to load accounts.json:', e.message); }
-}
-function saveLocalAccounts() {
+    } catch (e) {
+        console.error('Failed to load accounts.json (will try backup):', e.message);
+    }
+    // Fallback: try the backup file (catches the rare case where the main
+    // file was truncated by a power loss between write and rename).
     try {
-        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(localAccounts, null, 2), 'utf8');
-    } catch (e) { console.error('Failed to save accounts.json:', e.message); }
+        if (fs.existsSync(ACCOUNTS_BACKUP_FILE)) {
+            const raw = fs.readFileSync(ACCOUNTS_BACKUP_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                localAccounts = parsed;
+                console.warn(`Accounts recovered from backup: ${Object.keys(localAccounts).length} entries`);
+                return;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load accounts.json.backup:', e.message);
+    }
+    localAccounts = {};
+}
+
+// Atomic, verified save:
+//   1. Write to a temp file (.tmp)
+//   2. Read it back and compare to source-of-truth → catches disk corruption
+//   3. Copy current accounts.json to .backup
+//   4. Rename .tmp → accounts.json (atomic on most filesystems)
+// Returns true on success, false on failure. On failure the caller can roll
+// back the in-memory mutation so client and disk stay consistent.
+function saveLocalAccounts() {
+    const tmp = ACCOUNTS_FILE + '.tmp';
+    const data = JSON.stringify(localAccounts, null, 2);
+    try {
+        fs.writeFileSync(tmp, data, 'utf8');
+        // Verification: confirm the temp file actually contains what we wrote.
+        const readBack = fs.readFileSync(tmp, 'utf8');
+        if (readBack !== data) {
+            try { fs.unlinkSync(tmp); } catch {}
+            throw new Error('temp file content mismatch');
+        }
+        // Snapshot the existing file as a backup before overwriting it.
+        if (fs.existsSync(ACCOUNTS_FILE)) {
+            try { fs.copyFileSync(ACCOUNTS_FILE, ACCOUNTS_BACKUP_FILE); } catch (be) {
+                console.warn('Backup copy failed (continuing):', be.message);
+            }
+        }
+        // Atomic rename (replaces the existing file).
+        fs.renameSync(tmp, ACCOUNTS_FILE);
+        return true;
+    } catch (e) {
+        console.error('Failed to save accounts.json:', e.message);
+        try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch {}
+        return false;
+    }
 }
 loadLocalAccounts();
 
@@ -394,12 +450,12 @@ async function handleRegister(ws, client, msg) {
         }
 
         const { hash, salt } = hashPassword(password);
-        let savedSomewhere = false;
+        let supabaseSaved = false;
 
         if (supabase) {
             try {
                 const { error } = await supabase.from('accounts').insert({ email, name, password_hash: hash, salt });
-                if (!error) savedSomewhere = true;
+                if (!error) supabaseSaved = true;
                 else console.warn('Supabase register error (falling back to local):', error.message);
             } catch (e) {
                 console.warn('Supabase register exception (falling back to local):', e && e.message);
@@ -408,20 +464,34 @@ async function handleRegister(ws, client, msg) {
 
         // Always mirror to local JSON as a safety net (works offline / mis-configured
         // envs, and lets login fall back if Supabase becomes unreachable later).
-        localAccounts[email] = { email, name, passwordHash: hash, salt };
-        saveLocalAccounts();
-        savedSomewhere = true;
-
-        if (!savedSomewhere) {
-            send(ws, { type: 'auth_result', success: false, message: '登録に失敗しました' });
-            return;
+        // Record the creation timestamp so admins can audit / sort by signup time.
+        const createdAt = new Date().toISOString();
+        localAccounts[email] = { email, name, passwordHash: hash, salt, createdAt };
+        const localSaved = saveLocalAccounts();
+        if (!localSaved) {
+            // Roll back the in-memory mutation so the client and disk stay in
+            // sync. (If Supabase succeeded the row still exists there, but
+            // local fallback won't know about it until next Supabase load.)
+            delete localAccounts[email];
+            if (!supabaseSaved) {
+                send(ws, { type: 'auth_result', success: false, message: 'アカウントの保存に失敗しました。ディスクの空き容量とパーミッションをご確認ください。' });
+                return;
+            }
         }
+
+        // Confirm by reading back from disk so the success log is meaningful.
+        let onDisk = false;
+        try {
+            const raw = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            onDisk = !!(parsed && parsed[email] && parsed[email].passwordHash === hash);
+        } catch {}
 
         client.name = name;
         client.email = email;
         client.authenticated = true;
         const token = issueAuthToken(email, name);
-        console.log(`Register: ${name} (${email})`);
+        console.log(`Register: ${name} <${email}>  saved={local:${localSaved}/onDisk:${onDisk}, supabase:${supabaseSaved}}`);
         send(ws, { type: 'auth_result', success: true, name, email, token });
     } catch (e) {
         console.error('Register error:', e && e.message);

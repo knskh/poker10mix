@@ -3,4 +3,9 @@ node_modules/
 *.jsonl
 test*.js
 accounts.json
+accounts.json.backup
+accounts.json.tmp
 auth_tokens.json
+player_stats.json
+player_stats.json.tmp
+server.log
