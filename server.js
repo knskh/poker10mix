@@ -1008,6 +1008,8 @@ function handleMessage(ws, client, msg) {
                         '/rest/v1/accounts',
                         '/rest/v1/',
                         '/',
+                        '/accounts',
+                        '/accounts?select=*&limit=1',
                         '/data/v1/accounts',
                         '/api/v1/accounts',
                         '/api/rest/v1/accounts',
