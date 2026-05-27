@@ -918,6 +918,14 @@ function handleMessage(ws, client, msg) {
         // because it only reveals server state, not user data.
         case 'debug_supabase': {
             (async () => {
+                // List every env var name that LOOKS supabase-related so we
+                // can catch typos like SUPABASE-URL or supabase_url etc.
+                const supabaseLikeKeys = Object.keys(process.env).filter(k =>
+                    k.toLowerCase().includes('supabase') ||
+                    k.toLowerCase().includes('supa') ||
+                    k.toLowerCase().includes('url') ||
+                    k.toLowerCase().includes('key')
+                );
                 const out = {
                     type: 'debug_result',
                     supabase_url_set: !!process.env.SUPABASE_URL,
@@ -926,6 +934,10 @@ function handleMessage(ws, client, msg) {
                     supabase_key_prefix: (process.env.SUPABASE_KEY || '').slice(0, 20),
                     supabase_client_ready: !!supabase,
                     local_accounts_count: Object.keys(localAccounts).length,
+                    // The actual env var names visible to the process — useful
+                    // for spotting typos in the Render config (e.g. trailing
+                    // spaces, hyphens, wrong case).
+                    env_var_names_supabase_or_url_or_key: supabaseLikeKeys,
                 };
                 if (supabase) {
                     try {
