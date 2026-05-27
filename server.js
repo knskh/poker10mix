@@ -953,11 +953,13 @@ function handleMessage(ws, client, msg) {
                     // any RLS / permission error.
                     try {
                         const testEmail = `__dbg_${Date.now()}@test.invalid`;
-                        const { error: insErr } = await supabase.from('accounts').insert({
+                        const { error: insErr, status, statusText } = await supabase.from('accounts').insert({
                             email: testEmail, name: 'DbgRow', password_hash: 'x', salt: 'x',
                         });
                         out.insert_ok = !insErr;
                         out.insert_error = insErr ? insErr.message : null;
+                        out.insert_status = status;
+                        out.insert_status_text = statusText;
                         if (!insErr) {
                             await supabase.from('accounts').delete().eq('email', testEmail);
                         }
@@ -965,6 +967,35 @@ function handleMessage(ws, client, msg) {
                         out.insert_ok = false;
                         out.insert_error = e && e.message;
                     }
+
+                    // Direct REST API fetch fallback: bypass the SDK to compare.
+                    try {
+                        const url = process.env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/accounts';
+                        const r = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                apikey: process.env.SUPABASE_KEY,
+                                Authorization: `Bearer ${process.env.SUPABASE_KEY}`,
+                                'Content-Type': 'application/json',
+                                Prefer: 'return=minimal',
+                            },
+                            body: JSON.stringify({
+                                email: `__dbg2_${Date.now()}@test.invalid`,
+                                name: 'DbgRow2',
+                                password_hash: 'x', salt: 'x',
+                            }),
+                        });
+                        out.direct_fetch_status = r.status;
+                        out.direct_fetch_status_text = r.statusText;
+                        out.direct_fetch_body = (await r.text()).slice(0, 200);
+                    } catch (fe) {
+                        out.direct_fetch_error = fe && fe.message;
+                    }
+
+                    // Report SDK version actually loaded by the server
+                    try {
+                        out.sdk_version = require('@supabase/supabase-js/package.json').version;
+                    } catch {}
                 }
                 send(ws, out);
             })();
