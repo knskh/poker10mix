@@ -90,7 +90,22 @@ try { ({ createClient } = require('@supabase/supabase-js')); } catch (e) { /* op
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
-const supabase = (createClient && SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+// This project's Supabase URL points directly to PostgREST (not the standard
+// Kong API gateway), so the SDK's hard-coded "/rest/v1/" prefix produces
+// 404 PGRST125 "Invalid path specified in request URL". We patch the fetch
+// path to drop that prefix when present.
+function makeSupabaseClient(url, key) {
+    if (!createClient || !url || !key) return null;
+    const customFetch = (input, init) => {
+        let target = typeof input === 'string' ? input : (input && input.url) || '';
+        // Strip /rest/v1 segment so requests land at PostgREST root path.
+        target = target.replace('/rest/v1/', '/').replace(/\/rest\/v1$/, '');
+        return fetch(target, init);
+    };
+    return createClient(url, key, { global: { fetch: customFetch } });
+}
+const supabase = makeSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================
 // Player Stats (for Player Cloud visualization)
