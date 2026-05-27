@@ -1003,6 +1003,29 @@ function handleMessage(ws, client, msg) {
                         out.get_body = (await r.text()).slice(0, 100);
                     } catch (e) { out.get_error = e.message; }
 
+                    // Try multiple URL path variants to find the right endpoint
+                    const pathsToTry = [
+                        '/rest/v1/accounts',
+                        '/rest/v1/',
+                        '/',
+                        '/data/v1/accounts',
+                        '/api/v1/accounts',
+                        '/api/rest/v1/accounts',
+                        '/postgrest/v1/accounts',
+                    ];
+                    out.path_probe = {};
+                    for (const p of pathsToTry) {
+                        try {
+                            const r = await fetch(`${base}${p}`, {
+                                headers: { apikey: key, Authorization: `Bearer ${key}` },
+                            });
+                            const body = (await r.text()).slice(0, 80);
+                            out.path_probe[p] = `${r.status}: ${body}`;
+                        } catch (e) {
+                            out.path_probe[p] = `err: ${e.message}`;
+                        }
+                    }
+
                     // Report SDK version actually loaded by the server
                     try {
                         out.sdk_version = require('@supabase/supabase-js/package.json').version;
