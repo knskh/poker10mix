@@ -968,29 +968,40 @@ function handleMessage(ws, client, msg) {
                         out.insert_error = e && e.message;
                     }
 
-                    // Direct REST API fetch fallback: bypass the SDK to compare.
-                    try {
-                        const url = process.env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/accounts';
-                        const r = await fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                apikey: process.env.SUPABASE_KEY,
-                                Authorization: `Bearer ${process.env.SUPABASE_KEY}`,
-                                'Content-Type': 'application/json',
-                                Prefer: 'return=minimal',
-                            },
-                            body: JSON.stringify({
-                                email: `__dbg2_${Date.now()}@test.invalid`,
-                                name: 'DbgRow2',
-                                password_hash: 'x', salt: 'x',
-                            }),
-                        });
-                        out.direct_fetch_status = r.status;
-                        out.direct_fetch_status_text = r.statusText;
-                        out.direct_fetch_body = (await r.text()).slice(0, 200);
-                    } catch (fe) {
-                        out.direct_fetch_error = fe && fe.message;
+                    // Direct REST API: try multiple header combinations.
+                    const base = process.env.SUPABASE_URL.replace(/\/$/, '');
+                    const key = process.env.SUPABASE_KEY;
+                    const payload = (suffix) => JSON.stringify({
+                        email: `__dbg_${suffix}_${Date.now()}@test.invalid`,
+                        name: 'DbgRow' + suffix,
+                        password_hash: 'x', salt: 'x',
+                    });
+                    async function tryPost(label, url, headers) {
+                        try {
+                            const r = await fetch(url, { method: 'POST', headers, body: payload(label) });
+                            return { status: r.status, body: (await r.text()).slice(0, 150) };
+                        } catch (e) { return { error: e.message }; }
                     }
+                    out.try_apikey_and_auth = await tryPost('aa', `${base}/rest/v1/accounts`, {
+                        apikey: key, Authorization: `Bearer ${key}`,
+                        'Content-Type': 'application/json', Prefer: 'return=minimal',
+                    });
+                    out.try_auth_only = await tryPost('ao', `${base}/rest/v1/accounts`, {
+                        Authorization: `Bearer ${key}`,
+                        'Content-Type': 'application/json', Prefer: 'return=minimal',
+                    });
+                    out.try_apikey_only = await tryPost('ak', `${base}/rest/v1/accounts`, {
+                        apikey: key,
+                        'Content-Type': 'application/json', Prefer: 'return=minimal',
+                    });
+                    // Also test a GET (which we know works) to confirm path validity
+                    try {
+                        const r = await fetch(`${base}/rest/v1/accounts?select=email&limit=1`, {
+                            headers: { apikey: key, Authorization: `Bearer ${key}` },
+                        });
+                        out.get_status = r.status;
+                        out.get_body = (await r.text()).slice(0, 100);
+                    } catch (e) { out.get_error = e.message; }
 
                     // Report SDK version actually loaded by the server
                     try {
