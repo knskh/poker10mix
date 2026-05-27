@@ -268,6 +268,8 @@ function saveLocalAccounts() {
 }
 loadLocalAccounts();
 
+// Diagnostic log to confirm whether env vars are loaded on startup.
+console.log(`Auth boot: SUPABASE_URL=${SUPABASE_URL ? 'set(' + SUPABASE_URL.length + ' chars)' : 'EMPTY'}, SUPABASE_KEY=${SUPABASE_KEY ? 'set(' + SUPABASE_KEY.length + ' chars)' : 'EMPTY'}, client=${supabase ? 'ready' : 'null'}`);
 if (supabase) {
     console.log('Auth: using Supabase backend.');
 } else {
