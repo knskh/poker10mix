@@ -6,7 +6,7 @@
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css?v=74">
-    <link rel="stylesheet" href="css/sns.css?v=11">
+    <link rel="stylesheet" href="css/sns.css?v=12">
 </head>
 <body>
     <div id="app">
@@ -109,6 +109,20 @@
                 <span class="mx-resume-dot"></span>
                 <span class="mx-resume-label">プレイ中 <span id="mx-resume-count">0</span> 卓</span>
                 <span class="mx-resume-arrow">→</span>
+            </div>
+
+            <!-- Lobby Chat -->
+            <div class="mx-chat-wrap">
+                <div class="mx-chat-head">
+                    <h2>💬 ロビーチャット</h2>
+                </div>
+                <div id="lobby-chat-messages" class="mx-chat-messages">
+                    <div class="mx-chat-empty">まだメッセージがありません</div>
+                </div>
+                <div class="mx-chat-input-row">
+                    <input type="text" id="lobby-chat-input" maxlength="500" placeholder="メッセージを入力（登録ユーザーのみ）">
+                    <button id="lobby-chat-send" class="btn-mx-send">送信</button>
+                </div>
             </div>
 
             <!-- Player Cloud -->
@@ -483,11 +497,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=5"></script>
+    <script src="js/client.js?v=6"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=78"></script>
+    <script src="js/app.js?v=79"></script>
 
 </body>
 </html>

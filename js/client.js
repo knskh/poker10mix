@@ -188,6 +188,12 @@ class PokerClient {
             case 'session_records':
                 this.emit('session_records', msg.records || []);
                 break;
+            case 'lobby_chat_history':
+                this.emit('lobby_chat_history', msg.messages || []);
+                break;
+            case 'lobby_chat_new':
+                this.emit('lobby_chat_new', msg.message);
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -217,6 +223,8 @@ class PokerClient {
     endTableNow(roomId) { this.send({ type: 'end_table_now', roomId: roomId || this.roomId }); }
     getStats(roomId) { this.send({ type: 'get_stats', roomId: roomId || this.roomId }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
+    getLobbyChat() { this.send({ type: 'get_lobby_chat' }); }
+    sendLobbyChat(text) { this.send({ type: 'lobby_chat_send', text }); }
     getSessionRecords(opts) {
         const m = { type: 'get_session_records' };
         if (opts && opts.roomId)     m.roomId = opts.roomId;

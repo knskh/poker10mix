@@ -262,6 +262,67 @@ async function persistSessionRecord(record) {
 loadLocalSessionRecords();
 loadSessionRecordsFromSupabase();
 
+// ============================================
+// Lobby Chat (永続的なロビーチャットと、卓終了時の自動投稿)
+// In-memory: newest-last (chat-style append order).
+//   { id, type:'user'|'system', name, avatar, text, timestamp(ms),
+//     sessionResult?: { roomId, handsPlayed, participants:[{name, profit}] } }
+// ============================================
+const LOBBY_CHAT_FILE = path.join(__dirname, 'lobby_chat.json');
+const LOBBY_CHAT_MAX = 200;
+const lobbyChat = [];
+
+function loadLocalLobbyChat() {
+    try {
+        if (!fs.existsSync(LOBBY_CHAT_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(LOBBY_CHAT_FILE, 'utf8'));
+        if (Array.isArray(data)) {
+            lobbyChat.push(...data);
+            console.log(`lobby_chat loaded from local JSON: ${data.length} messages`);
+        }
+    } catch (e) { console.warn('Failed to load lobby_chat.json:', e && e.message); }
+}
+
+let saveLobbyChatTimer = null;
+function saveLobbyChatDebounced() {
+    if (saveLobbyChatTimer) return;
+    saveLobbyChatTimer = setTimeout(() => {
+        saveLobbyChatTimer = null;
+        try {
+            fs.writeFileSync(LOBBY_CHAT_FILE, JSON.stringify(lobbyChat.slice(-LOBBY_CHAT_MAX), null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Failed to save lobby_chat.json:', e && e.message);
+        }
+    }, 500);
+}
+
+function appendLobbyChat(message) {
+    if (!message || !message.text || !message.text.trim()) return null;
+    const entry = {
+        id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        type: message.type || 'user',
+        name: (message.name || '').slice(0, 24),
+        avatar: message.avatar || null,
+        text: String(message.text).slice(0, 500),
+        timestamp: Date.now(),
+    };
+    if (message.sessionResult) entry.sessionResult = message.sessionResult;
+    lobbyChat.push(entry);
+    if (lobbyChat.length > LOBBY_CHAT_MAX) lobbyChat.splice(0, lobbyChat.length - LOBBY_CHAT_MAX);
+    saveLobbyChatDebounced();
+    return entry;
+}
+
+function broadcastLobbyChat(entry) {
+    if (!entry) return;
+    const payload = { type: 'lobby_chat_new', message: entry };
+    for (const [, c] of clients) {
+        if (c && c.ws) send(c.ws, payload);
+    }
+}
+
+loadLocalLobbyChat();
+
 async function loadAllPlayerStats() {
     // Always load local JSON first as the baseline.
     loadLocalPlayerStats();
@@ -1680,6 +1741,33 @@ function handleMessage(ws, client, msg) {
             broadcastRoomList();
             break;
 
+        case 'get_lobby_chat': {
+            send(ws, { type: 'lobby_chat_history', messages: lobbyChat.slice(-LOBBY_CHAT_MAX) });
+            break;
+        }
+
+        case 'lobby_chat_send': {
+            // Registered users only — guests are play-only.
+            if (!client.authenticated || !client.name) {
+                send(ws, { type: 'error', message: 'ロビーチャットは登録ユーザーのみ投稿できます' });
+                break;
+            }
+            const text = (msg.text || '').trim();
+            if (!text) break;
+            // Light rate-limit: ~1 message per second per client.
+            const now = Date.now();
+            if (client._lastLobbyChat && now - client._lastLobbyChat < 1000) break;
+            client._lastLobbyChat = now;
+            const entry = appendLobbyChat({
+                type: 'user',
+                name: client.name,
+                avatar: client.avatar,
+                text,
+            });
+            broadcastLobbyChat(entry);
+            break;
+        }
+
         case 'get_session_records': {
             // Return per-session records used by the 成績 modal.
             //   msg.roomId      → filter to a single table
@@ -1780,6 +1868,26 @@ function recordSessionStats(room) {
     }
     if (sessionRecord.participants.length > 0) {
         persistSessionRecord(sessionRecord).catch(() => {});
+        // ロビーチャットに「テーブル終了」のシステムメッセージを自動投稿。
+        // テキストは内訳形式で書いておくと、対応していないクライアントでも
+        // そのまま読める。リッチ描画用には sessionResult フィールドも添える。
+        const sorted = [...sessionRecord.participants].sort((a, b) => b.profit - a.profit);
+        const breakdown = sorted.map(p => {
+            const sign = p.profit >= 0 ? '+' : '';
+            return `${p.name}: ${sign}${p.profit.toLocaleString()}`;
+        }).join(' / ');
+        const text = `📊 テーブル ${room.id} 終了 — ${handsPlayed} ハンド / ${sorted.length} 人\n${breakdown}`;
+        const entry = appendLobbyChat({
+            type: 'system',
+            name: 'システム',
+            text,
+            sessionResult: {
+                roomId: room.id,
+                handsPlayed,
+                participants: sorted.map(p => ({ name: p.name, profit: p.profit })),
+            },
+        });
+        broadcastLobbyChat(entry);
     }
 }
 

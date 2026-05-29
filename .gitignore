@@ -8,4 +8,6 @@ accounts.json.tmp
 auth_tokens.json
 player_stats.json
 player_stats.json.tmp
+session_records.json
+lobby_chat.json
 server.log

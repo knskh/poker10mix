@@ -5219,6 +5219,7 @@ let snsInitialized = false;
 function initSNSScreen() {
     if (!snsInitialized) {
         setupSNSEvents();
+        setupLobbyChat();
         snsInitialized = true;
     }
     // Update user display in topbar
@@ -5230,9 +5231,113 @@ function initSNSScreen() {
     if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
         client.send({ type: 'get_player_stats' });
     }
+    // ロビーチャットの履歴を取得
+    if (typeof client !== 'undefined' && client.getLobbyChat) {
+        client.getLobbyChat();
+    }
+    // 登録ユーザーのみ入力可能にする
+    refreshLobbyChatInputState();
     // Render the main-screen Player Cloud with whatever we currently have.
     // It will be re-rendered when the player_stats response arrives.
     if (typeof renderPlayerCloud === 'function') renderPlayerCloud(lastOnlineUsers || []);
+}
+
+// ==========================================
+// Lobby Chat
+// ==========================================
+let lobbyChatMessages = [];
+
+function setupLobbyChat() {
+    const input = document.getElementById('lobby-chat-input');
+    const btn   = document.getElementById('lobby-chat-send');
+    if (!input || !btn) return;
+
+    function send() {
+        const text = input.value.trim();
+        if (!text) return;
+        if (!loggedInAccount) {
+            showLoginRequiredToast && showLoginRequiredToast('ロビーチャット');
+            return;
+        }
+        client.sendLobbyChat(text);
+        input.value = '';
+    }
+    btn.addEventListener('click', send);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+
+    client.on('lobby_chat_history', (messages) => {
+        lobbyChatMessages = messages.slice();
+        renderLobbyChat();
+    });
+    client.on('lobby_chat_new', (m) => {
+        if (!m) return;
+        lobbyChatMessages.push(m);
+        if (lobbyChatMessages.length > 200) lobbyChatMessages.splice(0, lobbyChatMessages.length - 200);
+        renderLobbyChat({ scrollIntoNew: true });
+    });
+}
+
+function refreshLobbyChatInputState() {
+    const input = document.getElementById('lobby-chat-input');
+    const btn   = document.getElementById('lobby-chat-send');
+    if (!input || !btn) return;
+    const allowed = !!loggedInAccount;
+    input.disabled = !allowed;
+    btn.disabled = !allowed;
+    input.placeholder = allowed
+        ? 'メッセージを入力'
+        : 'ロビーチャットは登録ユーザーのみ投稿できます';
+}
+
+function renderLobbyChat(opts) {
+    const list = document.getElementById('lobby-chat-messages');
+    if (!list) return;
+    if (lobbyChatMessages.length === 0) {
+        list.innerHTML = '<div class="mx-chat-empty">まだメッセージがありません</div>';
+        return;
+    }
+    // Detect if user was scrolled to bottom before re-render so we can keep
+    // them pinned to live messages without disturbing manual scrollback.
+    const wasAtBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 8;
+    let html = '';
+    for (const m of lobbyChatMessages) {
+        html += _renderLobbyChatMsg(m);
+    }
+    list.innerHTML = html;
+    if (wasAtBottom || (opts && opts.scrollIntoNew)) {
+        list.scrollTop = list.scrollHeight;
+    }
+}
+
+function _renderLobbyChatMsg(m) {
+    const isSystem = m.type === 'system';
+    const dt = m.timestamp ? new Date(m.timestamp) : null;
+    const time = dt ? `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}` : '';
+    const name = escapeHtml(m.name || (isSystem ? 'システム' : ''));
+    let body = `<div class="mx-chat-msg-text">${escapeHtml(m.text || '')}</div>`;
+    if (isSystem && m.sessionResult && Array.isArray(m.sessionResult.participants)) {
+        const parts = m.sessionResult.participants.map(p => {
+            const profit = p.profit || 0;
+            const cls = profit > 0 ? 'sr-plus' : profit < 0 ? 'sr-minus' : 'sr-zero';
+            const sign = profit > 0 ? '+' : '';
+            return `<span><span class="sr-name">${escapeHtml(p.name)}</span> <span class="sr-prof ${cls}">${sign}${profit.toLocaleString()}</span></span>`;
+        }).join('');
+        // Replace the plain-text body with a richer summary that's easier
+        // to scan than the inline `Name: +N / Name: -M / ...` text.
+        body = `
+            <div class="mx-chat-msg-text">📊 テーブル <strong>${escapeHtml(m.sessionResult.roomId)}</strong> 終了 — ${m.sessionResult.handsPlayed} ハンド / ${m.sessionResult.participants.length} 人</div>
+            <div class="mx-chat-sr">${parts}</div>
+        `;
+    }
+    return `<div class="mx-chat-msg${isSystem ? ' is-system' : ''}">
+        <div class="mx-chat-msg-meta">
+            <span class="mx-chat-msg-name">${name}</span>
+            <span class="mx-chat-msg-time">${time}</span>
+        </div>
+        ${body}
+    </div>`;
 }
 
 function updateMainTopbarUser() {
