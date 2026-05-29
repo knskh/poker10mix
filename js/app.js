@@ -5420,11 +5420,6 @@ function setupSNSEvents() {
     const cpBd = document.querySelector('#chat-picker-modal .rp-backdrop');
     if (cpBd) cpBd.addEventListener('click', closeOnlineUsersModal);
 
-    // プレイヤークラウド タブ切り替え
-    document.querySelectorAll('.cp-tab').forEach(btn => {
-        btn.addEventListener('click', () => switchCpTab(btn.dataset.cpTab));
-    });
-
 }
 
 // ---- Room picker modal ----
@@ -5480,12 +5475,9 @@ function renderRoomModalList() {
 }
 
 // ---- Online users modal ----
-let currentCpTab = 'list';
-
 function openOnlineUsersModal() {
     document.getElementById('chat-picker-modal').classList.remove('hidden');
     renderOnlineUsers(lastOnlineUsers || []);
-    if (currentCpTab === 'cloud') renderPlayerCloud(lastOnlineUsers || []);
 }
 function closeOnlineUsersModal() {
     document.getElementById('chat-picker-modal').classList.add('hidden');
@@ -5494,32 +5486,11 @@ function openChatModal()   { openOnlineUsersModal(); }
 function closeChatModal()  { closeOnlineUsersModal(); }
 function switchChatTab()   { /* no-op */ }
 
-function switchCpTab(tab) {
-    currentCpTab = tab;
-    document.querySelectorAll('.cp-tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.cpTab === tab);
-    });
-    document.getElementById('cp-view-online').classList.toggle('hidden', tab !== 'list');
-    document.getElementById('cp-view-cloud').classList.toggle('hidden', tab !== 'cloud');
-    if (tab === 'cloud') {
-        // サーバーから最新の player_stats を取得してからレンダリング
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'get_player_stats' }));
-        } else {
-            renderPlayerCloud(lastOnlineUsers || []);
-        }
-    }
-}
-
-// ---- プレイヤークラウド描画 ----
+// ---- プレイヤークラウド描画 (メイン画面用) ----
 function renderPlayerCloud(users) {
-    // Render to both the modal SVG and the main-screen SVG (if present)
-    const svgs = [
-        document.getElementById('player-cloud-svg'),
-        document.getElementById('player-cloud-main-svg'),
-    ].filter(Boolean);
-    if (svgs.length === 0) return;
-    for (const svg of svgs) _renderPlayerCloudToSvg(svg, users);
+    const svg = document.getElementById('player-cloud-main-svg');
+    if (!svg) return;
+    _renderPlayerCloudToSvg(svg, users);
 }
 
 function _renderPlayerCloudToSvg(svg, users) {
@@ -5719,9 +5690,7 @@ client.on('player_stats', ({ stats }) => {
     window.playerStatsCache = Object.fromEntries(
         stats.map(s => [s.name, s])
     );
-    // メイン画面のプレイヤークラウド (#player-cloud-main-svg) は常に表示中。
-    // モーダル側 (#player-cloud-svg) はクラウドタブが開いている時だけ更新が
-    // 必要だが、renderPlayerCloud は両方の SVG を見つけて描画してくれる。
+    // メイン画面のプレイヤークラウドを再描画。
     renderPlayerCloud(lastOnlineUsers || []);
 });
 
