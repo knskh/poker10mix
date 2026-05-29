@@ -1012,19 +1012,26 @@ body {
     display: flex; gap: 1px; justify-content: center; flex-wrap: nowrap;
     margin-top: 2px; overflow: visible;
 }
-/* 上席（テーブル上部）の座席はカードを上に表示し、テーブル中央側へ
-   座席本体とベットチップが配置されるレイアウトにする。これにより
-   7-card stud のように横に長くなるカード行と、テーブル felt 上の
-   ベットチップが重ならない。下席は既定通りカードを下に表示。 */
-.seat-top .seat-cards,
-.seat-top-left .seat-cards,
-.seat-top-right .seat-cards {
+/* 7-card stud は相手のカードが最大7枚で横に長く、テーブル felt 上の
+   ベットチップと重なるため、上席のみカードを座席アイコンの「上」に
+   表示する。ただし上席は felt 上端付近にあり、カードを上に出すと
+   画面外にはみ出すので、stud のときだけ上席を felt 内側へ少し下げて
+   カードが収まるようにする (rail-stud スコープ)。
+   stud 以外 (ホールデム/オマハ/ドロー) は上席もカードを下に表示し、
+   常に画面内に収める。 */
+#table-felt.rail-stud .seat-top .seat-cards,
+#table-felt.rail-stud .seat-top-left .seat-cards,
+#table-felt.rail-stud .seat-top-right .seat-cards {
     position: absolute;
     bottom: calc(100% + 2px);
     left: 50%;
     transform: translateX(-50%);
     margin-top: 0;
 }
+/* stud 時のみ上席を felt 内側へ下げ、上に出したカードを画面内に収める */
+#table-felt.rail-stud .seat-top       { top: 2%; }
+#table-felt.rail-stud .seat-top-left  { top: 16%; }
+#table-felt.rail-stud .seat-top-right { top: 16%; }
 /* Card sizes by count — keeps seat icon stable */
 .seat-cards-1 .card, .seat-cards-2 .card {
     width: 26px; height: 36px; border-radius: 3px;
