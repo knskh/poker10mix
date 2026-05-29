@@ -186,7 +186,14 @@ async function upsertPlayerStats(name, delta) {
 //   { roomId, timestamp(ISO), handsPlayed, gameTypes, participants:[{name, profit, invested, endChips, handsPlayed}] }
 // ============================================
 const SESSION_RECORDS_FILE = path.join(__dirname, 'session_records.json');
-const SESSION_RECORDS_MAX = 2000;
+const SESSION_RECORDS_MAX = 2000;            // メモリ/ローカルJSONの保持上限
+// Supabase 側の保持上限。実際に使うのは最新 SESSION_RECORDS_MAX 件のみなので
+// 余裕を持って 5000 件だけ残し、古い行は自動削除する。これにより
+// session_records テーブルは無制限に増えず、~5MB 前後で頭打ちになる
+// (無料枠 500MB に対して十分小さい)。
+const SUPABASE_SESSION_RECORDS_KEEP = 5000;
+const SESSION_RECORDS_PRUNE_EVERY = 50;      // 何件 insert ごとに prune するか
+let sessionRecordInsertCount = 0;
 const sessionRecords = [];
 
 function loadLocalSessionRecords() {
@@ -239,6 +246,31 @@ async function loadSessionRecordsFromSupabase() {
     }
 }
 
+// Supabase の session_records を最新 SUPABASE_SESSION_RECORDS_KEEP 件に保つ。
+// KEEP 件目(0-based)の timestamp を基準に、それより古い行をまとめて削除する。
+// timestamp DESC のインデックスがあるため低負荷。
+async function pruneSupabaseSessionRecords() {
+    if (!supabase) return;
+    try {
+        const { data, error } = await supabase
+            .from('session_records')
+            .select('timestamp')
+            .order('timestamp', { ascending: false })
+            .range(SUPABASE_SESSION_RECORDS_KEEP, SUPABASE_SESSION_RECORDS_KEEP);
+        // KEEP 件以下しか無ければ data は空 → 削除不要
+        if (error || !data || data.length === 0) return;
+        const cutoff = data[0].timestamp;
+        const { error: delErr } = await supabase
+            .from('session_records')
+            .delete()
+            .lt('timestamp', cutoff);
+        if (delErr) console.warn('session_records prune delete error:', delErr.message);
+        else console.log(`session_records pruned: removed rows older than ${cutoff}`);
+    } catch (e) {
+        console.warn('session_records prune error:', e && e.message);
+    }
+}
+
 async function persistSessionRecord(record) {
     // Newest first.
     sessionRecords.unshift(record);
@@ -253,6 +285,11 @@ async function persistSessionRecord(record) {
                 game_types: record.gameTypes,
                 participants: record.participants,
             });
+            // 一定件数ごとに古い行を間引く (毎回ではなく低頻度で実行)
+            sessionRecordInsertCount++;
+            if (sessionRecordInsertCount % SESSION_RECORDS_PRUNE_EVERY === 0) {
+                pruneSupabaseSessionRecords().catch(() => {});
+            }
         } catch (e) {
             console.warn('session_records insert error:', e && e.message);
         }
@@ -261,6 +298,8 @@ async function persistSessionRecord(record) {
 
 loadLocalSessionRecords();
 loadSessionRecordsFromSupabase();
+// 起動時に一度だけ既存のバックログを間引く (過去に溜まった分の掃除)
+if (supabase) setTimeout(() => pruneSupabaseSessionRecords().catch(() => {}), 8000);
 
 // ============================================
 // Lobby Chat (永続的なロビーチャットと、卓終了時の自動投稿)
