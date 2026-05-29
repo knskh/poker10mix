@@ -1823,16 +1823,6 @@ function handleMessage(ws, client, msg) {
 // ============================================
 // Returns true if the room has at least one member who is NOT on sitout.
 // Members without an assigned seat (pre-game lobby) are always considered active.
-function hasActiveMemberInRoom(room) {
-    if (!room || !room.members || room.members.length === 0) return false;
-    for (const m of room.members) {
-        const seat = room.seatMap ? room.seatMap[m.clientId] : undefined;
-        if (seat === undefined) return true;           // pre-game / unassigned
-        if (!room.sitout || !room.sitout[seat]) return true;
-    }
-    return false;
-}
-
 // Record session stats (profit, session count, game diversity) on room close.
 function recordSessionStats(room) {
     if (!room || !room.handsPlayed) return;

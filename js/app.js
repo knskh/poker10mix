@@ -1217,12 +1217,6 @@ function clearLoginError() {
 // localStorage has a stale `last_account` whose email no longer matches any
 // real account, e.g. after a server reset or a failed Supabase migration).
 let loginFailuresByEmail = {};
-function recordLoginFailure(email) {
-    if (!email) return 0;
-    const key = email.toLowerCase();
-    loginFailuresByEmail[key] = (loginFailuresByEmail[key] || 0) + 1;
-    return loginFailuresByEmail[key];
-}
 function resetLoginFailures() {
     loginFailuresByEmail = {};
 }
@@ -2634,19 +2628,6 @@ function renderVisualCards(cardObjs) {
         const sym = SUIT_SYM[c.s] || c.s;
         const col = SUIT_COLORS[c.s] || '#333';
         return `<span class="hh-visual-card" style="color:${col}">${r}<span class="hh-vc-suit">${sym}</span></span>`;
-    }).join('');
-}
-
-function renderVisualCardsWithType(cardObjs) {
-    if (!cardObjs || cardObjs.length === 0) return '';
-    const SUIT_COLORS = { s: '#333', h: '#e53935', d: '#42a5f5', c: '#2e7d32' };
-    const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
-    return cardObjs.map(c => {
-        const r = RANK_D[c.r] || c.r;
-        const sym = SUIT_SYM[c.s] || c.s;
-        const col = SUIT_COLORS[c.s] || '#333';
-        const cls = c.faceDown ? 'hh-visual-card hh-vc-down' : 'hh-visual-card';
-        return `<span class="${cls}" style="color:${col}">${r}<span class="hh-vc-suit">${sym}</span></span>`;
     }).join('');
 }
 
@@ -5751,11 +5732,6 @@ function setupSNSEvents() {
 }
 
 // ---- Room picker modal ----
-function openRoomModal() {
-    client.getRooms();
-    document.getElementById('room-picker-modal').classList.remove('hidden');
-    renderRoomModalList();
-}
 function closeRoomModal() {
     document.getElementById('room-picker-modal').classList.add('hidden');
 }
@@ -5811,7 +5787,6 @@ function closeOnlineUsersModal() {
     document.getElementById('chat-picker-modal').classList.add('hidden');
 }
 function openChatModal()   { openOnlineUsersModal(); }
-function closeChatModal()  { closeOnlineUsersModal(); }
 function switchChatTab()   { /* no-op */ }
 
 // ---- プレイヤークラウド描画 (メイン画面用) ----
@@ -6001,11 +5976,6 @@ function _renderPlayerCloudToSvg(svg, users) {
         svg.appendChild(txt);
         setTimeout(() => { txt.style.transition = 'opacity 0.4s'; txt.style.opacity = txt.dataset.finalOpacity || '1'; }, idx * 40);
     });
-}
-
-function renderSNSSelf() {
-    // Old 3-column mixi layout is gone. Simply refresh topbar user info.
-    updateMainTopbarUser();
 }
 
 // footprints / new_footprint: UI removed — handler no longer needed
