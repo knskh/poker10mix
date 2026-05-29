@@ -1008,8 +1008,6 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
    Mobile bottom nav (Idea 3)
    ========================================== */
 .mx-bottom-nav { display: none; }
-/* My Profile panel: hidden by default, shown only via JS on mobile */
-.mx-me-panel { display: none; }
 
 @media (max-width: 768px) {
     #sns-screen .mx-bottom-nav {
@@ -1034,7 +1032,8 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     #sns-screen .mxbn-tab:hover { color: #2A6BC9; }
     #sns-screen .mxbn-ic { font-size: 20px; line-height: 1; }
     #sns-screen .mxbn-label { font-size: 10px; font-weight: 600; line-height: 1; }
-    /* Hide hamburger — "マイ" tab now handles the profile panel */
+    /* Hamburger button stays hidden on mobile — the "マイ" bottom-nav tab
+       opens the same dropdown menu (PC と同一内容). */
     #sns-screen #btn-mx-hamburger { display: none; }
     /* Reserve space so content isn't hidden behind the nav */
     #sns-screen { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
@@ -1042,87 +1041,24 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
     /* ---- View switching: show only the active section ---- */
     /* play view (default) */
     #sns-screen[data-mb-view="play"] .mx-cloud-wrap { display: none; }
-    #sns-screen[data-mb-view="play"] .mx-me-panel   { display: none; }
 
     /* cloud view */
     #sns-screen[data-mb-view="cloud"] .mx-play-rail  { display: none; }
     #sns-screen[data-mb-view="cloud"] .mx-resume-pill { display: none; }
-    #sns-screen[data-mb-view="cloud"] .mx-me-panel   { display: none; }
     #sns-screen[data-mb-view="cloud"] .mx-chat-wrap  { display: none; }
 
-    /* me view */
-    #sns-screen[data-mb-view="me"] .mx-play-rail    { display: none; }
-    #sns-screen[data-mb-view="me"] .mx-resume-pill  { display: none; }
-    #sns-screen[data-mb-view="me"] .mx-cloud-wrap   { display: none; }
-    #sns-screen[data-mb-view="me"] .mx-chat-wrap    { display: none; }
-    #sns-screen[data-mb-view="me"] .mx-me-panel     { display: flex; }
-
-    /* ---- My Profile panel styles ---- */
-    .mx-me-panel {
-        flex-direction: column;
-        gap: 20px;
-        padding: 24px 20px 16px;
-        max-width: 480px;
-        margin: 0 auto;
-        width: 100%;
-        box-sizing: border-box;
+    /* ---- マイ tab opens the hamburger menu; on mobile float it above the
+       bottom nav (bottom-right) so it appears near the tapped tab instead
+       of the top-right corner. ---- */
+    #sns-screen #mx-header-menu {
+        position: fixed;
+        top: auto;
+        bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+        right: 10px;
+        left: auto;
+        min-width: 200px;
+        z-index: 95;
     }
-    .mx-me-top {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        background: #fff;
-        border-radius: 16px;
-        padding: 18px 16px;
-        box-shadow: 0 2px 10px rgba(23,32,46,0.07);
-    }
-    .mx-me-av {
-        width: 60px; height: 60px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #3E84E4, #2A6BC9);
-        color: #fff;
-        font-size: 26px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-        box-shadow: 0 3px 8px rgba(42,107,201,0.25);
-    }
-    .mx-me-info { flex: 1; min-width: 0; }
-    .mx-me-name {
-        font-size: 18px;
-        font-weight: 700;
-        color: #17202E;
-        margin-bottom: 6px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .mx-me-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .mx-me-btn {
-        width: 100%;
-        padding: 14px 16px;
-        border-radius: 12px;
-        border: 1.5px solid #E2EAF5;
-        background: #fff;
-        color: #17202E;
-        font-size: 15px;
-        font-weight: 600;
-        font-family: inherit;
-        text-align: left;
-        cursor: pointer;
-        transition: background .12s, border-color .12s;
-        box-shadow: 0 1px 4px rgba(23,32,46,0.05);
-    }
-    .mx-me-btn:active { background: #F0F5FF; border-color: #2A6BC9; }
-    .mx-me-btn-logout {
-        color: #C0392B;
-        border-color: #FAD7D4;
-        margin-top: 4px;
-    }
-    .mx-me-btn-logout:active { background: #FFF0EE; }
 }
 
 /* Resume pill (shown on sns-screen when user has open tables) */

@@ -5355,18 +5355,6 @@ function updateMainTopbarUser() {
             avEl.textContent = (name || '?').charAt(0).toUpperCase();
         }
     }
-    // マイプロフィールパネルも同期
-    const mePanelAv = document.getElementById('mx-me-av');
-    const mePanelName = document.getElementById('mx-me-name');
-    if (mePanelAv) {
-        const avatarSrc = getAvatarSrc(selectedAvatar);
-        if (avatarSrc) {
-            mePanelAv.innerHTML = `<img src="${avatarSrc}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
-        } else {
-            mePanelAv.textContent = (name || '?').charAt(0).toUpperCase();
-        }
-    }
-    if (mePanelName) mePanelName.textContent = name;
 }
 
 function updateSNSCTACounts() {
@@ -5587,13 +5575,6 @@ function setupBottomNav() {
         window.scrollTo({ top: 0, behavior: 'instant' });
     };
 
-    // Populate the マイプロフィール panel with current user data
-    const refreshMePanel = () => {
-        const name = (client && client.name) ? client.name : 'ゲスト';
-        const el = (id) => document.getElementById(id);
-        if (el('mx-me-name')) el('mx-me-name').textContent = name;
-    };
-
     nav.querySelectorAll('.mxbn-tab').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -5618,31 +5599,13 @@ function setupBottomNav() {
             } else if (target === 'online') {
                 if (typeof openChatModal === 'function') openChatModal();
             } else if (target === 'me') {
-                if (isMobile()) {
-                    refreshMePanel();
-                    switchMbView('me');
-                } else {
-                    const headerMenu = document.getElementById('mx-header-menu');
-                    if (headerMenu) headerMenu.classList.toggle('hidden');
-                }
+                // マイ: PC と同じハンバーガーメニュー (スタッツ/ハンド履歴/
+                // 成績/オンライン/ログアウト) を開く。モバイル専用の
+                // マイプロフィールパネルは廃止し、PCと内容を統一。
+                const headerMenu = document.getElementById('mx-header-menu');
+                if (headerMenu) headerMenu.classList.toggle('hidden');
             }
         });
-    });
-
-    // Wire up マイパネル buttons
-    document.getElementById('mx-me-btn-stats')?.addEventListener('click', () => {
-        renderStatsFromStorage();
-        document.getElementById('stats-modal')?.classList.remove('hidden');
-    });
-    document.getElementById('mx-me-btn-history')?.addEventListener('click', () => {
-        if (typeof renderHandHistory === 'function') renderHandHistory('lobby-hand-history');
-        document.getElementById('history-modal')?.classList.remove('hidden');
-    });
-    document.getElementById('mx-me-btn-online')?.addEventListener('click', () => {
-        if (typeof openChatModal === 'function') openChatModal();
-    });
-    document.getElementById('mx-me-btn-logout')?.addEventListener('click', () => {
-        if (typeof doLogout === 'function') doLogout();
     });
 }
 
