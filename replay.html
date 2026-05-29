@@ -523,6 +523,24 @@ body { background: #0a0e14; color: #e0e0e0; font-family: 'Segoe UI','Hiragino Sa
 </div>
 
 <script>
+// ==================== LOG TOKENS ====================
+// 共有URL短縮のためのログ・トークン化逆変換テーブル。
+// app.js の REPLAY_LOG_TOKENS と必ず同一に保つこと。
+// 旧形式 (v=undefined) の共有URLには '~x' コードが含まれないため、
+// 逆変換しても無害だが、安全のため v===2 のときのみ適用する。
+const REPLAY_LOG_TOKENS = [
+    ['フォールド', '~a'], ['チェック', '~b'], ['オールイン', '~c'],
+    ['レイズ', '~d'], ['ベット', '~e'], ['コール', '~f'],
+    ['ブリングイン', '~g'], ['アンティ', '~h'],
+    ['フロップ', '~i'], ['ターン', '~j'], ['リバー', '~k'],
+    ['回目のドロー', '~l'], ['Street', '~m'], ['--- ', '~n'], [' ---', '~o'],
+];
+function detokenizeReplayLog(s) {
+    let r = String(s);
+    for (const [jp, code] of REPLAY_LOG_TOKENS) r = r.split(code).join(jp);
+    return r;
+}
+
 // ==================== COMPRESSION ====================
 async function compressData(str) {
     const blob = new Blob([new TextEncoder().encode(str)]);
@@ -1499,6 +1517,11 @@ async function init() {
     try {
         const json = await decompressData(hash);
         const data = JSON.parse(json);
+        // v2 形式はログがトークン化されているので元の日本語へ復元する。
+        // 以降の convertHandData / buildTimeline は従来どおり日本語ログを扱う。
+        if (data && data.v === 2 && Array.isArray(data.l)) {
+            data.l = data.l.map(detokenizeReplayLog);
+        }
         HAND = convertHandData(data);
         maxStep = HAND.timeline.length;
         $('loading-screen').classList.add('hidden');

@@ -2642,6 +2642,25 @@ function getActionClass(log) {
 }
 
 // ==================== REPLAY ====================
+// ログのトークン化テーブル。共有URLを短くするため、頻出する日本語の
+// アクション語・ラウンド見出しを '~' 始まりの短いコードに置換する。
+// '~' は名前(NAME_RE)・カード・数値・ログ装飾のいずれにも出現しないため
+// 衝突しない。replay.html 側で完全に逆変換するため挙動は一切変わらない。
+// ※ このテーブルを変更する場合は replay.html の REPLAY_LOG_TOKENS も
+//   必ず同一に保つこと。
+const REPLAY_LOG_TOKENS = [
+    ['フォールド', '~a'], ['チェック', '~b'], ['オールイン', '~c'],
+    ['レイズ', '~d'], ['ベット', '~e'], ['コール', '~f'],
+    ['ブリングイン', '~g'], ['アンティ', '~h'],
+    ['フロップ', '~i'], ['ターン', '~j'], ['リバー', '~k'],
+    ['回目のドロー', '~l'], ['Street', '~m'], ['--- ', '~n'], [' ---', '~o'],
+];
+function tokenizeReplayLog(s) {
+    let r = String(s);
+    for (const [jp, code] of REPLAY_LOG_TOKENS) r = r.split(jp).join(code);
+    return r;
+}
+
 async function compressForReplay(str) {
     const blob = new Blob([new TextEncoder().encode(str)]);
     const stream = blob.stream().pipeThrough(new CompressionStream('deflate-raw'));
@@ -2655,6 +2674,7 @@ async function buildReplayURL(idx) {
     if (!h || !h.handResult) return null;
     const hr = h.handResult;
     const data = {
+        v: 2,                                  // payload version (2 = tokenized logs)
         g: hr.gameName, t: hr.gameType,
         c: hr.communityCards, d: hr.dealerSeat,
         p: hr.players.map(p => ({
@@ -2662,11 +2682,12 @@ async function buildReplayURL(idx) {
             c: p.chips, s: p.startChips,
             h: p.cards, u: p.upCards, w: p.downCards,
         })),
-        l: h.logs, ds: hr.drawSnapshots,
+        l: (h.logs || []).map(tokenizeReplayLog), ds: hr.drawSnapshots,
     };
     const compressed = await compressForReplay(JSON.stringify(data));
     const base = window.location.href.replace(/\/[^/]*$/, '/');
-    return base + 'replay.html#' + compressed;
+    // ?v=2 でブラウザキャッシュをバスト (新形式に対応した replay.html を確実に取得)
+    return base + 'replay.html?v=2#' + compressed;
 }
 
 async function openReplay(idx) {
