@@ -3190,4 +3190,184 @@ body:not(.theme-classic):not(.theme-midnight) textarea::placeholder {
 .act-fold                             { color: #a0a8b4; }
 #game-log .log-entry.log-act-fold     { color: #a0a8b4; }
 
+/* ==========================================
+   ライトテーマ統一 (Site-wide light theme polish)
+   - スタッツ / ハンド履歴 / 成績 / ロビーチャット / 各モーダルの
+     背景を白〜薄いライトに、文字を黒〜紺に統一
+   - ゲームテーブル (felt) と プレイヤークラウド SVG は専用 UI のため
+     対象外（前者は緑、後者は暗背景に色彩テキストの方が見やすい）
+   - body にダーク系テーマ (theme-classic / theme-midnight) が付いて
+     いる場合は適用しない
+   ========================================== */
+
+body:not(.theme-classic):not(.theme-midnight) {
+
+    /* ---- モーダルのオーバーレイ＆コンテナ ---- */
+    #stats-modal,
+    .zoom-sitout-overlay,
+    #zoom-sitout-overlay {
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(6px);
+    }
+    .stats-modal-inner,
+    .zoom-sitout-inner {
+        background: #ffffff;
+        color: #17202E;
+        border: 1px solid #d1d8e0;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.25),
+                    0 2px 8px rgba(15, 23, 42, 0.08);
+    }
+    .zoom-sitout-inner h2,
+    .stats-header h2,
+    #results-modal h2 {
+        color: #0f172a;
+    }
+
+    /* ---- スタッツテーブル ---- */
+    .stats-table th {
+        color: #2A6BC9;
+        border-bottom: 1px solid #d1d8e0;
+    }
+    .stats-table td {
+        color: #17202E;
+        border-bottom: 1px solid #e7ecf2;
+    }
+    .stats-table tr:hover td { background: #f1f5f9; }
+    .stat-value { color: #1d4ed8; }
+    .stat-label { color: #475569; }
+
+    /* ---- ハンド履歴 ---- */
+    .hh-row {
+        background: #f1f5f9;
+        color: #17202E;
+        border: 1px solid #e2e8f0;
+    }
+    .hh-row:hover { background: #e2eaf3; }
+    .hh-row-active {
+        background: #dde6f3;
+        border-left: 3px solid #2A6BC9;
+    }
+    .hh-num         { color: #475569; }
+    .hh-game-label  { color: #2A6BC9; }
+    .hh-time-label  { color: #64748b; }
+    .hh-detail {
+        background: #f8fafc;
+        border: 1px solid #d1d8e0;
+        color: #17202E;
+    }
+    .hh-detail-header { border-bottom: 1px solid #e2e8f0; }
+    .hh-detail-title  { color: #2A6BC9; }
+    .hh-detail-time   { color: #64748b; }
+    .hh-player-table  { border-bottom: 1px solid #e2e8f0; }
+    .hh-p-row         { border-bottom: 1px solid #edf1f6; color: #17202E; }
+    .hh-p-row-me      { background: rgba(42, 107, 201, 0.10); }
+    .hh-row-win  { box-shadow: inset 3px 0 0 #16a34a; }
+    .hh-row-loss { box-shadow: inset 3px 0 0 #dc2626; }
+    .hh-chip-diff.hh-diff-plus  { color: #15803d; }
+    .hh-chip-diff.hh-diff-minus { color: #b91c1c; }
+    .hh-chip-diff.hh-diff-zero  { color: #64748b; }
+    .hh-folded-label            { color: #64748b; }
+    /* Mini cards: 既に白背景なのでテキスト色だけ確実に */
+    .mini-card { background: #ffffff; }
+
+    /* ---- 成績 (Results) モーダル ---- */
+    .results-tabs    { border-bottom: 1px solid #d1d8e0; }
+    .results-tab     { color: #64748b; }
+    .results-tab.active { color: #2A6BC9; border-bottom-color: #2A6BC9; }
+    .results-tab:hover  { color: #17202E; }
+    .results-empty   { color: #64748b; }
+    .results-summary-card {
+        background: #f1f5f9;
+        border: 1px solid #d1d8e0;
+    }
+    .results-summary-card .rsc-label { color: #64748b; }
+    .results-summary-card .rsc-val   { color: #17202E; }
+    .rsc-val-plus  { color: #15803d; }
+    .rsc-val-minus { color: #b91c1c; }
+    .results-row {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #17202E;
+    }
+    .results-row-key  { color: #17202E; }
+    .results-row-meta { color: #64748b; }
+    .results-row-val.plus  { color: #15803d; }
+    .results-row-val.minus { color: #b91c1c; }
+    .results-row-val.zero  { color: #64748b; }
+    .results-table-block {
+        background: #f1f5f9;
+        border: 1px solid #d1d8e0;
+    }
+    .results-table-head    { color: #17202E; }
+    .results-table-id      { color: #2A6BC9; }
+    .results-table-meta    { color: #64748b; }
+    .results-table-rows .results-row { background: #ffffff; }
+    .results-row-self      { outline: 2px solid #2A6BC9; }
+    /* 注意書きバナーは黄色ベースのまま (警告色は light でも有効) */
+    .results-ephemeral-notice {
+        background: linear-gradient(135deg, #fef3c7, #fff7d6);
+        border: 1px solid #f59e0b;
+        border-left: 4px solid #d97706;
+        color: #78350f;
+    }
+    .results-ephemeral-notice strong { color: #b45309; }
+    .results-ephemeral-notice small  { color: #92400e; }
+
+    /* ---- ロビーチャット (メイン画面) ---- */
+    #sns-screen .mx-chat-messages {
+        background: #ffffff;
+        border: 1px solid #d1d8e0;
+        color: #17202E;
+    }
+    #sns-screen .mx-chat-empty   { color: #64748b; }
+    #sns-screen .mx-chat-msg {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+    }
+    #sns-screen .mx-chat-msg-name { color: #2A6BC9; }
+    #sns-screen .mx-chat-msg-time { color: #64748b; }
+    #sns-screen .mx-chat-msg-text { color: #17202E; }
+    #sns-screen .mx-chat-msg.is-system {
+        background: linear-gradient(135deg, #ede9fe, #f5f3ff);
+        border: 1px solid #c4b5fd;
+        border-left: 4px solid #7c3aed;
+    }
+    #sns-screen .mx-chat-msg.is-system .mx-chat-msg-name { color: #5b21b6; }
+    #sns-screen .mx-chat-msg.is-system .mx-chat-msg-text { color: #1e1b4b; }
+    #sns-screen .mx-chat-sr .sr-name  { color: #17202E; }
+    #sns-screen .mx-chat-sr .sr-plus  { color: #15803d; }
+    #sns-screen .mx-chat-sr .sr-minus { color: #b91c1c; }
+    #sns-screen .mx-chat-sr .sr-zero  { color: #64748b; }
+
+    /* ---- ハンバーガーメニューのドロップダウン ---- */
+    #mx-header-menu,
+    #top-bar-menu {
+        background: #ffffff;
+        border: 1px solid #d1d8e0;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+    }
+    #mx-header-menu .menu-item,
+    #top-bar-menu .menu-item {
+        color: #17202E;
+    }
+    #mx-header-menu .menu-item:hover,
+    #top-bar-menu .menu-item:hover {
+        background: #eef2f6;
+    }
+    #mx-header-menu .menu-item.menu-danger,
+    #top-bar-menu .menu-item.menu-danger {
+        color: #dc2626;
+    }
+
+    /* ---- オンラインユーザーモーダル (rp-modal) ---- */
+    .rp-modal .rp-content { color: #17202E; }
+    .rp-modal .rp-backdrop { background: rgba(15, 23, 42, 0.45); }
+
+    /* ---- ハンド履歴ハイライト各種 ---- */
+    .hh-chip-diff { background: #e2e8f0; color: #17202E; }
+    .hh-chip-diff.hh-diff-plus  { background: #dcfce7; color: #14532d; }
+    .hh-chip-diff.hh-diff-minus { background: #fee2e2; color: #7f1d1d; }
+    .hh-chip-diff.hh-diff-zero  { background: #e2e8f0; color: #475569; }
+
+}
 
