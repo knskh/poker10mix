@@ -2222,15 +2222,34 @@ function renderHandHistory(containerId) {
         container.innerHTML = '<p style="color:var(--text-dim);padding:8px;line-height:1.6;">ゲストアカウントではハンド履歴は保存されません。<br>アカウント登録するとプレイしたハンドが記録されます。</p>';
         return;
     }
-    if (handHistory.length === 0) {
+    const myName = client.name;
+    // Defensive filter: only show hands where I'm actually in the result
+    // players list. Catches old hands saved before the save-time filter was
+    // tightened, plus any edge case where a hand without my participation
+    // slipped through (e.g. spectator views, multi-table cross-contamination).
+    function iAmInHand(h) {
+        if (!myName) return false;
+        if (h && h.handResult && Array.isArray(h.handResult.players)) {
+            return h.handResult.players.some(p => p && p.name === myName);
+        }
+        // No structured result — keep legacy hands that pre-date handResult.
+        return !h || !h.handResult;
+    }
+    const visibleHands = handHistory.filter(iAmInHand);
+    // One-shot persistence cleanup: if filtering removed any foreign-player
+    // hands, save the cleaned list so they don't reappear on next load.
+    if (visibleHands.length !== handHistory.length) {
+        handHistory = visibleHands;
+        persistHandHistory();
+    }
+    if (visibleHands.length === 0) {
         container.innerHTML = '<p style="color:var(--text-dim);padding:8px;">まだ履歴がありません</p>';
         return;
     }
     // Compact list of starting hands with win/loss badges
-    const myName = client.name;
     let html = '<div class="hh-list">';
-    for (let i = handHistory.length - 1; i >= 0; i--) {
-        const h = handHistory[i];
+    for (let i = visibleHands.length - 1; i >= 0; i--) {
+        const h = visibleHands[i];
         const cards = h.startCards || h.myCardObjs || [];
         // Determine win/loss from handResult
         let diff = 0, hasResult = false;
@@ -2275,7 +2294,7 @@ function renderHandHistory(containerId) {
             row.classList.add('hh-row-active');
             detail.dataset.activeIdx = String(idx);
             detail.classList.remove('hidden');
-            detail.innerHTML = renderHandDetail(handHistory[idx], idx);
+            detail.innerHTML = renderHandDetail(visibleHands[idx], idx);
         });
     });
 
