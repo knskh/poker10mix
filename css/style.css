@@ -2431,9 +2431,30 @@ body {
 
 
 /* Lock Toggle */
-.lock-toggle-label { display: flex; align-items: center; gap: 6px; cursor: pointer; margin-top: 8px; }
+.lock-toggle-label {
+    display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(124, 92, 255, 0.08);
+    border: 1px solid rgba(124, 92, 255, 0.35);
+    border-radius: 8px;
+    transition: background 0.15s, border-color 0.15s;
+}
+.lock-toggle-label:hover { background: rgba(124, 92, 255, 0.14); }
+.lock-toggle-label:has(input:checked) {
+    background: rgba(124, 92, 255, 0.18);
+    border-color: rgba(124, 92, 255, 0.7);
+}
 .lock-toggle-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
-.lock-toggle-text { font-size: 14px; color: var(--text); }
+.lock-toggle-text { font-size: 14px; font-weight: 600; color: var(--text); }
+/* lobby-options: 縦に並べる (start chips → toggle) */
+.lobby-options {
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 8px;
+}
+.starting-chips-fixed {
+    font-size: 13px; color: var(--text-dim);
+    padding: 2px 0;
+}
 
 /* Pending Joins (Room Screen) */
 .pending-joins { margin: 12px 0; padding: 10px; background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: 8px; }
