@@ -11,7 +11,7 @@
     --rail-inner: #c9a075;
     --card-bg: #ffffff;
     --text: #1a1d23;
-    --text-dim: #6b7280;
+    --text-dim: #4b5563;
     --border: #e5e7eb;
     --gold: #f59e0b;
     --accent: #7c5cff;         /* single vivid accent (electric purple) */
@@ -56,7 +56,7 @@ body.theme-classic {
     --glass-bg: rgba(255,255,255,0.04);
     --glass-border: rgba(255,213,79,0.2);
     --text: #f5f5dc;
-    --text-dim: #a8a078;
+    --text-dim: #c9c2a3;
 }
 body.theme-classic #table-felt {
     background: radial-gradient(ellipse at 50% 40%, #2e7d32 0%, #1b5e20 50%, #145218 80%, #0d3b10 100%) !important;
@@ -94,7 +94,7 @@ body.theme-midnight {
     --glass-bg: rgba(255,255,255,0.03);
     --glass-border: rgba(179,136,255,0.2);
     --text: #e8e0ff;
-    --text-dim: #9e93b8;
+    --text-dim: #bdb3d4;
 }
 body.theme-midnight #table-felt {
     background: radial-gradient(ellipse at 50% 40%, #2a1870 0%, #1a1050 50%, #120a40 80%, #0a0630 100%) !important;
@@ -121,6 +121,11 @@ body {
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+    /* Crisper text rendering — small Japanese characters become noticeably
+       sharper without changing any layout. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 .hidden { display: none !important; }
