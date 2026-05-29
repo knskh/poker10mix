@@ -1901,6 +1901,19 @@ body {
 .results-table-meta { font-size: 11px; color: var(--text-dim); }
 .results-table-rows .results-row { background: rgba(255,255,255,0.04); }
 .results-row-self { outline: 1px solid var(--accent); }
+.results-ephemeral-notice {
+    background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(251,191,36,0.08));
+    border: 1px solid rgba(251,191,36,0.55);
+    border-left: 4px solid #fbbf24;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    color: #fde68a;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.results-ephemeral-notice strong { color: #fbbf24; }
+.results-ephemeral-notice small { color: #fcd9a0; font-size: 11px; display: block; margin-top: 4px; }
 
 /* Compact list */
 .hh-list { display: flex; flex-direction: column; gap: 2px; }

@@ -3855,11 +3855,21 @@ function _renderGroupedTab(mode) {
 function _renderTableTab() {
     // テーブル別はサーバーのセッション記録から、各テーブル ID ごとに
     // 全参加者の累積収支を集計して表示する。
+    // Render Free Tier の ephemeral filesystem のため、サーバー再起動や
+    // 一定時間アクセスがないとデータが消えてしまうことを明示する。
+    const ephemeralNotice = `
+        <div class="results-ephemeral-notice">
+            ⚠️ <strong>このデータはしばらくすると消えます</strong><br>
+            <small>テーブル別の成績はサーバー側に保存されています。サーバーの再起動や、
+            一定時間アクセスがない状態（無料プランの自動スリープ）の後にはリセットされます。
+            記録したい結果はスクリーンショット等で控えてください。</small>
+        </div>
+    `;
     if (resultsServerSessions === null) {
-        return '<div class="results-empty">サーバーから取得中...</div>';
+        return ephemeralNotice + '<div class="results-empty">サーバーから取得中...</div>';
     }
     if (resultsServerSessions.length === 0) {
-        return '<div class="results-empty">テーブル別の記録はまだありません。<br>テーブルが閉じられたタイミングで記録されます。</div>';
+        return ephemeralNotice + '<div class="results-empty">テーブル別の記録はまだありません。<br>テーブルが閉じられたタイミングで記録されます。</div>';
     }
     const myName = (typeof client !== 'undefined' && client.name) ? client.name : '';
     // Group by roomId. For each roomId, aggregate per-name profit across all
@@ -3886,7 +3896,7 @@ function _renderTableTab() {
     }
     const blocks = [...byRoom.values()].sort((a, b) =>
         b.lastTimestamp.localeCompare(a.lastTimestamp));
-    let html = '';
+    let html = ephemeralNotice;
     for (const b of blocks) {
         const players = [...b.perPlayer.values()].sort((a, b) => b.profit - a.profit);
         const date = b.lastTimestamp ? new Date(b.lastTimestamp).toLocaleString() : '';
