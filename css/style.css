@@ -1007,6 +1007,19 @@ body {
     display: flex; gap: 1px; justify-content: center; flex-wrap: nowrap;
     margin-top: 2px; overflow: visible;
 }
+/* 上席（テーブル上部）の座席はカードを上に表示し、テーブル中央側へ
+   座席本体とベットチップが配置されるレイアウトにする。これにより
+   7-card stud のように横に長くなるカード行と、テーブル felt 上の
+   ベットチップが重ならない。下席は既定通りカードを下に表示。 */
+.seat-top .seat-cards,
+.seat-top-left .seat-cards,
+.seat-top-right .seat-cards {
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 0;
+}
 /* Card sizes by count — keeps seat icon stable */
 .seat-cards-1 .card, .seat-cards-2 .card {
     width: 26px; height: 36px; border-radius: 3px;
