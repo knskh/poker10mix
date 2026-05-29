@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=70">
+    <link rel="stylesheet" href="css/style.css?v=71">
     <link rel="stylesheet" href="css/sns.css?v=11">
 </head>
 <body>
@@ -80,6 +80,7 @@
                     <div id="mx-header-menu" class="hidden">
                         <button id="sns-header-stats" class="menu-item">スタッツ</button>
                         <button id="sns-header-history" class="menu-item">ハンド履歴</button>
+                        <button id="sns-header-results" class="menu-item">成績</button>
                         <button id="sns-header-online" class="menu-item">オンラインユーザーリスト</button>
                         <button id="sns-header-logout" class="menu-item">ログアウト</button>
                     </div>
@@ -266,6 +267,23 @@
                     <h3>直近30ハンド</h3>
                     <div id="lobby-hand-history" class="hand-history-list"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Results modal (成績) -->
+        <div id="results-modal" class="zoom-sitout-overlay hidden">
+            <div class="zoom-sitout-inner results-modal-inner">
+                <h2>成績</h2>
+                <div class="zoom-sitout-buttons" style="margin-bottom:12px;">
+                    <button id="btn-results-close" class="btn-small btn-danger">閉じる</button>
+                </div>
+                <div class="results-tabs">
+                    <button class="results-tab active" data-rtab="overall">全体</button>
+                    <button class="results-tab" data-rtab="date">日付別</button>
+                    <button class="results-tab" data-rtab="month">月別</button>
+                    <button class="results-tab" data-rtab="table">テーブル別</button>
+                </div>
+                <div id="results-body" class="results-body"></div>
             </div>
         </div>
 
@@ -465,11 +483,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=4"></script>
+    <script src="js/client.js?v=5"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=76"></script>
+    <script src="js/app.js?v=77"></script>
 
 </body>
 </html>

@@ -636,6 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupRoomScreen();
     setupGameScreen();
     setupStatsModal();
+    setupResultsModal();
     setupChat();
     setupPreActions();
     setupPresetSettingsModal();
@@ -2178,6 +2179,10 @@ function saveCurrentHand() {
         }
         handHistory.push({
             gameName, logs: [...currentHandLogs], time: new Date().toLocaleTimeString(),
+            t: Date.now(),
+            roomId: (currentState && currentState.roomId) ? currentState.roomId
+                  : (typeof activeTableId !== 'undefined' && activeTableId) ? activeTableId
+                  : null,
             myCards, communityCards, myCardObjs, communityCardObjs,
             startCards: startingHandCards.length > 0 ? [...startingHandCards] : myCardObjs,
             cardSnapshots: cardSnapshots.length > 0 ? cardSnapshots.map(s => {
@@ -3693,6 +3698,214 @@ function setupStatsModal() {
         renderStatsFromStorage();
         document.getElementById('stats-modal').classList.remove('hidden');
     });
+}
+
+// ==========================================
+// 成績 (Results) Modal
+// ==========================================
+let resultsActiveTab = 'overall';
+let resultsServerSessions = null; // cached from 'session_records' WS event
+
+function setupResultsModal() {
+    const modal = document.getElementById('results-modal');
+    if (!modal) return;
+    document.getElementById('btn-results-close').addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+    const openBtn = document.getElementById('sns-header-results');
+    if (openBtn) openBtn.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        renderResultsTab(resultsActiveTab);
+        // Pre-fetch server-side session records for the テーブル別 tab.
+        if (typeof client !== 'undefined' && client.getSessionRecords) {
+            client.getSessionRecords({ limit: 500 });
+        }
+    });
+    modal.querySelectorAll('.results-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.rtab;
+            resultsActiveTab = tab;
+            modal.querySelectorAll('.results-tab').forEach(b =>
+                b.classList.toggle('active', b.dataset.rtab === tab));
+            renderResultsTab(tab);
+        });
+    });
+    // Cache server-side session records when they arrive.
+    if (typeof client !== 'undefined' && client.on) {
+        client.on('session_records', (records) => {
+            resultsServerSessions = records || [];
+            if (!modal.classList.contains('hidden') && resultsActiveTab === 'table') {
+                renderResultsTab('table');
+            }
+        });
+    }
+}
+
+// Aggregate the local hand history into per-hand profit entries we can group.
+function _myHandResults() {
+    const myName = (typeof client !== 'undefined' && client.name) ? client.name : '';
+    if (!myName) return [];
+    const out = [];
+    for (const h of (handHistory || [])) {
+        if (!h || !h.handResult || !Array.isArray(h.handResult.players)) continue;
+        const me = h.handResult.players.find(p => p && p.name === myName);
+        if (!me) continue;
+        const profit = (me.chips || 0) - (me.startChips || 0);
+        out.push({
+            t: h.t || null,
+            roomId: h.roomId || null,
+            gameName: h.gameName || h.handResult.gameName || '',
+            profit,
+        });
+    }
+    return out;
+}
+
+function _formatProfit(n) {
+    if (n > 0) return `+${n.toLocaleString()}`;
+    if (n < 0) return n.toLocaleString();
+    return '±0';
+}
+function _profitCls(n) { return n > 0 ? 'plus' : n < 0 ? 'minus' : 'zero'; }
+
+function renderResultsTab(tab) {
+    const body = document.getElementById('results-body');
+    if (!body) return;
+    if (!loggedInAccount && tab !== 'table') {
+        body.innerHTML = '<div class="results-empty">ゲストアカウントでは成績は記録されません。<br>アカウント登録後にプレイすると成績が蓄積されます。</div>';
+        return;
+    }
+    if (tab === 'overall') body.innerHTML = _renderOverallTab();
+    else if (tab === 'date') body.innerHTML = _renderGroupedTab('date');
+    else if (tab === 'month') body.innerHTML = _renderGroupedTab('month');
+    else if (tab === 'table') body.innerHTML = _renderTableTab();
+}
+
+function _renderOverallTab() {
+    const entries = _myHandResults();
+    if (entries.length === 0) return '<div class="results-empty">まだ記録がありません</div>';
+    const total = entries.reduce((s, e) => s + e.profit, 0);
+    const wins  = entries.filter(e => e.profit > 0).length;
+    const losses = entries.filter(e => e.profit < 0).length;
+    const winRate = entries.length > 0 ? Math.round(100 * wins / entries.length) : 0;
+    return `
+        <div class="results-summary">
+            <div class="results-summary-card">
+                <div class="rsc-label">合計収支</div>
+                <div class="rsc-val ${total > 0 ? 'rsc-val-plus' : total < 0 ? 'rsc-val-minus' : ''}">${_formatProfit(total)}</div>
+            </div>
+            <div class="results-summary-card">
+                <div class="rsc-label">ハンド数</div>
+                <div class="rsc-val">${entries.length}</div>
+            </div>
+            <div class="results-summary-card">
+                <div class="rsc-label">勝率</div>
+                <div class="rsc-val">${winRate}%</div>
+            </div>
+        </div>
+        <div class="results-row-list">
+            <div class="results-row"><span class="results-row-key">勝ったハンド</span><span class="results-row-val plus">${wins}</span></div>
+            <div class="results-row"><span class="results-row-key">負けたハンド</span><span class="results-row-val minus">${losses}</span></div>
+            <div class="results-row"><span class="results-row-key">引き分け / フォールド</span><span class="results-row-val zero">${entries.length - wins - losses}</span></div>
+        </div>
+    `;
+}
+
+function _renderGroupedTab(mode) {
+    const entries = _myHandResults().filter(e => e.t);
+    if (entries.length === 0) return '<div class="results-empty">日付付きの記録がまだありません</div>';
+    const groups = new Map();
+    for (const e of entries) {
+        const d = new Date(e.t);
+        const key = mode === 'date'
+            ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+            : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        const g = groups.get(key) || { key, profit: 0, hands: 0 };
+        g.profit += e.profit; g.hands += 1;
+        groups.set(key, g);
+    }
+    const sorted = [...groups.values()].sort((a, b) => b.key.localeCompare(a.key));
+    const total = sorted.reduce((s, g) => s + g.profit, 0);
+    let html = `
+        <div class="results-summary">
+            <div class="results-summary-card">
+                <div class="rsc-label">対象期間 合計</div>
+                <div class="rsc-val ${total > 0 ? 'rsc-val-plus' : total < 0 ? 'rsc-val-minus' : ''}">${_formatProfit(total)}</div>
+            </div>
+            <div class="results-summary-card">
+                <div class="rsc-label">${mode === 'date' ? '日数' : '月数'}</div>
+                <div class="rsc-val">${sorted.length}</div>
+            </div>
+            <div class="results-summary-card">
+                <div class="rsc-label">合計ハンド</div>
+                <div class="rsc-val">${entries.length}</div>
+            </div>
+        </div>
+        <div class="results-row-list">`;
+    for (const g of sorted) {
+        html += `<div class="results-row">
+            <span><span class="results-row-key">${g.key}</span><span class="results-row-meta">${g.hands} ハンド</span></span>
+            <span class="results-row-val ${_profitCls(g.profit)}">${_formatProfit(g.profit)}</span>
+        </div>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+function _renderTableTab() {
+    // テーブル別はサーバーのセッション記録から、各テーブル ID ごとに
+    // 全参加者の累積収支を集計して表示する。
+    if (resultsServerSessions === null) {
+        return '<div class="results-empty">サーバーから取得中...</div>';
+    }
+    if (resultsServerSessions.length === 0) {
+        return '<div class="results-empty">テーブル別の記録はまだありません。<br>テーブルが閉じられたタイミングで記録されます。</div>';
+    }
+    const myName = (typeof client !== 'undefined' && client.name) ? client.name : '';
+    // Group by roomId. For each roomId, aggregate per-name profit across all
+    // sessions (a table ID can be reused — the same id might host multiple
+    // separate sessions). Show participants sorted by profit desc.
+    const byRoom = new Map();
+    for (const rec of resultsServerSessions) {
+        if (!rec || !rec.roomId || !Array.isArray(rec.participants)) continue;
+        const entry = byRoom.get(rec.roomId) || {
+            roomId: rec.roomId, sessionCount: 0, totalHands: 0,
+            lastTimestamp: '', perPlayer: new Map(),
+        };
+        entry.sessionCount++;
+        entry.totalHands += (rec.handsPlayed || 0);
+        if (rec.timestamp > entry.lastTimestamp) entry.lastTimestamp = rec.timestamp;
+        for (const p of rec.participants) {
+            if (!p || !p.name) continue;
+            const pp = entry.perPlayer.get(p.name) || { name: p.name, profit: 0, hands: 0 };
+            pp.profit += (p.profit || 0);
+            pp.hands  += (p.handsPlayed || 0);
+            entry.perPlayer.set(p.name, pp);
+        }
+        byRoom.set(rec.roomId, entry);
+    }
+    const blocks = [...byRoom.values()].sort((a, b) =>
+        b.lastTimestamp.localeCompare(a.lastTimestamp));
+    let html = '';
+    for (const b of blocks) {
+        const players = [...b.perPlayer.values()].sort((a, b) => b.profit - a.profit);
+        const date = b.lastTimestamp ? new Date(b.lastTimestamp).toLocaleString() : '';
+        html += `<div class="results-table-block">
+            <div class="results-table-head">
+                <span class="results-table-id">テーブル ${escapeHtml(b.roomId)}</span>
+                <span class="results-table-meta">${b.sessionCount} セッション / 計 ${b.totalHands} ハンド / ${escapeHtml(date)}</span>
+            </div>
+            <div class="results-table-rows results-row-list">`;
+        for (const p of players) {
+            const isMe = myName && p.name === myName;
+            html += `<div class="results-row${isMe ? ' results-row-self' : ''}">
+                <span><span class="results-row-key">${escapeHtml(p.name)}${isMe ? ' <small>(自分)</small>' : ''}</span><span class="results-row-meta">${p.hands} ハンド</span></span>
+                <span class="results-row-val ${_profitCls(p.profit)}">${_formatProfit(p.profit)}</span>
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+    return html;
 }
 
 // Render stats from server (in-game)

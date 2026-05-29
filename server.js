@@ -180,6 +180,88 @@ async function upsertPlayerStats(name, delta) {
     }
 }
 
+// ============================================
+// Session Records (per-table, per-session profit log used by 成績 modal)
+// In-memory: array of records sorted newest-first.
+//   { roomId, timestamp(ISO), handsPlayed, gameTypes, participants:[{name, profit, invested, endChips, handsPlayed}] }
+// ============================================
+const SESSION_RECORDS_FILE = path.join(__dirname, 'session_records.json');
+const SESSION_RECORDS_MAX = 2000;
+const sessionRecords = [];
+
+function loadLocalSessionRecords() {
+    try {
+        if (!fs.existsSync(SESSION_RECORDS_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(SESSION_RECORDS_FILE, 'utf8'));
+        if (Array.isArray(data)) {
+            sessionRecords.push(...data);
+            console.log(`session_records loaded from local JSON: ${data.length} records`);
+        }
+    } catch (e) { console.warn('Failed to load session_records.json:', e && e.message); }
+}
+
+let saveSessionRecordsTimer = null;
+function saveSessionRecordsDebounced() {
+    if (saveSessionRecordsTimer) return;
+    saveSessionRecordsTimer = setTimeout(() => {
+        saveSessionRecordsTimer = null;
+        try {
+            fs.writeFileSync(SESSION_RECORDS_FILE, JSON.stringify(sessionRecords.slice(0, SESSION_RECORDS_MAX), null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Failed to save session_records.json:', e && e.message);
+        }
+    }, 500);
+}
+
+async function loadSessionRecordsFromSupabase() {
+    if (!supabase) return;
+    try {
+        const { data, error } = await supabase
+            .from('session_records')
+            .select('*')
+            .order('timestamp', { ascending: false })
+            .limit(SESSION_RECORDS_MAX);
+        if (!error && Array.isArray(data)) {
+            sessionRecords.length = 0;
+            for (const row of data) {
+                sessionRecords.push({
+                    roomId: row.room_id,
+                    timestamp: row.timestamp,
+                    handsPlayed: row.hands_played,
+                    gameTypes: row.game_types || [],
+                    participants: row.participants || [],
+                });
+            }
+            console.log(`session_records loaded from Supabase: ${data.length} records`);
+        }
+    } catch (e) {
+        console.warn('session_records load error:', e && e.message);
+    }
+}
+
+async function persistSessionRecord(record) {
+    // Newest first.
+    sessionRecords.unshift(record);
+    if (sessionRecords.length > SESSION_RECORDS_MAX) sessionRecords.length = SESSION_RECORDS_MAX;
+    saveSessionRecordsDebounced();
+    if (supabase) {
+        try {
+            await supabase.from('session_records').insert({
+                room_id: record.roomId,
+                timestamp: record.timestamp,
+                hands_played: record.handsPlayed,
+                game_types: record.gameTypes,
+                participants: record.participants,
+            });
+        } catch (e) {
+            console.warn('session_records insert error:', e && e.message);
+        }
+    }
+}
+
+loadLocalSessionRecords();
+loadSessionRecordsFromSupabase();
+
 async function loadAllPlayerStats() {
     // Always load local JSON first as the baseline.
     loadLocalPlayerStats();
@@ -1598,6 +1680,22 @@ function handleMessage(ws, client, msg) {
             broadcastRoomList();
             break;
 
+        case 'get_session_records': {
+            // Return per-session records used by the 成績 modal.
+            //   msg.roomId      → filter to a single table
+            //   msg.playerName  → return only sessions that include this player
+            //   msg.limit       → cap how many records to return (default 200)
+            const roomFilter   = msg.roomId   ? String(msg.roomId)   : null;
+            const playerFilter = msg.playerName ? String(msg.playerName) : null;
+            const limit = Math.min(Math.max(parseInt(msg.limit) || 200, 1), SESSION_RECORDS_MAX);
+            let records = sessionRecords;
+            if (roomFilter) records = records.filter(r => r.roomId === roomFilter);
+            if (playerFilter) records = records.filter(r =>
+                Array.isArray(r.participants) && r.participants.some(p => p.name === playerFilter));
+            send(ws, { type: 'session_records', records: records.slice(0, limit) });
+            break;
+        }
+
         case 'get_player_stats': {
             // Build a roster of REGISTERED accounts only (guests excluded).
             // Players who registered but never played are included with zero
@@ -1660,13 +1758,28 @@ function recordSessionStats(room) {
         }
     }
     const gameCount = room.sessionGameIds ? room.sessionGameIds.size : 1;
+    const handsPlayed = room.handsPlayed || 0;
+    // Build a detailed session record for the 成績 (Results) modal, in
+    // addition to bumping each player's lifetime aggregate.
+    const sessionRecord = {
+        roomId: room.id,
+        timestamp: new Date().toISOString(),
+        handsPlayed,
+        gameTypes: room.sessionGameIds ? Array.from(room.sessionGameIds) : [],
+        participants: [],
+    };
     for (const name of Object.keys(participants)) {
         const rebuyAmount = rebuys[name] || 0;
         const invested = startingChips + rebuyAmount;
         const endChips = (name in finalByName) ? finalByName[name] : 0;
         const diff = endChips - invested;
-        const handsPlayed = room.handsPlayed || 0;
+        sessionRecord.participants.push({
+            name, profit: diff, invested, endChips, handsPlayed,
+        });
         upsertPlayerStats(name, { profitDelta: diff, sessionDelta: 1, diversityDelta: gameCount, handsDelta: handsPlayed });
+    }
+    if (sessionRecord.participants.length > 0) {
+        persistSessionRecord(sessionRecord).catch(() => {});
     }
 }
 

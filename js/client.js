@@ -185,6 +185,9 @@ class PokerClient {
             case 'join_request_cancelled':
                 this.emit('join_request_cancelled', msg);
                 break;
+            case 'session_records':
+                this.emit('session_records', msg.records || []);
+                break;
             case 'error':
                 this.emit('error', msg.message);
                 break;
@@ -214,6 +217,13 @@ class PokerClient {
     endTableNow(roomId) { this.send({ type: 'end_table_now', roomId: roomId || this.roomId }); }
     getStats(roomId) { this.send({ type: 'get_stats', roomId: roomId || this.roomId }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
+    getSessionRecords(opts) {
+        const m = { type: 'get_session_records' };
+        if (opts && opts.roomId)     m.roomId = opts.roomId;
+        if (opts && opts.playerName) m.playerName = opts.playerName;
+        if (opts && opts.limit)      m.limit = opts.limit;
+        this.send(m);
+    }
     toggleLock(locked, roomId) { this.send({ type: 'toggle_lock', locked, roomId: roomId || this.roomId }); }
     approveJoin(targetId, roomId) { this.send({ type: 'approve_join', targetId, roomId: roomId || this.roomId }); }
     rejectJoin(targetId, roomId) { this.send({ type: 'reject_join', targetId, roomId: roomId || this.roomId }); }
