@@ -3115,4 +3115,58 @@ body:not(.theme-classic):not(.theme-midnight) .pending-join-name {
     color: var(--text);
 }
 
+/* ==========================================
+   視認性向上 (Readability boost — Plan B)
+   - ハードコードされた低コントラスト色を明るく上書き
+   - 小サイズの dim テキストを font-weight 500 に
+   - フェルト上のテキストに強めの text-shadow を付与
+   - プレースホルダー文字のコントラストを引き上げ
+   ========================================== */
+
+/* プレースホルダー: 入力フィールド全般を見やすく */
+input::placeholder, textarea::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+    opacity: 1;
+}
+body:not(.theme-classic):not(.theme-midnight) input::placeholder,
+body:not(.theme-classic):not(.theme-midnight) textarea::placeholder {
+    color: #6b7280;
+}
+
+/* 小さいラベル類 (10-11px) は font-weight 500 で線が太くなる分読みやすい */
+.preset-tab, .preset-row-label, .preset-unit-hint, .preset-add-btn,
+.bhf-room, .bhf-game, .add-table-room-info, .add-table-empty,
+.hh-folded-label, .hh-chip-diff,
+.seat-chips, .seat-name, .seat-bet, .seat-action-label,
+.act-fold, .act-check, .act-call, .act-raise {
+    font-weight: 500;
+}
+
+/* テーブルフェルト上のテキストに強めの影 — felt のグラデと擬似要素の
+   ノイズに対して常に読めるよう確保。既存の text-shadow を上書きする
+   ため後置 + 同 specificity で OK。 */
+.seat-name, .seat-chips, .seat-bet, .seat-action-label,
+.table-bet-chip, .blind-info {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+/* 個別箇所: ハードコードされた #666 / #888 / #999 / rgba(255,...,0.45)
+   を明るくする。背景が dark surface (modal / panel) のため、
+   light theme 含めて読みやすさが優先される。 */
+.preset-tab               { color: #b8c4d4; }
+.preset-segment           { color: #b0bcc8; }
+.preset-segment .segment-value       { color: #94a3b8; }
+.preset-segment:hover                 { color: #e0e6f0; }
+.preset-add-btn                       { color: #a8b2c4; }
+.preset-add-btn:hover                 { color: #e0e6f0; }
+.preset-row-label                     { color: #c5cbd6; }
+.preset-unit-hint                     { color: #94a3b8; }
+.bhf-game                             { color: #9ba6b8; }
+.add-table-room-info                  { color: #b0b8c4; }
+.add-table-empty                      { color: #94a3b8; }
+.hh-folded-label                      { color: #9aa5b8; }
+.hh-chip-diff.hh-diff-zero            { color: #a0a8b4; }
+.act-fold                             { color: #a0a8b4; }
+#game-log .log-entry.log-act-fold     { color: #a0a8b4; }
+
 
