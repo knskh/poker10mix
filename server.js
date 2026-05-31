@@ -1133,12 +1133,10 @@ function handleMessage(ws, client, msg) {
                 if (room.playing && room.disconnectedPlayers && room.disconnectedPlayers[client.name]) {
                     const dp = room.disconnectedPlayers[client.name];
                     const seat = dp.seat;
-                    delete room.disconnectedPlayers[client.name];
-                    room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
                     client.roomId = roomId;
                     if (!client.roomIds.includes(roomId)) client.roomIds.push(roomId);
-                    room.seatMap[client.id] = seat;
-                    room.game.players[seat].connected = true;
+                    // 席へ再アタッチ (古いソケットの残骸掃除 + sitout/timeout 解除)
+                    reattachPlayerToSeat(room, client, ws, seat);
                     broadcastLog(room, `${client.name} が再接続しました`, 'important');
                     send(ws, { type: 'room_joined', room: room.toJSON(), roomId: room.id });
                     send(ws, { type: 'game_started', roomId: room.id });
@@ -1260,6 +1258,20 @@ function handleMessage(ws, client, msg) {
                     p.connected = true;
                     p.folded = true;
                     p.id = seatIdx;
+                    if (isReturning) {
+                        // 再接続: 切断時の離席/タイムアウト状態を解除し、即プレイ
+                        // 再開可能にする。また旧ソケットが同じ席に残っていれば除去。
+                        if (room.sitout) delete room.sitout[seatIdx];
+                        if (room.sitoutTime) delete room.sitoutTime[seatIdx];
+                        if (room.consecutiveTimeouts) delete room.consecutiveTimeouts[seatIdx];
+                        for (const [cid, s] of Object.entries(room.seatMap)) {
+                            const cidNum = parseInt(cid);
+                            if (s === seatIdx && cidNum !== client.id) {
+                                delete room.seatMap[cid];
+                                room.members = room.members.filter(m => m.clientId !== cidNum);
+                            }
+                        }
+                    }
                 } else {
                     seatIdx = room.game.players.length;
                     room.game.players.push({
@@ -2217,6 +2229,35 @@ function leaveRoom(client, targetRoomId) {
     }
 }
 
+// プレイヤーを指定席へ再アタッチする (再接続時の共通処理)。
+// - ネットワーク断で旧ソケットの close がまだ発火していない場合に備え、
+//   同じ席を占有する古いメンバー/seatMap エントリを除去 (重複防止)。
+// - 切断時に付与された離席(sitout)/連続タイムアウト状態を解除し、
+//   すぐにプレイ再開できるようにする (再接続後に自動フォールドされ続ける
+//   バグの修正)。
+function reattachPlayerToSeat(room, client, ws, seat) {
+    if (!room || seat === undefined || seat < 0) return;
+    // 同じ席を占有している別clientId(=切断前の自分)の残骸を掃除
+    for (const [cid, s] of Object.entries(room.seatMap)) {
+        const cidNum = parseInt(cid);
+        if (s === seat && cidNum !== client.id) {
+            delete room.seatMap[cid];
+            room.members = room.members.filter(m => m.clientId !== cidNum);
+        }
+    }
+    // このクライアントをメンバー登録 (重複なく) し、席を割り当て
+    const existing = room.getMember(client.id);
+    if (existing) existing.ws = ws;
+    else room.members.push({ clientId: client.id, name: client.name, avatar: client.avatar, ws });
+    room.seatMap[client.id] = seat;
+    // 切断時に付いた離席/タイムアウト状態を解除
+    if (room.sitout) delete room.sitout[seat];
+    if (room.sitoutTime) delete room.sitoutTime[seat];
+    if (room.consecutiveTimeouts) delete room.consecutiveTimeouts[seat];
+    if (room.game && room.game.players[seat]) room.game.players[seat].connected = true;
+    if (room.disconnectedPlayers) delete room.disconnectedPlayers[client.name];
+}
+
 function handleDisconnect(client) {
     if (client.inZoom) leaveZoom(client);
     // Clean up pending join requests from this client
@@ -2239,6 +2280,18 @@ function handleDisconnect(client) {
         if (room.playing && room.game) {
             const seat = room.seatMap[client.id];
             if (seat !== undefined) {
+                // 既に別の接続(=再接続)が同じ席を占有している場合、この close は
+                // ネットワーク断で遅れて届いた「古いソケット」のもの。プレイヤーを
+                // 切断扱いにせず、古いエントリだけ掃除して終える (再接続が
+                // 巻き戻されて固まる/再開できないバグの防止)。
+                const replacedByNewConn = room.members.some(
+                    m => m.clientId !== client.id && room.seatMap[m.clientId] === seat
+                );
+                room.members = room.members.filter(m => m.clientId !== client.id);
+                delete room.seatMap[client.id];
+                if (replacedByNewConn) {
+                    continue;
+                }
                 room.game.players[seat].connected = false;
                 room.game.players[seat].folded = true;
                 if (!room.sitout) room.sitout = {};
@@ -2253,8 +2306,6 @@ function handleDisconnect(client) {
                     room.pending = null;
                     p.resolve({ type: 'fold' });
                 }
-                room.members = room.members.filter(m => m.clientId !== client.id);
-                delete room.seatMap[client.id];
                 broadcastLog(room, `${client.name} が切断されました`, 'dim');
                 broadcastGameState(room);
                 // If the disconnect emptied the room, start idle-close timer so
