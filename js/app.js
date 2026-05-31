@@ -725,6 +725,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Server has deferred the leave to the end of the current hand.
         showToast('退出予約しました（ハンド終了後に適用）');
     });
+    // セッション退室時: その卓での自分の収支を表示
+    client.on('session_result', (result) => {
+        if (result) showSessionResult(result);
+    });
     client.on('game_started', (msg) => {
         const rid = msg.roomId;
         if (rid && rid !== activeTableId) {
@@ -5568,6 +5572,55 @@ function hideTablePreview() {
 // ==========================================
 // Mobile bottom nav (Idea 3)
 // ==========================================
+// ==========================================
+// セッション収支モーダル (退室時に表示)
+// ==========================================
+let _sessionResultQueue = [];
+let _sessionResultShowing = false;
+
+function showSessionResult(result) {
+    if (!result) return;
+    _sessionResultQueue.push(result);
+    if (!_sessionResultShowing) _renderNextSessionResult();
+}
+
+function _renderNextSessionResult() {
+    if (_sessionResultQueue.length === 0) { _sessionResultShowing = false; return; }
+    _sessionResultShowing = true;
+    const result = _sessionResultQueue.shift();
+
+    let overlay = document.getElementById('session-result-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'session-result-overlay';
+        overlay.className = 'session-result-overlay';
+        document.body.appendChild(overlay);
+    }
+    const profit = result.profit || 0;
+    const sign = profit > 0 ? '+' : '';
+    const cls = profit > 0 ? 'sr-plus' : profit < 0 ? 'sr-minus' : 'sr-zero';
+    const headline = profit > 0 ? '🎉 セッション収支' : profit < 0 ? 'セッション収支' : 'セッション収支';
+    overlay.innerHTML = `
+        <div class="session-result-card">
+            <div class="sr-title">${headline}</div>
+            <div class="sr-table">テーブル ${escapeHtml(String(result.roomId || ''))} ・ ${result.handsPlayed || 0} ハンド</div>
+            <div class="sr-amount ${cls}">${sign}${profit.toLocaleString()}</div>
+            <div class="sr-detail">投資 ${(result.invested||0).toLocaleString()} → 終了 ${(result.endChips||0).toLocaleString()}</div>
+            <button class="sr-ok btn-primary" id="session-result-ok">OK</button>
+        </div>`;
+    overlay.classList.add('show');
+
+    const close = () => {
+        overlay.classList.remove('show');
+        // 次のキューがあれば少し待って表示
+        setTimeout(_renderNextSessionResult, 200);
+    };
+    const okBtn = document.getElementById('session-result-ok');
+    if (okBtn) okBtn.addEventListener('click', close, { once: true });
+    // 背景クリックでも閉じる
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); }, { once: true });
+}
+
 function updateResumePill() {
     const pill = document.getElementById('mx-resume-pill');
     if (!pill) return;

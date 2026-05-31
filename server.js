@@ -1920,6 +1920,39 @@ function recordSessionStats(room) {
     }
 }
 
+// あるプレイヤーの、その卓セッションでの収支を計算して返す。
+// 収支 = 現在チップ - (開始チップ + リバイ累計)。participant でなければ null。
+function playerSessionProfit(room, name) {
+    if (!room || !name) return null;
+    const startingChips = (room.settings && room.settings.startingChips) || 10000;
+    const rebuyAmount = (room.totalRebuys && room.totalRebuys[name]) || 0;
+    const invested = startingChips + rebuyAmount;
+    let endChips = null;
+    if (room.game && room.game.players) {
+        const p = room.game.players.find(pl => pl && pl.name === name);
+        if (p) endChips = p.chips;
+    }
+    const participated = !!(room.sessionParticipants && room.sessionParticipants[name]) || endChips !== null;
+    if (!participated) return null;
+    if (endChips === null) endChips = startingChips; // 着席のみでゲーム未開始
+    return {
+        roomId: room.id,
+        profit: endChips - invested,
+        invested,
+        endChips,
+        handsPlayed: room.handsPlayed || 0,
+    };
+}
+
+// 退室するクライアントへ、その卓セッションの自分の収支を通知する。
+// ハンドが1回も消化されていない場合は表示しない (収支が意味を持たないため)。
+function sendSessionResult(client, room) {
+    if (!client || !client.ws || !room) return;
+    const r = playerSessionProfit(room, client.name);
+    if (!r || !(r.handsPlayed > 0)) return;
+    send(client.ws, { type: 'session_result', result: r });
+}
+
 // Delete a room: clear timers, evict remaining members, remove from map,
 // broadcast lobby update. Also records player stats if hands were played.
 function deleteRoomAndEvict(room, reason) {
@@ -1930,8 +1963,10 @@ function deleteRoomAndEvict(room, reason) {
     if (room.idleCloseTimer) { try { clearTimeout(room.idleCloseTimer); } catch {} room.idleCloseTimer = null; }
     // Notify + detach any remaining members (sitout players stay in room until this runs)
     for (const m of [...(room.members || [])]) {
-        try { send(m.ws, { type: 'room_left', roomId: room.id, reason: reason || 'closed' }); } catch {}
         const c = clients.get(m.ws);
+        // 残っているメンバーにも、卓終了時に自分のセッション収支を通知する。
+        if (c) sendSessionResult(c, room);
+        try { send(m.ws, { type: 'room_left', roomId: room.id, reason: reason || 'closed' }); } catch {}
         if (c) {
             c.roomIds = (c.roomIds || []).filter(id => id !== room.id);
             c.roomId = c.roomIds.length > 0 ? c.roomIds[c.roomIds.length - 1] : null;
@@ -2122,6 +2157,11 @@ function leaveRoom(client, targetRoomId) {
     const rid = targetRoomId || client.roomId;
     const room = rooms.get(rid);
     if (!room) { return; }
+
+    // 退室時に、この卓での自分のセッション収支を通知する (チップ等を
+    // 変更する前に計算する)。手動退室・バスト退室・自動キックなど、退室は
+    // すべて leaveRoom を通るのでここで一括対応できる。
+    sendSessionResult(client, room);
 
     // If they were in a bust-decision window, cancel the pending kick timer.
     const leavingSeat = room.seatMap ? room.seatMap[client.id] : undefined;

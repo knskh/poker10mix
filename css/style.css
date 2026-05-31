@@ -2438,6 +2438,36 @@ body {
 
 
 /* Lock Toggle */
+/* ==========================================
+   セッション収支モーダル (退室時)
+   ========================================== */
+.session-result-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    padding: 20px;
+}
+.session-result-overlay.show { display: flex; animation: modal-fade-in 0.2s ease-out; }
+.session-result-card {
+    background: #ffffff; color: #17202E;
+    border-radius: 16px; padding: 24px 28px;
+    width: 100%; max-width: 340px; text-align: center;
+    box-shadow: 0 16px 48px rgba(15,23,42,0.35);
+    animation: modal-scale-in 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+.session-result-card .sr-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+.session-result-card .sr-table { font-size: 12px; color: #64748b; margin-bottom: 14px; }
+.session-result-card .sr-amount {
+    font-size: 40px; font-weight: 800; letter-spacing: 0.5px; line-height: 1.1;
+    margin-bottom: 10px;
+}
+.session-result-card .sr-amount.sr-plus  { color: #16a34a; }
+.session-result-card .sr-amount.sr-minus { color: #dc2626; }
+.session-result-card .sr-amount.sr-zero  { color: #64748b; }
+.session-result-card .sr-detail { font-size: 12px; color: #64748b; margin-bottom: 18px; }
+.session-result-card .sr-ok { width: 100%; padding: 12px; font-size: 16px; }
+
 .lock-toggle-label {
     display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 8px;
     padding: 8px 12px;

@@ -188,6 +188,9 @@ class PokerClient {
             case 'session_records':
                 this.emit('session_records', msg.records || []);
                 break;
+            case 'session_result':
+                this.emit('session_result', msg.result);
+                break;
             case 'lobby_chat_history':
                 this.emit('lobby_chat_history', msg.messages || []);
                 break;
