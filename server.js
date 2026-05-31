@@ -1817,15 +1817,34 @@ function handleMessage(ws, client, msg) {
                 };
                 if (supabase) {
                     try {
-                        const { count, error } = await supabase
+                        const { data: selData, error } = await supabase
                             .from('session_records')
-                            .select('*', { count: 'exact', head: true });
+                            .select('*')
+                            .limit(3);
                         out.table_reachable = !error;
-                        out.supabase_count = count;
+                        out.rows_returned = Array.isArray(selData) ? selData.length : null;
                         out.error = error ? error.message : null;
                     } catch (e) {
                         out.table_reachable = false;
                         out.error = e && e.message;
+                    }
+                    // ドライラン insert: 実際に書けるか・どんなエラーが出るか確認
+                    try {
+                        const testRow = {
+                            room_id: '__dbg', timestamp: new Date().toISOString(),
+                            hands_played: 0, game_types: [], participants: [],
+                        };
+                        const { error: insErr, status } = await supabase
+                            .from('session_records').insert(testRow);
+                        out.insert_ok = !insErr;
+                        out.insert_status = status;
+                        out.insert_error = insErr ? insErr.message : null;
+                        if (!insErr) {
+                            await supabase.from('session_records').delete().eq('room_id', '__dbg');
+                        }
+                    } catch (e) {
+                        out.insert_ok = false;
+                        out.insert_error = e && e.message;
                     }
                 }
                 send(ws, out);
