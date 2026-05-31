@@ -1496,12 +1496,27 @@ function renderRoom(room) {
     document.getElementById('room-waiting-msg').style.display = isHost ? 'none' : 'block';
     document.getElementById('room-host-controls').style.display = 'block';
 
-    // Lock toggle: only for non-guest hosts
+    // 承認制トグル: ホストには常に表示する。
+    // - ログイン済み: 有効。チェックで承認制 ON/OFF。
+    // - ゲスト: 無効化し「ログインで利用可」と明示 (承認制はアカウント機能)。
+    //   以前はゲスト時に非表示にしていたため「トグルが出ない」と
+    //   バグのように見えていた。ホストには常に見せて理由を伝える。
     const lockLabel = document.getElementById('lock-toggle-label');
     const lockToggle = document.getElementById('room-lock-toggle');
-    if (isHost && loggedInAccount) {
+    const lockText = lockLabel ? lockLabel.querySelector('.lock-toggle-text') : null;
+    if (isHost) {
         lockLabel.classList.remove('hidden');
-        lockToggle.checked = !!room.locked;
+        if (loggedInAccount) {
+            lockToggle.disabled = false;
+            lockToggle.checked = !!room.locked;
+            lockLabel.classList.remove('lock-toggle-disabled');
+            if (lockText) lockText.textContent = '🔓 承認制テーブル';
+        } else {
+            lockToggle.disabled = true;
+            lockToggle.checked = false;
+            lockLabel.classList.add('lock-toggle-disabled');
+            if (lockText) lockText.textContent = '🔒 承認制テーブル（ログインで利用可）';
+        }
     } else {
         lockLabel.classList.add('hidden');
     }

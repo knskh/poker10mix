@@ -2453,6 +2453,15 @@ body {
 }
 .lock-toggle-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
 .lock-toggle-text { font-size: 14px; font-weight: 600; color: var(--text); }
+/* ゲスト時: 承認制トグルを無効表示 (ログインで利用可の案内) */
+.lock-toggle-label.lock-toggle-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.4);
+}
+.lock-toggle-label.lock-toggle-disabled input[type="checkbox"] { cursor: not-allowed; }
+.lock-toggle-label.lock-toggle-disabled .lock-toggle-text { color: var(--text-dim); }
 /* lobby-options: 縦に並べる (start chips → toggle) */
 .lobby-options {
     display: flex; flex-direction: column; align-items: stretch;
