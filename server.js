@@ -1807,51 +1807,6 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
-        case 'debug_session_records': {
-            // 一時的な診断: Supabase の session_records テーブルの状態を返す。
-            (async () => {
-                const out = {
-                    type: 'debug_sr_result',
-                    supabase_configured: !!supabase,
-                    in_memory_count: sessionRecords.length,
-                };
-                if (supabase) {
-                    try {
-                        const { data: selData, error } = await supabase
-                            .from('session_records')
-                            .select('*')
-                            .limit(3);
-                        out.table_reachable = !error;
-                        out.rows_returned = Array.isArray(selData) ? selData.length : null;
-                        out.error = error ? error.message : null;
-                    } catch (e) {
-                        out.table_reachable = false;
-                        out.error = e && e.message;
-                    }
-                    // ドライラン insert: 実際に書けるか・どんなエラーが出るか確認
-                    try {
-                        const testRow = {
-                            room_id: '__dbg', timestamp: new Date().toISOString(),
-                            hands_played: 0, game_types: [], participants: [],
-                        };
-                        const { error: insErr, status } = await supabase
-                            .from('session_records').insert(testRow);
-                        out.insert_ok = !insErr;
-                        out.insert_status = status;
-                        out.insert_error = insErr ? insErr.message : null;
-                        if (!insErr) {
-                            await supabase.from('session_records').delete().eq('room_id', '__dbg');
-                        }
-                    } catch (e) {
-                        out.insert_ok = false;
-                        out.insert_error = e && e.message;
-                    }
-                }
-                send(ws, out);
-            })();
-            break;
-        }
-
         case 'get_session_records': {
             // Return per-session records used by the 成績 modal.
             //   msg.roomId      → filter to a single table
