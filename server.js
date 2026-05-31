@@ -1865,6 +1865,10 @@ function handleMessage(ws, client, msg) {
 // Record session stats (profit, session count, game diversity) on room close.
 function recordSessionStats(room) {
     if (!room || !room.handsPlayed) return;
+    // 1セッション(=1ゲーム)につき1回だけ記録する。game_over と部屋削除の
+    // 両方から呼ばれるため、二重で生涯スタッツが加算されないようガードする。
+    if (room.statsRecorded) return;
+    room.statsRecorded = true;
     const startingChips = (room.settings && room.settings.startingChips) || 10000;
     const rebuys = room.totalRebuys || {};
     const participants = room.sessionParticipants || {};
@@ -2571,14 +2575,19 @@ function startGame(room) {
 
     room.game = game;
     room.playing = true;
-    // Session tracking (for session summary when room closes)
-    if (!room.sessionStart) room.sessionStart = Date.now();
-    if (room.handsPlayed == null) room.handsPlayed = 0;
+    // Session tracking: チップは startGame ごとにリセットされる (initialChips/
+    // totalRebuys を上で初期化) ため、「セッション = 1ゲーム」として集計も
+    // 毎回リセットする。これにより game_over 時点で当該ゲームの正確な収支を
+    // 記録できる。
+    room.sessionStart = Date.now();
+    room.handsPlayed = 0;
+    room.sessionGameIds = new Set();
+    room.statsRecorded = false; // game_over / 部屋削除での二重記録防止フラグ
     // Snapshot initial participants (name → avatar) so we can show avatars even
     // if a player leaves before the session ends.
-    if (!room.sessionParticipants) room.sessionParticipants = {};
+    room.sessionParticipants = {};
     for (const m of room.members) {
-        if (m.name && !room.sessionParticipants[m.name]) {
+        if (m.name) {
             room.sessionParticipants[m.name] = { avatar: m.avatar || null };
         }
     }
@@ -2703,6 +2712,11 @@ async function runGameLoop(room) {
         ranking,
     });
     broadcastRoomList();
+
+    // プレイ終了直後にセッション収支を記録する (チップは確定済み)。
+    // 以前は部屋が idle クローズする10分後にのみ記録していたため、
+    // 再デプロイ/スリープで記録が失われたり、反映が遅かった。
+    try { recordSessionStats(room); } catch (e) { console.warn('recordSessionStats (game_over) failed:', e && e.message); }
 }
 
 // ============================================
