@@ -1807,6 +1807,32 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'debug_session_records': {
+            // 一時的な診断: Supabase の session_records テーブルの状態を返す。
+            (async () => {
+                const out = {
+                    type: 'debug_sr_result',
+                    supabase_configured: !!supabase,
+                    in_memory_count: sessionRecords.length,
+                };
+                if (supabase) {
+                    try {
+                        const { count, error } = await supabase
+                            .from('session_records')
+                            .select('*', { count: 'exact', head: true });
+                        out.table_reachable = !error;
+                        out.supabase_count = count;
+                        out.error = error ? error.message : null;
+                    } catch (e) {
+                        out.table_reachable = false;
+                        out.error = e && e.message;
+                    }
+                }
+                send(ws, out);
+            })();
+            break;
+        }
+
         case 'get_session_records': {
             // Return per-session records used by the 成績 modal.
             //   msg.roomId      → filter to a single table
