@@ -642,7 +642,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPresetSettingsModal();
     setupFocusMode();
     setupAddTableModal();
-    setupBottomNav();
     setupResumePill();
 
     // Request notification permission
@@ -5569,61 +5568,6 @@ function hideTablePreview() {
 // ==========================================
 // Mobile bottom nav (Idea 3)
 // ==========================================
-function setupBottomNav() {
-    const nav = document.getElementById('mx-bottom-nav');
-    if (!nav) return;
-    const screen = document.getElementById('sns-screen');
-
-    // isMobile: only apply view-switching on narrow screens
-    const isMobile = () => window.innerWidth <= 768;
-
-    const setActive = (name) => {
-        nav.querySelectorAll('.mxbn-tab').forEach(b => {
-            b.classList.toggle('active', b.dataset.target === name);
-        });
-    };
-
-    // Switch the visible section on mobile (data-mb-view attribute drives CSS)
-    const switchMbView = (view) => {
-        if (screen) screen.setAttribute('data-mb-view', view);
-        // Scroll back to top when switching sections
-        window.scrollTo({ top: 0, behavior: 'instant' });
-    };
-
-    nav.querySelectorAll('.mxbn-tab').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const target = btn.dataset.target;
-            setActive(target);
-
-            if (target === 'play') {
-                if (isMobile()) {
-                    switchMbView('play');
-                } else {
-                    document.querySelector('#sns-screen .mx-play-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            } else if (target === 'cloud') {
-                if (isMobile()) {
-                    switchMbView('cloud');
-                } else {
-                    document.querySelector('#sns-screen .mx-cloud-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            } else if (target === 'history') {
-                if (typeof renderHandHistory === 'function') renderHandHistory('lobby-hand-history');
-                document.getElementById('history-modal')?.classList.remove('hidden');
-            } else if (target === 'online') {
-                if (typeof openChatModal === 'function') openChatModal();
-            } else if (target === 'me') {
-                // マイ: PC と同じハンバーガーメニュー (スタッツ/ハンド履歴/
-                // 成績/オンライン/ログアウト) を開く。モバイル専用の
-                // マイプロフィールパネルは廃止し、PCと内容を統一。
-                const headerMenu = document.getElementById('mx-header-menu');
-                if (headerMenu) headerMenu.classList.toggle('hidden');
-            }
-        });
-    });
-}
-
 function updateResumePill() {
     const pill = document.getElementById('mx-resume-pill');
     if (!pill) return;

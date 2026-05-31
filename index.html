@@ -6,7 +6,7 @@
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css?v=78">
-    <link rel="stylesheet" href="css/sns.css?v=13">
+    <link rel="stylesheet" href="css/sns.css?v=14">
 </head>
 <body>
     <div id="app">
@@ -67,7 +67,7 @@
         <div id="big-hand-feed" class="big-hand-feed hidden"></div>
 
         <!-- Main Screen (unified lobby + player cloud) -->
-        <div id="sns-screen" class="hidden" data-mb-view="play">
+        <div id="sns-screen" class="hidden">
             <!-- Top bar: avatar on the left, hamburger menu on the right -->
             <div class="mx-topbar">
                 <div class="mx-top-user" id="mx-top-user">
@@ -137,15 +137,6 @@
                 </div>
                 <svg id="player-cloud-main-svg" class="cp-cloud-svg" viewBox="0 0 360 320" preserveAspectRatio="xMidYMid meet"></svg>
             </div>
-
-            <!-- Mobile bottom nav -->
-            <nav id="mx-bottom-nav" class="mx-bottom-nav" aria-label="メインナビ">
-                <button class="mxbn-tab active" data-target="play"><span class="mxbn-ic">🎰</span><span class="mxbn-label">プレイ</span></button>
-                <button class="mxbn-tab" data-target="cloud"><span class="mxbn-ic">☁️</span><span class="mxbn-label">クラウド</span></button>
-                <button class="mxbn-tab" data-target="history"><span class="mxbn-ic">📋</span><span class="mxbn-label">履歴</span></button>
-                <button class="mxbn-tab" data-target="online"><span class="mxbn-ic">👥</span><span class="mxbn-label">オンライン</span></button>
-                <button class="mxbn-tab" data-target="me"><span class="mxbn-ic">👤</span><span class="mxbn-label">マイ</span></button>
-            </nav>
 
         </div>
 
@@ -488,7 +479,7 @@
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=83"></script>
+    <script src="js/app.js?v=84"></script>
 
 </body>
 </html>

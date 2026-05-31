@@ -1004,62 +1004,10 @@ body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
 }
 .mx-preview-footer.locked { color: #a86a1f; }
 
-/* ==========================================
-   Mobile bottom nav (Idea 3)
-   ========================================== */
-.mx-bottom-nav { display: none; }
-
-@media (max-width: 768px) {
-    #sns-screen .mx-bottom-nav {
-        display: flex;
-        position: fixed; left: 0; right: 0; bottom: 0;
-        background: rgba(255,255,255,0.97);
-        -webkit-backdrop-filter: saturate(180%) blur(10px);
-        backdrop-filter: saturate(180%) blur(10px);
-        border-top: 1px solid #EAF0F9;
-        padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
-        z-index: 90;
-        box-shadow: 0 -2px 10px rgba(23,32,46,0.06);
-    }
-    #sns-screen .mxbn-tab {
-        flex: 1; background: transparent; border: 0;
-        display: flex; flex-direction: column; align-items: center; gap: 2px;
-        padding: 4px 2px; cursor: pointer;
-        color: #8794A8; font-family: inherit;
-        transition: color .12s;
-    }
-    #sns-screen .mxbn-tab.active { color: #2A6BC9; }
-    #sns-screen .mxbn-tab:hover { color: #2A6BC9; }
-    #sns-screen .mxbn-ic { font-size: 20px; line-height: 1; }
-    #sns-screen .mxbn-label { font-size: 10px; font-weight: 600; line-height: 1; }
-    /* Hamburger button stays hidden on mobile — the "マイ" bottom-nav tab
-       opens the same dropdown menu (PC と同一内容). */
-    #sns-screen #btn-mx-hamburger { display: none; }
-    /* Reserve space so content isn't hidden behind the nav */
-    #sns-screen { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
-
-    /* ---- View switching: show only the active section ---- */
-    /* play view (default) */
-    #sns-screen[data-mb-view="play"] .mx-cloud-wrap { display: none; }
-
-    /* cloud view */
-    #sns-screen[data-mb-view="cloud"] .mx-play-rail  { display: none; }
-    #sns-screen[data-mb-view="cloud"] .mx-resume-pill { display: none; }
-    #sns-screen[data-mb-view="cloud"] .mx-chat-wrap  { display: none; }
-
-    /* ---- マイ tab opens the hamburger menu; on mobile float it above the
-       bottom nav (bottom-right) so it appears near the tapped tab instead
-       of the top-right corner. ---- */
-    #sns-screen #mx-header-menu {
-        position: fixed;
-        top: auto;
-        bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-        right: 10px;
-        left: auto;
-        min-width: 200px;
-        z-index: 95;
-    }
-}
+/* ロビー画面はスマホでも PC と同じ縦積みレイアウトで全セクションを表示
+   する。専用のボトムナビ/ビュー切替は廃止し、トップバーのハンバーガー
+   メニュー (PCと同一) で操作する。 */
+.mx-bottom-nav { display: none !important; }
 
 /* Resume pill (shown on sns-screen when user has open tables) */
 .mx-resume-pill {
