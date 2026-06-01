@@ -1,4 +1,46 @@
 ﻿// js/app.js - Multiplayer Application Controller
+//
+// ==========================================================================
+//  目次 (TABLE OF CONTENTS)
+// --------------------------------------------------------------------------
+//  各セクションは「// ===」見出しで区切られています。下記の英語見出し名
+//  (例: "Game Screen", "Player Cloud") でファイル内を検索 (Ctrl/Cmd+F)
+//  すると、その節へジャンプできます。
+//  ※ 行番号は編集でずれるため、あえて記載していません (見出し名で検索)。
+//
+//   1. Avatar System ................ アバター選択
+//   2. Sound System (Web Audio API) . 効果音 (yourTurn / yourDraw / gameChange)
+//   3. Multi-Table Management ....... 複数卓 (tables Map / タブ / 切替)
+//   4. Add Table Modal .............. 卓追加モーダル
+//   5. Player Notes (localStorage) .. プレイヤーメモ
+//   6. Bet Preset Settings .......... ベットプリセット設定
+//   7. Screen Management ............ 画面切替 (showScreen)
+//   8. Login Screen ................. ゲスト/アカウントのログイン画面
+//   9. Account Login / Register ..... アカウント認証・welcome-back・成績/退室
+//  10. Global (ex-Lobby) setup ...... ヘッダ/メニュー配線
+//  11. Room Screen ................. 待機ルーム (renderRoom / 承認制トグル)
+//  12. Join Pending Overlay ........ 参加リクエスト待機
+//  13. Join Request Notification ... ホスト側の参加承認通知
+//  14. Game Screen ................. ゲーム卓本体・アクション・通知
+//  15. Replay ...................... ハンドリプレイ共有 (URLトークン化)
+//  16. Pre-action system ........... 先行アクション (チェック/フォールド等)
+//  17. 成績 (Results) Modal ........ 全体/日付別/月別/テーブル別
+//  18. Stats Graph ................. スタッツ・グラフ
+//  19. Chat ........................ 卓内チャット・クイックチャット
+//  20. Online User List ............ オンラインユーザー一覧モーダル
+//  21. Showdown Reaction Bar ....... ショーダウンのリアクション
+//  22. Lobby Big Hand Feed ......... 大物ハンドの通知フィード
+//  23. Chip Animation System ....... チップ移動アニメ
+//  24. Game Change Overlay + Banner  ゲーム切替演出
+//  25. Ripple effect + vibration ... アクションボタンの触覚/波紋
+//  26. Side Panel (chat / log) ..... 横/下のチャット・ログパネル
+//  27. SNS (mixi-style) Screen ..... メイン画面 (ロビー)
+//  28. Lobby Chat .................. ロビーチャット
+//  29. Table preview popover ....... 卓プレビュー
+//  30. セッション収支モーダル ...... 退室時の自分の収支表示
+//  31. Player Cloud ................ プレイヤークラウド描画
+// ==========================================================================
+
 const client = new PokerClient();
 const ui = new PokerUI();
 
@@ -2677,7 +2719,9 @@ function getActionClass(log) {
     return '';
 }
 
-// ==================== REPLAY ====================
+// ==========================================
+// Replay (ハンドリプレイ共有)
+// ==========================================
 // ログのトークン化テーブル。共有URLを短くするため、頻出する日本語の
 // アクション語・ラウンド見出しを '~' 始まりの短いコードに置換する。
 // '~' は名前(NAME_RE)・カード・数値・ログ装飾のいずれにも出現しないため
@@ -5590,9 +5634,6 @@ function hideTablePreview() {
 }
 
 // ==========================================
-// Mobile bottom nav (Idea 3)
-// ==========================================
-// ==========================================
 // セッション収支モーダル (退室時に表示)
 // ==========================================
 let _sessionResultQueue = [];
@@ -5805,7 +5846,9 @@ function closeOnlineUsersModal() {
 function openChatModal()   { openOnlineUsersModal(); }
 function switchChatTab()   { /* no-op */ }
 
-// ---- プレイヤークラウド描画 (メイン画面用) ----
+// ==========================================
+// Player Cloud (プレイヤークラウド描画)
+// ==========================================
 function renderPlayerCloud(users) {
     const svg = document.getElementById('player-cloud-main-svg');
     if (!svg) return;
