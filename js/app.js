@@ -4151,21 +4151,32 @@ function renderParticipantList() {
     });
 }
 
-// 参加者スタッツ: 指定プレイヤーの詳細スタッツ (全体/ゲーム別/グラフ) を表示。
+// 参加者スタッツ: 指定プレイヤーの「現在プレイ中のゲーム」のスタッツのみ表示。
 function renderParticipantStat(name) {
     const container = document.getElementById('stats-table-container');
     if (!container) return;
     const saved = loadSavedStats();
     const c = saved[name];
+    const isMe = name === client.name;
+    const nameStyle = isMe ? ' style="color:var(--gold)"' : '';
+    // 現在プレイ中のゲームID
+    const gid = currentState ? currentState.gameId : null;
+    const gameLabel = (gid && GAME_NAMES[gid]) || (currentState && currentState.gameName) || '現在のゲーム';
+
     let html = '<div class="stats-toolbar"><button id="btn-ps-back" class="btn-small">← 参加者一覧へ戻る</button></div>';
-    if (c && c.hands > 0) {
-        const isMe = name === client.name;
-        html += renderPlayerStatsWithTabs(name, c, isMe ? ' style="color:var(--gold)"' : '', isMe);
+    const gs = (c && c.byGame && gid) ? c.byGame[gid] : null;
+    if (gs && gs.hands > 0) {
+        html += `<div class="stats-player-panel">`;
+        html += `<h3${nameStyle}>${escapeHtml(name)} — ${escapeHtml(gameLabel)} (${gs.hands}ハンド)</h3>`;
+        html += renderStatsTable(gs, isMe);
+        html += `</div>`;
     } else {
-        html += `<p style="color:var(--text-dim);padding:16px;">${escapeHtml(name)} のスタッツはまだありません（同卓したハンドが記録されると表示されます）。</p>`;
+        html += `<div class="stats-player-panel">`;
+        html += `<h3${nameStyle}>${escapeHtml(name)} — ${escapeHtml(gameLabel)}</h3>`;
+        html += `<p style="color:var(--text-dim);padding:16px;">このゲームのスタッツはまだありません（同卓したハンドが記録されると表示されます）。</p>`;
+        html += `</div>`;
     }
     container.innerHTML = html;
-    bindStatsEvents(container);
     document.getElementById('btn-ps-back')?.addEventListener('click', renderParticipantList);
 }
 
