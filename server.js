@@ -2292,8 +2292,12 @@ function handleDisconnect(client) {
                 if (replacedByNewConn) {
                     continue;
                 }
-                room.game.players[seat].connected = false;
-                room.game.players[seat].folded = true;
+                const dp = room.game.players[seat];
+                dp.connected = false;
+                // 切断保護: オールイン済みのプレイヤーはもう判断の余地が無いので
+                // 降ろさず、ショーダウンまでのポット権利を維持する。まだアクション
+                // が必要な(非オールインの)プレイヤーのみ自動フォールドする。
+                if (!dp.allIn) dp.folded = true;
                 if (!room.sitout) room.sitout = {};
                 room.sitout[seat] = true;
                 if (!room.sitoutTime) room.sitoutTime = {};

@@ -780,8 +780,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ctx) ctx.isMyTurn = true;
             renderTableTabs();
             if (myTurnOnActiveTable) {
-                // Queue switch — don't interrupt current action
+                // Queue switch — don't interrupt current action.
+                // 自動切替しないので、音とバックグラウンド通知で別卓の番に気づけるようにする。
                 if (!pendingSwitchQueue.includes(rid)) pendingSwitchQueue.push(rid);
+                sound.yourTurn();
+                notifyYourTurnBackground('別の卓');
             } else {
                 switchToTable(rid);
             }
@@ -798,6 +801,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTableTabs();
             if (myTurnOnActiveTable) {
                 if (!pendingSwitchQueue.includes(rid)) pendingSwitchQueue.push(rid);
+                sound.yourDraw();
+                notifyYourTurnBackground('別の卓');
             } else {
                 switchToTable(rid);
             }
@@ -2788,37 +2793,39 @@ function triggerTurnFlash() {
     flash.addEventListener('animationend', () => flash.classList.remove('flash-active'), { once: true });
 }
 
-function notifyYourTurn() {
-    // Turn flash effect
-    triggerTurnFlash();
-    // Title flash when tab is hidden
-    if (document.hidden) {
-        if (!titleFlashInterval) {
-            const orig = document.title;
-            let flip = false;
-            titleFlashInterval = setInterval(() => {
-                document.title = flip ? orig : '★ あなたの番です！';
-                flip = !flip;
-            }, 800);
-            // Stop flashing when tab becomes visible
-            const stopFlash = () => {
-                if (!document.hidden) {
-                    clearInterval(titleFlashInterval);
-                    titleFlashInterval = null;
-                    document.title = orig;
-                    document.removeEventListener('visibilitychange', stopFlash);
-                }
-            };
-            document.addEventListener('visibilitychange', stopFlash);
-        }
-        // Desktop notification
-        if (Notification.permission === 'granted') {
-            try {
-                const n = new Notification('mix-1', { body: 'あなたの番です！', icon: 'logos/logo.png', tag: 'your-turn' });
-                setTimeout(() => n.close(), 5000);
-            } catch (e) {}
-        }
+// タブ非表示時のバックグラウンド通知（タイトル点滅 + デスクトップ通知）。
+// label を渡すと「<label>: あなたの番です！」と表示し、どの卓かを伝える。
+function notifyYourTurnBackground(label) {
+    if (!document.hidden) return;
+    if (!titleFlashInterval) {
+        const orig = document.title;
+        let flip = false;
+        titleFlashInterval = setInterval(() => {
+            document.title = flip ? orig : '★ あなたの番です！';
+            flip = !flip;
+        }, 800);
+        const stopFlash = () => {
+            if (!document.hidden) {
+                clearInterval(titleFlashInterval);
+                titleFlashInterval = null;
+                document.title = orig;
+                document.removeEventListener('visibilitychange', stopFlash);
+            }
+        };
+        document.addEventListener('visibilitychange', stopFlash);
     }
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+            const body = label ? `${label}: あなたの番です！` : 'あなたの番です！';
+            const n = new Notification('mix-1', { body, icon: 'logos/logo.png', tag: 'your-turn' });
+            setTimeout(() => n.close(), 5000);
+        } catch (e) {}
+    }
+}
+
+function notifyYourTurn() {
+    triggerTurnFlash();          // 画面フラッシュ (アクティブ卓)
+    notifyYourTurnBackground();  // タブ非表示時のタイトル点滅 + デスクトップ通知
 }
 
 function onYourTurn(data) {
