@@ -3361,6 +3361,40 @@ body:not(.theme-classic):not(.theme-midnight) {
     .stat-value { color: #1d4ed8; }
     .stat-label { color: #475569; }
 
+    /* ---- スタッツのタブ (全体 / ゲーム別 / グラフ) ---- */
+    .stats-tab {
+        background: #eef2f8; color: #334155; border: 1px solid #c8d4e2;
+    }
+    .stats-tab:hover { background: #e2eaf3; color: #17202E; }
+    .stats-tab.active,
+    .stats-tab.active:hover {
+        background: #2A6BC9; color: #ffffff; border-color: #2A6BC9;
+    }
+
+    /* ---- グラフのフィルタ (ゲーム別 / 卓種類別 / ルーム別 ドロップダウン) ---- */
+    .stats-dropdown,
+    .graph-filters select {
+        background: #ffffff; color: #17202E; border: 1px solid #c8d4e2;
+    }
+    .stats-dropdown:focus,
+    .graph-filters select:focus {
+        border-color: #2A6BC9; box-shadow: 0 0 0 2px rgba(42,107,201,0.18);
+    }
+
+    /* ---- グラフ凡例 (チェックボックス) ----
+       線の色はそのままに、白モーダル上でも明るい色が読めるよう暗チップを敷く。
+       (グラフ canvas が暗色なので色味の対応も取れる) */
+    .graph-checkboxes { gap: 6px; }
+    .graph-cb-label {
+        background: #1e2633; padding: 4px 9px; border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* ---- グラフ下のサマリ ---- */
+    .graph-summary { color: #17202E; }
+    .graph-summary-label { color: #475569; opacity: 1; }
+    .graph-summary-value { color: #17202E; }
+
     /* ---- ハンド履歴 ---- */
     .hh-row {
         background: #f1f5f9;
