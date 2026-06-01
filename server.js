@@ -1278,6 +1278,8 @@ function handleMessage(ws, client, msg) {
                         if (room.sitout) delete room.sitout[seatIdx];
                         if (room.sitoutTime) delete room.sitoutTime[seatIdx];
                         if (room.consecutiveTimeouts) delete room.consecutiveTimeouts[seatIdx];
+                        // 復帰したので退室時スナップショットを無効化 (現在チップを使う)
+                        if (room.finalChipsByName) delete room.finalChipsByName[client.name];
                         for (const [cid, s] of Object.entries(room.seatMap)) {
                             const cidNum = parseInt(cid);
                             if (s === seatIdx && cidNum !== client.id) {
@@ -1915,10 +1917,15 @@ function recordSessionStats(room) {
         gameTypes: room.sessionGameIds ? Array.from(room.sessionGameIds) : [],
         participants: [],
     };
+    const finalSnapshot = room.finalChipsByName || {};
     for (const name of Object.keys(participants)) {
         const rebuyAmount = rebuys[name] || 0;
         const invested = startingChips + rebuyAmount;
-        const endChips = (name in finalByName) ? finalByName[name] : 0;
+        // 退室/切断時にスナップショットしたチップを最優先。無ければ現在の
+        // game.players のチップ。どちらも無い場合のみ 0 (本当に記録が無い)。
+        const endChips = (name in finalSnapshot) ? finalSnapshot[name]
+            : (name in finalByName) ? finalByName[name]
+            : 0;
         const diff = endChips - invested;
         sessionRecord.participants.push({
             name, profit: diff, invested, endChips, handsPlayed,
@@ -2214,6 +2221,15 @@ function leaveRoom(client, targetRoomId) {
     if (room.playing) {
         const seat = room.seatMap[client.id];
         if (seat !== undefined && room.game) {
+            // 退室時点のチップを記録しておく。退室後にこの席が途中参加者へ
+            // 再利用されると game.players から名前が消え、セッション収支計算で
+            // endChips が 0 扱い(全額損失)になってしまうため、スナップショットを
+            // 優先して使う (recordSessionStats 参照)。
+            const lp = room.game.players[seat];
+            if (lp && lp.name) {
+                if (!room.finalChipsByName) room.finalChipsByName = {};
+                room.finalChipsByName[lp.name] = lp.chips;
+            }
             room.game.players[seat].connected = false;
             room.game.players[seat].folded = true;
             if (room.missedHands) room.missedHands[seat] = 0;
@@ -2270,6 +2286,9 @@ function reattachPlayerToSeat(room, client, ws, seat) {
     if (room.consecutiveTimeouts) delete room.consecutiveTimeouts[seat];
     if (room.game && room.game.players[seat]) room.game.players[seat].connected = true;
     if (room.disconnectedPlayers) delete room.disconnectedPlayers[client.name];
+    // 復帰したのでプレイ中。退室時スナップショットは無効化し、最終的には
+    // 現在の game.players のチップが収支計算に使われるようにする。
+    if (room.finalChipsByName) delete room.finalChipsByName[client.name];
 }
 
 function handleDisconnect(client) {
@@ -2307,6 +2326,11 @@ function handleDisconnect(client) {
                     continue;
                 }
                 const dp = room.game.players[seat];
+                // 切断時点のチップを記録 (席が再利用されても収支計算で使えるように)
+                if (dp && dp.name) {
+                    if (!room.finalChipsByName) room.finalChipsByName = {};
+                    room.finalChipsByName[dp.name] = dp.chips;
+                }
                 dp.connected = false;
                 // 切断保護: オールイン済みのプレイヤーはもう判断の余地が無いので
                 // 降ろさず、ショーダウンまでのポット権利を維持する。まだアクション
@@ -2652,6 +2676,7 @@ function startGame(room) {
     room.handsPlayed = 0;
     room.sessionGameIds = new Set();
     room.statsRecorded = false; // game_over / 部屋削除での二重記録防止フラグ
+    room.finalChipsByName = {}; // 退室/切断時のチップスナップショット (収支計算用)
     // Snapshot initial participants (name → avatar) so we can show avatars even
     // if a player leaves before the session ends.
     room.sessionParticipants = {};
