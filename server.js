@@ -902,7 +902,17 @@ function broadcastToRoom(room, data) {
     for (const m of room.members) send(m.ws, tagged);
 }
 
+// ロビー全体ブロードキャストは多くのイベントから呼ばれ、同一tick内に複数回
+// 呼ばれることが多い。ペイロード生成と全クライアント送信を都度行うのは無駄
+// なので、同一tick(次のマイクロタスク)で1回にまとめて実行する。クライアントが
+// 受け取る内容は変わらず、冗長な再生成・送信だけを削減する。
+let _roomListScheduled = false;
 function broadcastRoomList() {
+    if (_roomListScheduled) return;
+    _roomListScheduled = true;
+    queueMicrotask(() => { _roomListScheduled = false; _broadcastRoomListNow(); });
+}
+function _broadcastRoomListNow() {
     const list = [...rooms.values()].map(r => ({
         id: r.id,
         hostName: r.members[0]?.name || r.hostName || '???',
@@ -915,12 +925,17 @@ function broadcastRoomList() {
         // Small member preview — avatars/names only, capped by table size.
         members: r.members.slice(0, 6).map(m => ({ name: m.name, avatar: m.avatar || null }))
     }));
-    for (const [ws] of clients) {
-        send(ws, { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size });
-    }
+    const payload = { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size };
+    for (const [ws] of clients) send(ws, payload);
 }
 
+let _onlineUsersScheduled = false;
 function broadcastOnlineUsers() {
+    if (_onlineUsersScheduled) return;
+    _onlineUsersScheduled = true;
+    queueMicrotask(() => { _onlineUsersScheduled = false; _broadcastOnlineUsersNow(); });
+}
+function _broadcastOnlineUsersNow() {
     const users = [];
     for (const [, c] of clients) {
         if (c.name.startsWith('Player') && !c.avatar) continue; // skip unnamed clients
@@ -929,9 +944,8 @@ function broadcastOnlineUsers() {
         else if (c.roomIds.length > 0) status = 'playing';
         users.push({ name: c.name, avatar: c.avatar || null, status, isGuest: !!c.isGuest });
     }
-    for (const [ws] of clients) {
-        send(ws, { type: 'online_users', users });
-    }
+    const payload = { type: 'online_users', users };
+    for (const [ws] of clients) send(ws, payload);
 }
 
 function broadcastRoomUpdate(room) {
