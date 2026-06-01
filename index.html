@@ -6,7 +6,7 @@
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css?v=79">
-    <link rel="stylesheet" href="css/sns.css?v=14">
+    <link rel="stylesheet" href="css/sns.css?v=15">
 </head>
 <body>
     <div id="app">
@@ -99,6 +99,19 @@
                             <button id="mx-btn-join-id" class="mx-action-btn mx-secondary">参加</button>
                         </div>
                         <button id="mx-btn-refresh" class="mx-action-btn mx-secondary" title="更新">🔄</button>
+                    </div>
+                </div>
+                <!-- Table search + filters -->
+                <div class="mx-search-bar">
+                    <div class="mx-search-input-wrap">
+                        <span class="mx-search-icon">🔍</span>
+                        <input type="text" id="mx-table-search" placeholder="ID・ホスト名・ゲームで検索" autocomplete="off">
+                        <button id="mx-search-clear" class="mx-search-clear hidden" title="クリア">✕</button>
+                    </div>
+                    <div class="mx-filter-chips">
+                        <button class="mx-chip" data-filter="vacant">空席あり</button>
+                        <button class="mx-chip" data-filter="waiting">待機中のみ</button>
+                        <button class="mx-chip" data-filter="open">承認制を除く</button>
                     </div>
                 </div>
                 <div class="mx-rail" id="mx-rail"></div>
@@ -479,7 +492,7 @@
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=88"></script>
+    <script src="js/app.js?v=89"></script>
 
 </body>
 </html>

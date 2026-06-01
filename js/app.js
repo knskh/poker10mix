@@ -5451,24 +5451,57 @@ function updateSNSCTACounts() {
     }
 }
 
+// テーブル検索/フィルタの状態 (クライアント側のみ)
+const tableFilter = { q: '', vacant: false, waiting: false, open: false };
+
+// 検索語・フィルタチップで卓一覧を絞り込む。
+function applyTableFilter(rooms) {
+    let list = rooms || [];
+    const q = tableFilter.q.trim().toLowerCase();
+    if (q) {
+        list = list.filter(r => {
+            const gameName = r.gameName ||
+                (r.mergedGames && r.mergedGames[0] != null && GAME_LIST && GAME_LIST[r.mergedGames[0]]
+                    ? GAME_LIST[r.mergedGames[0]].shortName : '') || '';
+            return (
+                (r.id || '').toLowerCase().includes(q) ||
+                (r.hostName || '').toLowerCase().includes(q) ||
+                gameName.toLowerCase().includes(q)
+            );
+        });
+    }
+    if (tableFilter.vacant)  list = list.filter(r => r.playerCount < 6);
+    if (tableFilter.waiting) list = list.filter(r => !r.playing);
+    if (tableFilter.open)    list = list.filter(r => !r.locked);
+    return list;
+}
+
 function renderRailRooms(rooms) {
     const rail = document.getElementById('mx-rail');
     if (!rail) return;
     rail.innerHTML = '';
-    if (!rooms || rooms.length === 0) {
+    // 検索/フィルタを適用 (元の rooms は window.lastRoomList のまま保持)
+    const filtered = applyTableFilter(rooms);
+    const hasFilter = !!(tableFilter.q || tableFilter.vacant || tableFilter.waiting || tableFilter.open);
+    if (!filtered || filtered.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'mx-rail-empty';
-        empty.textContent = '参加できる卓がありません。作成しましょう！';
+        // フィルタで0件なのか、そもそも卓が無いのかで文言を変える
+        empty.textContent = hasFilter
+            ? '条件に合う卓がありません'
+            : '参加できる卓がありません。作成しましょう！';
         rail.appendChild(empty);
-        // Add button
-        const addBtn = document.createElement('div');
-        addBtn.className = 'mx-rail-add';
-        addBtn.textContent = '＋ 新規ルーム';
-        addBtn.addEventListener('click', () => client.createRoom());
-        rail.appendChild(addBtn);
+        // Add button (フィルタ中は出さない — 誤解を避ける)
+        if (!hasFilter) {
+            const addBtn = document.createElement('div');
+            addBtn.className = 'mx-rail-add';
+            addBtn.textContent = '＋ 新規ルーム';
+            addBtn.addEventListener('click', () => client.createRoom());
+            rail.appendChild(addBtn);
+        }
         return;
     }
-    for (const r of rooms) {
+    for (const r of filtered) {
         const canJoin = r.playerCount < 6;
         const card = document.createElement('div');
         card.className = 'mx-rail-card' + (canJoin ? '' : ' is-full');
@@ -5756,6 +5789,34 @@ function setupSNSEvents() {
             if (e.key === 'Enter') btnJoinId.click();
         });
     }
+
+    // テーブル検索 + フィルタチップ (クライアント側で window.lastRoomList を絞り込む)
+    const searchInput = document.getElementById('mx-table-search');
+    const searchClear = document.getElementById('mx-search-clear');
+    const rerenderRail = () => renderRailRooms(window.lastRoomList || []);
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            tableFilter.q = searchInput.value;
+            if (searchClear) searchClear.classList.toggle('hidden', !searchInput.value);
+            rerenderRail();
+        });
+    }
+    if (searchClear) {
+        searchClear.addEventListener('click', () => {
+            tableFilter.q = '';
+            if (searchInput) searchInput.value = '';
+            searchClear.classList.add('hidden');
+            rerenderRail();
+        });
+    }
+    document.querySelectorAll('.mx-filter-chips .mx-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const key = chip.dataset.filter;
+            tableFilter[key] = !tableFilter[key];
+            chip.classList.toggle('active', tableFilter[key]);
+            rerenderRail();
+        });
+    });
 
     // Room picker modal (legacy, still available via direct call)
     const btnRpClose = document.getElementById('btn-rp-close');

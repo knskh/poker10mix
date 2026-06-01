@@ -174,6 +174,47 @@
     #sns-screen .mx-win-amount { font-size: 19px; }
 }
 
+/* ---- Table search + filters (play rail) ---- */
+#sns-screen .mx-search-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin: 8px 2px 10px;
+}
+#sns-screen .mx-search-input-wrap {
+    position: relative; flex: 1; min-width: 180px;
+}
+#sns-screen .mx-search-icon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; opacity: 0.6; pointer-events: none;
+}
+#sns-screen #mx-table-search {
+    width: 100%; box-sizing: border-box;
+    padding: 8px 30px 8px 30px; font-size: 13px;
+    border: 1px solid #c8d4e2; border-radius: 8px;
+    background: #fff; color: #17202E; outline: none;
+    font-family: inherit;
+}
+#sns-screen #mx-table-search:focus {
+    border-color: #2A6BC9; box-shadow: 0 0 0 2px rgba(42,107,201,0.18);
+}
+#sns-screen .mx-search-clear {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px; border: none; border-radius: 50%;
+    background: #e2e8f0; color: #475569; font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+#sns-screen .mx-search-clear:hover { background: #cbd5e1; }
+#sns-screen .mx-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+#sns-screen .mx-chip {
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    border: 1px solid #c8d4e2; border-radius: 999px;
+    background: #fff; color: #4a5568; cursor: pointer;
+    font-family: inherit; transition: background .12s, border-color .12s, color .12s;
+}
+#sns-screen .mx-chip:hover { border-color: #2A6BC9; color: #2A6BC9; }
+#sns-screen .mx-chip.active {
+    background: #2A6BC9; border-color: #2A6BC9; color: #fff;
+}
+
 /* ---- Lobby Chat (main screen) ---- */
 #sns-screen .mx-chat-wrap {
     max-width: 640px; margin: 0 auto;
