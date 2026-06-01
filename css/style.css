@@ -2439,6 +2439,45 @@ body {
 
 /* Lock Toggle */
 /* ==========================================
+   現在収支モーダル (in-game)
+   ========================================== */
+.standings-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    padding: 20px;
+}
+.standings-overlay:not(.hidden) { display: flex; animation: modal-fade-in 0.2s ease-out; }
+.standings-inner {
+    background: #ffffff; color: #17202E;
+    border-radius: 16px; padding: 20px 22px;
+    width: 100%; max-width: 380px;
+    max-height: 80vh; overflow-y: auto;
+    box-shadow: 0 16px 48px rgba(15,23,42,0.35);
+    animation: modal-scale-in 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+.standings-inner h2 { font-size: 18px; color: #0f172a; margin-bottom: 4px; text-align: center; }
+.standings-sub { font-size: 12px; color: #64748b; margin-bottom: 14px; text-align: center; }
+.standings-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.standings-inner .btn-small { display: block; width: 100%; color: #64748b; }
+/* 成績モーダルの行スタイルを流用するが、本モーダルは常に白背景のため
+   テーマに依存しない色を明示しておく。 */
+.standings-inner .results-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: #f8fafc;
+    border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px;
+}
+.standings-inner .results-row-key  { font-weight: 600; color: #17202E; }
+.standings-inner .results-row-meta { font-size: 11px; color: #64748b; margin-left: 8px; }
+.standings-inner .results-row-val  { font-weight: 700; min-width: 84px; text-align: right; }
+.standings-inner .results-row-val.plus  { color: #15803d; }
+.standings-inner .results-row-val.minus { color: #b91c1c; }
+.standings-inner .results-row-val.zero  { color: #64748b; }
+.standings-inner .results-row-self { outline: 2px solid #2A6BC9; }
+.standings-inner .results-empty { color: #64748b; padding: 16px; text-align: center; }
+
+/* ==========================================
    チップ追加モーダル (in-game)
    ========================================== */
 .add-chips-overlay {

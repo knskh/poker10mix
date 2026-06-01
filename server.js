@@ -1829,6 +1829,46 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'get_current_standings': {
+            // 現時点の参加者全員の収支を返す。
+            //   収支 = 現在チップ - (各自の買い込み initialChips + リバイ累計)
+            // 退室済みプレイヤーは finalChipsByName のスナップショットを使う。
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room) break;
+            const startingChips = (room.settings && room.settings.startingChips) || 10000;
+            const rebuys = room.totalRebuys || {};
+            const initial = room.initialChips || {};
+            const participants = room.sessionParticipants || {};
+            const finalSnap = room.finalChipsByName || {};
+            const liveByName = {};
+            if (room.game && room.game.players) {
+                for (const p of room.game.players) if (p.name) liveByName[p.name] = p.chips;
+            }
+            const standings = [];
+            for (const name of Object.keys(participants)) {
+                const invested = (initial[name] != null ? initial[name] : startingChips) + (rebuys[name] || 0);
+                const cur = (name in liveByName) ? liveByName[name]
+                    : (name in finalSnap) ? finalSnap[name]
+                    : 0;
+                standings.push({
+                    name,
+                    profit: cur - invested,
+                    chips: cur,
+                    invested,
+                    left: !(name in liveByName), // 退室済みフラグ (表示用)
+                });
+            }
+            standings.sort((a, b) => b.profit - a.profit);
+            send(ws, {
+                type: 'current_standings',
+                roomId: room.id,
+                handsPlayed: room.handsPlayed || 0,
+                myName: client.name,
+                standings,
+            });
+            break;
+        }
+
         case 'get_rooms':
             broadcastRoomList();
             break;

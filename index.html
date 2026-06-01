@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=80">
+    <link rel="stylesheet" href="css/style.css?v=81">
     <link rel="stylesheet" href="css/sns.css?v=15">
 </head>
 <body>
@@ -277,6 +277,16 @@
             </div>
         </div>
 
+        <!-- Current Standings Modal (in-game) -->
+        <div id="standings-modal" class="standings-overlay hidden">
+            <div class="standings-inner">
+                <h2>📈 現在収支</h2>
+                <p class="standings-sub" id="standings-sub"></p>
+                <div id="standings-list" class="standings-list"></div>
+                <button id="btn-standings-close" class="btn-small">閉じる</button>
+            </div>
+        </div>
+
         <!-- Hand History Modal -->
         <div id="history-modal" class="zoom-sitout-overlay hidden">
             <div class="zoom-sitout-inner">
@@ -317,6 +327,7 @@
                     <button id="btn-hamburger" class="btn-tiny" title="メニュー">☰</button>
                     <div id="top-bar-menu" class="hidden">
                         <button id="btn-ingame-stats" class="menu-item">📊 Stats</button>
+                        <button id="btn-current-standings" class="menu-item">📈 現在収支</button>
                         <button id="btn-add-chips" class="menu-item">💰 チップ追加</button>
                         <button id="btn-back-room" class="menu-item">🚪 退出予約</button>
                         <button id="btn-zoom-sitout" class="menu-item">💤 離席予約</button>
@@ -505,11 +516,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=9"></script>
+    <script src="js/client.js?v=10"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=91"></script>
+    <script src="js/app.js?v=92"></script>
 
 </body>
 </html>

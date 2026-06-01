@@ -784,6 +784,10 @@ document.addEventListener('DOMContentLoaded', () => {
     client.on('session_result', (result) => {
         if (result) showSessionResult(result);
     });
+    // 現在収支: 参加者全員の現時点の収支を表示
+    client.on('current_standings', (data) => {
+        if (data) renderCurrentStandings(data);
+    });
     client.on('game_started', (msg) => {
         const rid = msg.roomId;
         if (rid && rid !== activeTableId) {
@@ -1788,6 +1792,17 @@ function setupGameScreen() {
         client.getStats(activeTableId);
         document.getElementById('stats-modal').classList.remove('hidden');
     });
+
+    // 現在収支メニュー → サーバーに要求してモーダル表示
+    const standingsBtn = document.getElementById('btn-current-standings');
+    if (standingsBtn) {
+        standingsBtn.addEventListener('click', () => client.getCurrentStandings(activeTableId));
+    }
+    const standingsModal = document.getElementById('standings-modal');
+    if (standingsModal) {
+        document.getElementById('btn-standings-close')?.addEventListener('click', () => standingsModal.classList.add('hidden'));
+        standingsModal.addEventListener('click', (e) => { if (e.target === standingsModal) standingsModal.classList.add('hidden'); });
+    }
 
     // チップ追加メニュー → モーダルを開く
     const addChipsModal = document.getElementById('add-chips-modal');
@@ -5703,6 +5718,39 @@ function hideTablePreview() {
     if (!pop) return;
     pop.classList.add('hidden');
     _previewActiveCard = null;
+}
+
+// ==========================================
+// 現在収支モーダル (テーブル内メニュー)
+// ==========================================
+function renderCurrentStandings(data) {
+    const modal = document.getElementById('standings-modal');
+    const list = document.getElementById('standings-list');
+    const sub = document.getElementById('standings-sub');
+    if (!modal || !list) return;
+    const standings = data.standings || [];
+    const myName = data.myName || (client && client.name) || '';
+    if (sub) sub.textContent = `テーブル ${data.roomId || ''} ・ ${data.handsPlayed || 0} ハンド`;
+    if (standings.length === 0) {
+        list.innerHTML = '<div class="results-empty">まだ記録がありません</div>';
+    } else {
+        let html = '';
+        for (const s of standings) {
+            const profit = s.profit || 0;
+            const cls = profit > 0 ? 'plus' : profit < 0 ? 'minus' : 'zero';
+            const sign = profit > 0 ? '+' : '';
+            const isMe = myName && s.name === myName;
+            html += `<div class="results-row${isMe ? ' results-row-self' : ''}">
+                <span>
+                    <span class="results-row-key">${escapeHtml(s.name)}${isMe ? ' <small>(自分)</small>' : ''}${s.left ? ' <small>(退室)</small>' : ''}</span>
+                    <span class="results-row-meta">所持 ${(s.chips||0).toLocaleString()}</span>
+                </span>
+                <span class="results-row-val ${cls}">${sign}${profit.toLocaleString()}</span>
+            </div>`;
+        }
+        list.innerHTML = html;
+    }
+    modal.classList.remove('hidden');
 }
 
 // ==========================================

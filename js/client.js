@@ -191,6 +191,9 @@ class PokerClient {
             case 'session_result':
                 this.emit('session_result', msg.result);
                 break;
+            case 'current_standings':
+                this.emit('current_standings', msg);
+                break;
             case 'lobby_chat_history':
                 this.emit('lobby_chat_history', msg.messages || []);
                 break;
@@ -227,6 +230,7 @@ class PokerClient {
     leaveFromBust(roomId) { this.send({ type: 'leave_from_bust', roomId: roomId || this.roomId }); }
     endTableNow(roomId) { this.send({ type: 'end_table_now', roomId: roomId || this.roomId }); }
     getStats(roomId) { this.send({ type: 'get_stats', roomId: roomId || this.roomId }); }
+    getCurrentStandings(roomId) { this.send({ type: 'get_current_standings', roomId: roomId || this.roomId }); }
     getRooms() { this.send({ type: 'get_rooms' }); }
     getLobbyChat() { this.send({ type: 'get_lobby_chat' }); }
     sendLobbyChat(text) { this.send({ type: 'lobby_chat_send', text }); }
