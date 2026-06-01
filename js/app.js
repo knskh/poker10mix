@@ -6162,10 +6162,9 @@ function _renderPlayerCloudToSvg(svg, users) {
         txt.addEventListener('mouseenter', e => {
             let tt = document.getElementById('pc-tooltip-el');
             if (!tt) { tt = document.createElement('div'); tt.id = 'pc-tooltip-el'; tt.className = 'pc-tooltip'; document.body.appendChild(tt); }
-            const sign = s.profit >= 0 ? '+' : '';
             const onlineBadge = s.isOnline ? '<span class="pct-online">● オンライン</span>' : '<span class="pct-offline">○ オフライン</span>';
+            // 収支の具体的な数字は非公表 (文字サイズで相対的に示すのみ)。
             tt.innerHTML = `<div class="pct-name">${escapeHtml(s.name)} ${onlineBadge}</div>
-                <div class="pct-row"><span>収支</span><span class="pct-val">${sign}${s.profit.toLocaleString()}</span></div>
                 <div class="pct-row"><span>ゲーム多様性</span><span class="pct-val">${s.avgDiversity.toFixed(1)}</span></div>
                 <div class="pct-row"><span>ハンド数</span><span class="pct-val">${s.handCount}</span></div>`;
             tt.classList.add('show');
