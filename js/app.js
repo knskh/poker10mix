@@ -1791,12 +1791,6 @@ function setupGameScreen() {
         }
     });
 
-    // Stats button
-    document.getElementById('btn-ingame-stats').addEventListener('click', () => {
-        client.getStats(activeTableId);
-        document.getElementById('stats-modal').classList.remove('hidden');
-    });
-
     // 参加者スタッツ: 現在の参加者名一覧 → タップでそのプレイヤーのスタッツ
     document.getElementById('btn-participant-stats')?.addEventListener('click', () => {
         renderParticipantList();
