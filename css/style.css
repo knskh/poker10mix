@@ -2439,6 +2439,33 @@ body {
 
 /* Lock Toggle */
 /* ==========================================
+   参加者スタッツ 一覧 (in-game)
+   ========================================== */
+.ps-hint { font-size: 12px; color: var(--text-dim); margin: 4px 2px 10px; }
+.participant-stats-list { display: flex; flex-direction: column; gap: 6px; }
+.ps-name-row {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 12px 14px; font-size: 15px; font-weight: 600;
+    background: #2a2d35; color: var(--text);
+    border: 1px solid #3a3d45; border-radius: 8px;
+    cursor: pointer; font-family: inherit; text-align: left;
+    transition: background .12s, border-color .12s;
+}
+.ps-name-row:hover { background: #353a45; border-color: var(--accent); }
+.ps-name-row.ps-me { color: var(--gold); }
+.ps-arrow { font-size: 18px; color: var(--text-dim); }
+/* ライトテーマ: 白モーダル上で読みやすく */
+body:not(.theme-classic):not(.theme-midnight) .ps-name-row {
+    background: #f1f5f9; color: #17202E; border: 1px solid #d1d8e0;
+}
+body:not(.theme-classic):not(.theme-midnight) .ps-name-row:hover {
+    background: #e2eaf3; border-color: #2A6BC9;
+}
+body:not(.theme-classic):not(.theme-midnight) .ps-name-row.ps-me { color: #1d4ed8; }
+body:not(.theme-classic):not(.theme-midnight) .ps-arrow { color: #64748b; }
+body:not(.theme-classic):not(.theme-midnight) .ps-hint { color: #64748b; }
+
+/* ==========================================
    現在収支モーダル (in-game)
    ========================================== */
 .standings-overlay {

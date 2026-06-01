@@ -1797,6 +1797,12 @@ function setupGameScreen() {
         document.getElementById('stats-modal').classList.remove('hidden');
     });
 
+    // 参加者スタッツ: 現在の参加者名一覧 → タップでそのプレイヤーのスタッツ
+    document.getElementById('btn-participant-stats')?.addEventListener('click', () => {
+        renderParticipantList();
+        document.getElementById('stats-modal').classList.remove('hidden');
+    });
+
     // 現在収支メニュー → サーバーに要求してモーダル表示
     const standingsBtn = document.getElementById('btn-current-standings');
     if (standingsBtn) {
@@ -4117,6 +4123,50 @@ function renderStatsFromStorage() {
 
     container.innerHTML = html;
     bindStatsEvents(container);
+}
+
+// 参加者スタッツ: 現在卓の参加者名一覧を表示。名前タップで個別スタッツへ。
+function renderParticipantList() {
+    const container = document.getElementById('stats-table-container');
+    if (!container) return;
+    const players = (currentState && currentState.players) ? currentState.players : [];
+    const names = [];
+    for (const p of players) {
+        if (p && p.name && !names.includes(p.name)) names.push(p.name);
+    }
+    if (names.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim);padding:16px;">参加者がいません</p>';
+        return;
+    }
+    let html = '<p class="ps-hint">名前をタップしてスタッツを表示</p><div class="participant-stats-list">';
+    for (const name of names) {
+        const isMe = name === client.name;
+        html += `<button class="ps-name-row${isMe ? ' ps-me' : ''}" data-name="${escapeHtml(name)}">
+            <span>${escapeHtml(name)}${isMe ? ' (自分)' : ''}</span><span class="ps-arrow">›</span></button>`;
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    container.querySelectorAll('.ps-name-row').forEach(btn => {
+        btn.addEventListener('click', () => renderParticipantStat(btn.dataset.name));
+    });
+}
+
+// 参加者スタッツ: 指定プレイヤーの詳細スタッツ (全体/ゲーム別/グラフ) を表示。
+function renderParticipantStat(name) {
+    const container = document.getElementById('stats-table-container');
+    if (!container) return;
+    const saved = loadSavedStats();
+    const c = saved[name];
+    let html = '<div class="stats-toolbar"><button id="btn-ps-back" class="btn-small">← 参加者一覧へ戻る</button></div>';
+    if (c && c.hands > 0) {
+        const isMe = name === client.name;
+        html += renderPlayerStatsWithTabs(name, c, isMe ? ' style="color:var(--gold)"' : '', isMe);
+    } else {
+        html += `<p style="color:var(--text-dim);padding:16px;">${escapeHtml(name)} のスタッツはまだありません（同卓したハンドが記録されると表示されます）。</p>`;
+    }
+    container.innerHTML = html;
+    bindStatsEvents(container);
+    document.getElementById('btn-ps-back')?.addEventListener('click', renderParticipantList);
 }
 
 // Render search result for a specific player
