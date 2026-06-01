@@ -834,6 +834,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     client.on('your_turn', (msg) => {
         const rid = msg.roomId;
+        // ロビー滞在中なら自分の番で自動的に卓へ復帰 (案B)
+        maybeReturnFromLobbyForTurn(rid);
         if (rid && rid !== activeTableId) {
             const ctx = tables.get(rid);
             if (ctx) ctx.isMyTurn = true;
@@ -854,6 +856,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     client.on('your_draw', (msg) => {
         const rid = msg.roomId;
+        // ロビー滞在中なら自分の番(ドロー)で自動的に卓へ復帰 (案B)
+        maybeReturnFromLobbyForTurn(rid);
         if (rid && rid !== activeTableId) {
             const ctx = tables.get(rid);
             if (ctx) ctx.isMyTurn = true;
@@ -1842,6 +1846,13 @@ function setupGameScreen() {
             if (e.key === 'Enter') submitCustom();
         });
     }
+
+    // ロビーへ（席キープ）: 退出せずロビー画面を表示する。卓はサーバー上で
+    // 維持され、復帰ピル/タブで戻れる。自分の番が来たら自動で卓に戻る(下記)。
+    document.getElementById('btn-go-lobby')?.addEventListener('click', () => {
+        showScreen('sns');
+        showToast('ロビーに戻りました（席はキープ中。自分の番で自動的に卓へ戻ります）');
+    });
 
     // Back to room button — sends leave request. Server decides whether to
     // apply immediately or defer until hand end (leave_reserved response).
@@ -2937,6 +2948,19 @@ function notifyYourTurnBackground(label) {
 function notifyYourTurn() {
     triggerTurnFlash();          // 画面フラッシュ (アクティブ卓)
     notifyYourTurnBackground();  // タブ非表示時のタイトル点滅 + デスクトップ通知
+}
+
+// 「ロビーへ（席キープ）」でロビー表示中に自分の番が来たら、自動で卓へ復帰する。
+// (案B) フォールド事故を防ぐため。rid があればその卓へ、無ければ現在のactiveへ。
+function maybeReturnFromLobbyForTurn(rid) {
+    const gameScreen = document.getElementById('game-screen');
+    // すでにゲーム画面を見ている / 着席卓が無い場合は何もしない
+    if (!gameScreen || !gameScreen.classList.contains('hidden')) return;
+    if (typeof tables === 'undefined' || !tables || tables.size === 0) return;
+    const target = (rid && tables.has(rid)) ? rid : activeTableId;
+    showScreen('game');
+    if (target && target !== activeTableId) switchToTable(target);
+    showToast('自分の番になったため卓に戻りました');
 }
 
 function onYourTurn(data) {
