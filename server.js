@@ -1037,6 +1037,7 @@ function getStateForPlayer(game, room, playerSeat) {
                     ? Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - room.bustedAt[i])) / 1000))
                     : null,
                 pendingRejoin: !!(room.pendingRejoin && room.pendingRejoin[i]),
+                awaitingBB: !!(room.awaitingBB && room.awaitingBB[i]),
                 hand: showCards ? p.hand : [],
                 upCards: gc.type === 'stud' ? p.upCards : [],
                 downCards: (isMe && gc.type === 'stud') ? p.downCards : [],
@@ -1718,9 +1719,11 @@ function handleMessage(ws, client, msg) {
                 room.sitout[seat] = false;
                 delete room.sitoutTime[seat];
                 room.consecutiveTimeouts[seat] = 0;
-                if (!room.pendingRejoin) room.pendingRejoin = {};
-                room.pendingRejoin[seat] = true;
-                broadcastLog(room, `${client.name} が次のハンドから復帰します`, 'important');
+                // 案2: ブラインド回避防止のため、すぐには配牌せず「自分がBBに
+                // なるハンド」まで待ってから復帰する。
+                if (!room.awaitingBB) room.awaitingBB = {};
+                room.awaitingBB[seat] = true;
+                broadcastLog(room, `${client.name} は次に自分がBBになるハンドで復帰します（ブラインド支払いで参加）`, 'important');
                 broadcastGameState(room);
             }
             break;
@@ -2361,6 +2364,7 @@ function leaveRoom(client, targetRoomId) {
                 p.resolve({ type: 'fold' });
             }
         }
+        if (room.awaitingBB) delete room.awaitingBB[seat];
         delete room.seatMap[client.id];
     }
 
@@ -2648,6 +2652,27 @@ function startGame(room) {
             }
         });
 
+        // 案2: 離席から復帰したプレイヤーは、自分の席がBBになるハンドまで
+        // 配牌しない (BBを跨いで復帰=ブラインド回避を防ぐ)。
+        // この時点で sitout 折りは済んでおり、awaitingBB のプレイヤーはまだ
+        // !folded なので、現在の active からBB席を求めて判定する。
+        if (room.awaitingBB && Object.keys(room.awaitingBB).some(k => room.awaitingBB[k])) {
+            let bbSeat = -1;
+            try { bbSeat = game.getBigBlindSeat(); } catch {}
+            game.players.forEach((p, seat) => {
+                if (!room.awaitingBB[seat]) return;
+                if (!p || p.chips <= 0) { delete room.awaitingBB[seat]; return; }
+                if (seat === bbSeat) {
+                    // BB が回ってきた → このハンドで復帰 (BBを支払う)
+                    delete room.awaitingBB[seat];
+                    broadcastLog(room, `${p.name} がBBを支払って復帰します`, 'important');
+                } else {
+                    // まだBBでない → このハンドは参加しない (配牌されない)
+                    p.folded = true;
+                }
+            });
+        }
+
         // Auto-kick sitout players after 10 minutes
         const TEN_MINUTES = 10 * 60 * 1000;
         game.players.forEach((p, seat) => {
@@ -2795,6 +2820,7 @@ function startGame(room) {
     room.statsRecorded = false; // game_over / 部屋削除での二重記録防止フラグ
     room.finalChipsByName = {}; // 退室/切断時のチップスナップショット (収支計算用)
     room.pendingAddChips = {};  // ハンド中に予約されたチップ補充
+    room.awaitingBB = {};       // 離席復帰時のBB待ち (案2: ブラインド回避防止)
     // Snapshot initial participants (name → avatar) so we can show avatars even
     // if a player leaves before the session ends.
     room.sessionParticipants = {};

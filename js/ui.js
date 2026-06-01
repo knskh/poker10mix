@@ -433,9 +433,11 @@ class PokerUI {
         nameDiv.className = 'seat-name';
         nameDiv.style.cursor = 'pointer';
         const noteIcon = (typeof hasPlayerNote === 'function' && hasPlayerNote(p.name)) ? ' 📝' : '';
-        const statusTag = p.pendingRejoin ? ' [復帰待ち]' : (!p.connected ? ' [離席]' : '');
+        const statusTag = p.awaitingBB ? ' [BB待ち]'
+            : p.pendingRejoin ? ' [復帰待ち]'
+            : (!p.connected ? ' [離席]' : '');
         nameDiv.textContent = p.name + (isMe ? ' (自分)' : '') + statusTag + noteIcon;
-        if (p.pendingRejoin) nameDiv.classList.add('seat-name-rejoin');
+        if (p.pendingRejoin || p.awaitingBB) nameDiv.classList.add('seat-name-rejoin');
         const playerData = p;
         const gameState = s;
         const seatIdx = idx;
@@ -446,7 +448,12 @@ class PokerUI {
         el.appendChild(nameDiv);
 
         // Sitout countdown badge or pending rejoin badge (visible to all players)
-        if (p.pendingRejoin) {
+        if (p.awaitingBB) {
+            const badge = document.createElement('div');
+            badge.className = 'sitout-timer-badge sitout-timer-rejoin';
+            badge.textContent = 'BB待ち';
+            el.appendChild(badge);
+        } else if (p.pendingRejoin) {
             const badge = document.createElement('div');
             badge.className = 'sitout-timer-badge sitout-timer-rejoin';
             badge.textContent = '✓ 復帰';
