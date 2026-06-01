@@ -1655,61 +1655,26 @@ function handleMessage(ws, client, msg) {
 
         case 'add_chips': {
             // メニューからのチップ追加。
-            //  - msg.target が指定されていれば「その額まで補充」(不足分を追加)。
-            //    プリセット「10,000 に補充」で使用。
-            //  - それ以外は msg.amount を加算 (任意の数値入力)。
-            //  - 現在チップが ADD_CHIPS_GATE(10001) 以下のときのみ使用可。
-            //  - 追加後の合計は ADD_CHIPS_MAX_TOTAL(15000) を超えない。
-            const ADD_CHIPS_GATE = 10001;
-            const ADD_CHIPS_MAX_TOTAL = 15000;
+            //  - msg.target 指定で「その額まで補充」(プリセット)、なければ msg.amount を加算。
+            //  - フォールド中(ハンド間/不参加)は即時適用。
+            //  - ハンド中(まだ参加中)は予約し、ハンド終了時に適用する。
             const room = rooms.get(msg.roomId || client.roomId);
             if (!room || !room.game) break;
             const seat = room.seatMap[client.id];
             if (seat === undefined) break;
             const p = room.game.players[seat];
-            // ハンド中の不正なスタック操作を防ぐため、フォールド中(=現在のハンドに
-            // 参加していない / ハンド間)のみ追加を許可する。
-            if (!p.folded) {
-                send(ws, { type: 'error', message: 'ハンド中はチップを追加できません。次のハンド開始前（フォールド後など）に追加してください。' });
-                break;
-            }
-            const cur = p.chips;
-            // チップが十分にある場合は使用不可
-            if (cur > ADD_CHIPS_GATE) {
-                send(ws, { type: 'error', message: `チップ追加は現在のチップが ${ADD_CHIPS_GATE.toLocaleString()} 以下のときのみ使用できます。` });
-                break;
-            }
-            // 追加後の目標スタックを決める
-            let target;
-            if (msg.target != null) {
-                target = parseInt(msg.target, 10);         // 「~に補充」
+            const opts = { target: msg.target, amount: msg.amount };
+            if (p.folded) {
+                // 即時適用
+                const added = applyAddChips(room, seat, opts);
+                if (added > 0) broadcastGameState(room);
+                else send(ws, { type: 'error', message: 'チップを追加できません（チップが10,001超、または上限15,000に到達済み）。' });
             } else {
-                const add = parseInt(msg.amount, 10);       // 任意額を加算
-                if (!Number.isFinite(add) || add <= 0) break;
-                target = cur + add;
+                // ハンド中: 予約 (ハンド終了時に applyPendingReservations で適用)
+                if (!room.pendingAddChips) room.pendingAddChips = {};
+                room.pendingAddChips[seat] = opts;
+                send(ws, { type: 'log', message: 'チップ補充を予約しました（このハンド終了後に反映されます）', cls: 'important', roomId: room.id });
             }
-            if (!Number.isFinite(target)) break;
-            // 合計上限でクリップ
-            target = Math.min(target, ADD_CHIPS_MAX_TOTAL);
-            const added = target - cur;
-            if (added <= 0) {
-                send(ws, { type: 'error', message: 'これ以上追加できません（上限または補充不要）。' });
-                break;
-            }
-            p.chips = target;
-            if (!room.totalRebuys) room.totalRebuys = {};
-            room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + added;
-            // バスト猶予中だった場合は復帰させ、次ハンドから参加可能にする。
-            if (room.bustedAt && room.bustedAt[seat]) {
-                clearBustState(room, seat);
-                if (room.sitout) room.sitout[seat] = false;
-                if (room.sitoutTime) delete room.sitoutTime[seat];
-                if (room.consecutiveTimeouts) room.consecutiveTimeouts[seat] = 0;
-                if (!room.pendingRejoin) room.pendingRejoin = {};
-                room.pendingRejoin[seat] = true;
-            }
-            broadcastLog(room, `${client.name} がチップを追加しました (+${added.toLocaleString()} → ${target.toLocaleString()})`, 'important');
-            broadcastGameState(room);
             break;
         }
 
@@ -2074,6 +2039,47 @@ function deleteRoomAndEvict(room, reason) {
     broadcastRoomList();
 }
 
+// チップ追加の共通適用ロジック。即時/予約のどちらからも呼ばれる。
+//  opts.target が指定されていれば「その額まで補充」、なければ opts.amount を加算。
+//  - 現在チップが ADD_CHIPS_GATE 以下のときのみ適用。
+//  - 追加後の合計は ADD_CHIPS_MAX_TOTAL を超えない。
+// 戻り値: 実際に追加した額 (>0 で適用成功)、0 なら未適用。
+const ADD_CHIPS_GATE = 10001;
+const ADD_CHIPS_MAX_TOTAL = 15000;
+function applyAddChips(room, seat, opts) {
+    if (!room || !room.game) return 0;
+    const p = room.game.players[seat];
+    if (!p) return 0;
+    const cur = p.chips;
+    if (cur > ADD_CHIPS_GATE) return 0; // チップが十分にある
+    let target;
+    if (opts && opts.target != null) {
+        target = parseInt(opts.target, 10);
+    } else {
+        const add = parseInt(opts && opts.amount, 10);
+        if (!Number.isFinite(add) || add <= 0) return 0;
+        target = cur + add;
+    }
+    if (!Number.isFinite(target)) return 0;
+    target = Math.min(target, ADD_CHIPS_MAX_TOTAL);
+    const added = target - cur;
+    if (added <= 0) return 0;
+    p.chips = target;
+    if (!room.totalRebuys) room.totalRebuys = {};
+    room.totalRebuys[p.name] = (room.totalRebuys[p.name] || 0) + added;
+    // バスト猶予中だった場合は復帰させる
+    if (room.bustedAt && room.bustedAt[seat]) {
+        clearBustState(room, seat);
+        if (room.sitout) room.sitout[seat] = false;
+        if (room.sitoutTime) delete room.sitoutTime[seat];
+        if (room.consecutiveTimeouts) room.consecutiveTimeouts[seat] = 0;
+        if (!room.pendingRejoin) room.pendingRejoin = {};
+        room.pendingRejoin[seat] = true;
+    }
+    broadcastLog(room, `${p.name} がチップを追加しました (+${added.toLocaleString()} → ${target.toLocaleString()})`, 'important');
+    return added;
+}
+
 // Apply any pending sitout/leave reservations. Called from onHandEnd hooks,
 // so deferred actions take effect right before the next hand starts.
 // After each hand: any player whose chips reached 0 enters a 10-minute
@@ -2179,6 +2185,17 @@ function applyPendingReservations(room) {
             }
         }
         room.pendingLeaveRequest = {};
+    }
+
+    // Pending chip add: ハンド中に予約されたチップ補充をここで適用する。
+    if (room.pendingAddChips) {
+        for (const key of Object.keys(room.pendingAddChips)) {
+            const seat = Number(key);
+            const opts = room.pendingAddChips[key];
+            if (!opts) continue;
+            applyAddChips(room, seat, opts); // gate/上限は適用時に再評価される
+        }
+        room.pendingAddChips = {};
     }
 }
 
@@ -2737,6 +2754,7 @@ function startGame(room) {
     room.sessionGameIds = new Set();
     room.statsRecorded = false; // game_over / 部屋削除での二重記録防止フラグ
     room.finalChipsByName = {}; // 退室/切断時のチップスナップショット (収支計算用)
+    room.pendingAddChips = {};  // ハンド中に予約されたチップ補充
     // Snapshot initial participants (name → avatar) so we can show avatars even
     // if a player leaves before the session ends.
     room.sessionParticipants = {};
