@@ -2657,12 +2657,21 @@ function startGame(room) {
         // この時点で sitout 折りは済んでおり、awaitingBB のプレイヤーはまだ
         // !folded なので、現在の active からBB席を求めて判定する。
         if (room.awaitingBB && Object.keys(room.awaitingBB).some(k => room.awaitingBB[k])) {
+            // 案X: ブラインド制のゲーム(ホールデム/オマハ/ドロー)は BB を跨ぐまで
+            // 待たせる。スタッド系はブラインドが無く、位置による回避の利得が無い
+            // (アンティは全員支払い・ブリングインはカード順)ため、このハンドで
+            // 即復帰させる。
+            const hasBlinds = !!(game.gameConfig && game.gameConfig.bigBlind);
             let bbSeat = -1;
-            try { bbSeat = game.getBigBlindSeat(); } catch {}
+            if (hasBlinds) { try { bbSeat = game.getBigBlindSeat(); } catch {} }
             game.players.forEach((p, seat) => {
                 if (!room.awaitingBB[seat]) return;
                 if (!p || p.chips <= 0) { delete room.awaitingBB[seat]; return; }
-                if (seat === bbSeat) {
+                if (!hasBlinds) {
+                    // ブラインドの無いゲーム(スタッド) → 待たずに復帰
+                    delete room.awaitingBB[seat];
+                    broadcastLog(room, `${p.name} が復帰します`, 'important');
+                } else if (seat === bbSeat) {
                     // BB が回ってきた → このハンドで復帰 (BBを支払う)
                     delete room.awaitingBB[seat];
                     broadcastLog(room, `${p.name} がBBを支払って復帰します`, 'important');
