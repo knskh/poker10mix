@@ -1654,7 +1654,14 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'add_chips': {
-            // メニューからの任意額チップ追加。指定額を現在のスタックに加算する。
+            // メニューからのチップ追加。
+            //  - msg.target が指定されていれば「その額まで補充」(不足分を追加)。
+            //    プリセット「10,000 に補充」で使用。
+            //  - それ以外は msg.amount を加算 (任意の数値入力)。
+            //  - 現在チップが ADD_CHIPS_GATE(10001) 以下のときのみ使用可。
+            //  - 追加後の合計は ADD_CHIPS_MAX_TOTAL(15000) を超えない。
+            const ADD_CHIPS_GATE = 10001;
+            const ADD_CHIPS_MAX_TOTAL = 15000;
             const room = rooms.get(msg.roomId || client.roomId);
             if (!room || !room.game) break;
             const seat = room.seatMap[client.id];
@@ -1666,12 +1673,32 @@ function handleMessage(ws, client, msg) {
                 send(ws, { type: 'error', message: 'ハンド中はチップを追加できません。次のハンド開始前（フォールド後など）に追加してください。' });
                 break;
             }
-            let amount = parseInt(msg.amount, 10);
-            if (!Number.isFinite(amount) || amount <= 0) break;
-            amount = Math.min(amount, 1000000); // 上限ガード (不正/誤入力対策)
-            p.chips += amount;
+            const cur = p.chips;
+            // チップが十分にある場合は使用不可
+            if (cur > ADD_CHIPS_GATE) {
+                send(ws, { type: 'error', message: `チップ追加は現在のチップが ${ADD_CHIPS_GATE.toLocaleString()} 以下のときのみ使用できます。` });
+                break;
+            }
+            // 追加後の目標スタックを決める
+            let target;
+            if (msg.target != null) {
+                target = parseInt(msg.target, 10);         // 「~に補充」
+            } else {
+                const add = parseInt(msg.amount, 10);       // 任意額を加算
+                if (!Number.isFinite(add) || add <= 0) break;
+                target = cur + add;
+            }
+            if (!Number.isFinite(target)) break;
+            // 合計上限でクリップ
+            target = Math.min(target, ADD_CHIPS_MAX_TOTAL);
+            const added = target - cur;
+            if (added <= 0) {
+                send(ws, { type: 'error', message: 'これ以上追加できません（上限または補充不要）。' });
+                break;
+            }
+            p.chips = target;
             if (!room.totalRebuys) room.totalRebuys = {};
-            room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + amount;
+            room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + added;
             // バスト猶予中だった場合は復帰させ、次ハンドから参加可能にする。
             if (room.bustedAt && room.bustedAt[seat]) {
                 clearBustState(room, seat);
@@ -1681,7 +1708,7 @@ function handleMessage(ws, client, msg) {
                 if (!room.pendingRejoin) room.pendingRejoin = {};
                 room.pendingRejoin[seat] = true;
             }
-            broadcastLog(room, `${client.name} がチップを追加しました (+${amount.toLocaleString()})`, 'important');
+            broadcastLog(room, `${client.name} がチップを追加しました (+${added.toLocaleString()} → ${target.toLocaleString()})`, 'important');
             broadcastGameState(room);
             break;
         }

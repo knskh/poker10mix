@@ -265,13 +265,12 @@
         <div id="add-chips-modal" class="add-chips-overlay hidden">
             <div class="add-chips-inner">
                 <h2>💰 チップ追加</h2>
-                <p class="add-chips-hint">追加する量を選択してください</p>
+                <p class="add-chips-hint">現在のチップが10,001以下のとき使用できます（合計上限15,000）</p>
                 <div class="add-chips-presets">
-                    <button class="add-chips-preset" data-amt="10000">＋10,000</button>
-                    <button class="add-chips-preset" data-amt="20000">＋20,000</button>
+                    <button class="add-chips-preset" data-target="10000">10,000 に補充</button>
                 </div>
                 <div class="add-chips-custom">
-                    <input type="number" id="add-chips-input" placeholder="任意の数値" min="1" step="1000" inputmode="numeric">
+                    <input type="number" id="add-chips-input" placeholder="任意の数値" min="1" max="15000" step="1000" inputmode="numeric">
                     <button id="btn-add-chips-custom" class="btn-primary">追加</button>
                 </div>
                 <button id="btn-add-chips-close" class="btn-small">閉じる</button>
@@ -506,11 +505,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=8"></script>
+    <script src="js/client.js?v=9"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=90"></script>
+    <script src="js/app.js?v=91"></script>
 
 </body>
 </html>

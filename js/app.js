@@ -1803,11 +1803,11 @@ function setupGameScreen() {
         document.getElementById('btn-add-chips-close')?.addEventListener('click', closeAddChips);
         // 背景クリックで閉じる
         addChipsModal.addEventListener('click', (e) => { if (e.target === addChipsModal) closeAddChips(); });
-        // プリセット (+10,000 / +20,000)
+        // プリセット (「10,000 に補充」= 合計が10000になるよう不足分を追加)
         addChipsModal.querySelectorAll('.add-chips-preset').forEach(btn => {
             btn.addEventListener('click', () => {
-                const amt = parseInt(btn.dataset.amt, 10);
-                if (amt > 0) client.addChips(amt, activeTableId);
+                const target = parseInt(btn.dataset.target, 10);
+                if (target > 0) client.refillChips(target, activeTableId);
                 closeAddChips();
             });
         });
