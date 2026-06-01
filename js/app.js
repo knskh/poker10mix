@@ -300,6 +300,7 @@ function switchToTable(roomId) {
     renderTableTabs();
 }
 
+let _tabsSig = '';
 function renderTableTabs() {
     const tabsEl = document.getElementById('table-tabs');
     const listEl = document.getElementById('table-tabs-list');
@@ -307,10 +308,22 @@ function renderTableTabs() {
     const gameScreen = document.getElementById('game-screen');
     if (gameScreen.classList.contains('hidden')) {
         tabsEl.classList.add('hidden');
+        _tabsSig = ''; // 次に表示する際は必ず再構築させる
         return;
     }
     tabsEl.classList.remove('hidden');
     if (!listEl) return;
+    // タブ表示に関係する状態の署名。game_state は毎秒複数回届くが、タブ自体
+    // (卓・アクティブ・自分の番バッジ・ゲーム名) が変わらない限り再構築は不要。
+    // 変化が無ければ DOM 再生成とリスナ再登録をスキップする。
+    let sig = String(tables.size) + '|';
+    for (const [rid, ctx] of tables) {
+        sig += rid + ':' + (ctx.gameName || ctx.roomId) + ':' +
+            (rid === activeTableId ? 1 : 0) + ':' +
+            (ctx.isMyTurn && rid !== activeTableId ? 1 : 0) + ';';
+    }
+    if (sig === _tabsSig) return;
+    _tabsSig = sig;
     listEl.innerHTML = '';
     for (const [rid, ctx] of tables) {
         const tab = document.createElement('div');
