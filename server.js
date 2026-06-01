@@ -1653,6 +1653,39 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        case 'add_chips': {
+            // メニューからの任意額チップ追加。指定額を現在のスタックに加算する。
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room || !room.game) break;
+            const seat = room.seatMap[client.id];
+            if (seat === undefined) break;
+            const p = room.game.players[seat];
+            // ハンド中の不正なスタック操作を防ぐため、フォールド中(=現在のハンドに
+            // 参加していない / ハンド間)のみ追加を許可する。
+            if (!p.folded) {
+                send(ws, { type: 'error', message: 'ハンド中はチップを追加できません。次のハンド開始前（フォールド後など）に追加してください。' });
+                break;
+            }
+            let amount = parseInt(msg.amount, 10);
+            if (!Number.isFinite(amount) || amount <= 0) break;
+            amount = Math.min(amount, 1000000); // 上限ガード (不正/誤入力対策)
+            p.chips += amount;
+            if (!room.totalRebuys) room.totalRebuys = {};
+            room.totalRebuys[client.name] = (room.totalRebuys[client.name] || 0) + amount;
+            // バスト猶予中だった場合は復帰させ、次ハンドから参加可能にする。
+            if (room.bustedAt && room.bustedAt[seat]) {
+                clearBustState(room, seat);
+                if (room.sitout) room.sitout[seat] = false;
+                if (room.sitoutTime) delete room.sitoutTime[seat];
+                if (room.consecutiveTimeouts) room.consecutiveTimeouts[seat] = 0;
+                if (!room.pendingRejoin) room.pendingRejoin = {};
+                room.pendingRejoin[seat] = true;
+            }
+            broadcastLog(room, `${client.name} がチップを追加しました (+${amount.toLocaleString()})`, 'important');
+            broadcastGameState(room);
+            break;
+        }
+
         case 'end_table_now': {
             const room = rooms.get(msg.roomId || client.roomId);
             if (!room || !room.game) break;

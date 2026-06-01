@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=79">
+    <link rel="stylesheet" href="css/style.css?v=80">
     <link rel="stylesheet" href="css/sns.css?v=15">
 </head>
 <body>
@@ -261,6 +261,23 @@
 
         <!-- Ranking Modal (removed from lobby, now in game screen) -->
 
+        <!-- Add Chips Modal (in-game) -->
+        <div id="add-chips-modal" class="add-chips-overlay hidden">
+            <div class="add-chips-inner">
+                <h2>💰 チップ追加</h2>
+                <p class="add-chips-hint">追加する量を選択してください</p>
+                <div class="add-chips-presets">
+                    <button class="add-chips-preset" data-amt="10000">＋10,000</button>
+                    <button class="add-chips-preset" data-amt="20000">＋20,000</button>
+                </div>
+                <div class="add-chips-custom">
+                    <input type="number" id="add-chips-input" placeholder="任意の数値" min="1" step="1000" inputmode="numeric">
+                    <button id="btn-add-chips-custom" class="btn-primary">追加</button>
+                </div>
+                <button id="btn-add-chips-close" class="btn-small">閉じる</button>
+            </div>
+        </div>
+
         <!-- Hand History Modal -->
         <div id="history-modal" class="zoom-sitout-overlay hidden">
             <div class="zoom-sitout-inner">
@@ -301,6 +318,7 @@
                     <button id="btn-hamburger" class="btn-tiny" title="メニュー">☰</button>
                     <div id="top-bar-menu" class="hidden">
                         <button id="btn-ingame-stats" class="menu-item">📊 Stats</button>
+                        <button id="btn-add-chips" class="menu-item">💰 チップ追加</button>
                         <button id="btn-back-room" class="menu-item">🚪 退出予約</button>
                         <button id="btn-zoom-sitout" class="menu-item">💤 離席予約</button>
                         <button id="btn-zoom-exit" class="menu-item menu-danger hidden">⛔ Zoom退出</button>
@@ -488,11 +506,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=7"></script>
+    <script src="js/client.js?v=8"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=47"></script>
-    <script src="js/app.js?v=89"></script>
+    <script src="js/app.js?v=90"></script>
 
 </body>
 </html>

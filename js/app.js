@@ -1789,6 +1789,45 @@ function setupGameScreen() {
         document.getElementById('stats-modal').classList.remove('hidden');
     });
 
+    // チップ追加メニュー → モーダルを開く
+    const addChipsModal = document.getElementById('add-chips-modal');
+    const addChipsBtn = document.getElementById('btn-add-chips');
+    if (addChipsBtn && addChipsModal) {
+        const openAddChips = () => {
+            const input = document.getElementById('add-chips-input');
+            if (input) input.value = '';
+            addChipsModal.classList.remove('hidden');
+        };
+        const closeAddChips = () => addChipsModal.classList.add('hidden');
+        addChipsBtn.addEventListener('click', openAddChips);
+        document.getElementById('btn-add-chips-close')?.addEventListener('click', closeAddChips);
+        // 背景クリックで閉じる
+        addChipsModal.addEventListener('click', (e) => { if (e.target === addChipsModal) closeAddChips(); });
+        // プリセット (+10,000 / +20,000)
+        addChipsModal.querySelectorAll('.add-chips-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const amt = parseInt(btn.dataset.amt, 10);
+                if (amt > 0) client.addChips(amt, activeTableId);
+                closeAddChips();
+            });
+        });
+        // 任意の数値
+        const submitCustom = () => {
+            const input = document.getElementById('add-chips-input');
+            const amt = parseInt(input ? input.value : '', 10);
+            if (!Number.isFinite(amt) || amt <= 0) {
+                showToast('正しい数値を入力してください');
+                return;
+            }
+            client.addChips(amt, activeTableId);
+            closeAddChips();
+        };
+        document.getElementById('btn-add-chips-custom')?.addEventListener('click', submitCustom);
+        document.getElementById('add-chips-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitCustom();
+        });
+    }
+
     // Back to room button — sends leave request. Server decides whether to
     // apply immediately or defer until hand end (leave_reserved response).
     document.getElementById('btn-back-room').addEventListener('click', () => {

@@ -2439,6 +2439,46 @@ body {
 
 /* Lock Toggle */
 /* ==========================================
+   チップ追加モーダル (in-game)
+   ========================================== */
+.add-chips-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    padding: 20px;
+}
+.add-chips-overlay:not(.hidden) { display: flex; animation: modal-fade-in 0.2s ease-out; }
+.add-chips-inner {
+    background: #ffffff; color: #17202E;
+    border-radius: 16px; padding: 22px 24px;
+    width: 100%; max-width: 320px; text-align: center;
+    box-shadow: 0 16px 48px rgba(15,23,42,0.35);
+    animation: modal-scale-in 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+.add-chips-inner h2 { font-size: 18px; color: #0f172a; margin-bottom: 4px; }
+.add-chips-hint { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+.add-chips-presets { display: flex; gap: 10px; margin-bottom: 14px; }
+.add-chips-preset {
+    flex: 1; padding: 14px 8px; font-size: 16px; font-weight: 700;
+    border: 1.5px solid #2A6BC9; border-radius: 10px;
+    background: #eef5ff; color: #2A6BC9; cursor: pointer;
+    font-family: inherit; transition: background .12s;
+}
+.add-chips-preset:hover { background: #dbe9fa; }
+.add-chips-preset:active { background: #c7ddf5; }
+.add-chips-custom { display: flex; gap: 8px; margin-bottom: 16px; }
+.add-chips-custom input {
+    flex: 1; min-width: 0; box-sizing: border-box;
+    padding: 11px 12px; font-size: 15px;
+    border: 1px solid #c8d4e2; border-radius: 8px;
+    background: #fff; color: #17202E; outline: none; text-align: right;
+}
+.add-chips-custom input:focus { border-color: #2A6BC9; box-shadow: 0 0 0 2px rgba(42,107,201,0.18); }
+.add-chips-custom .btn-primary { flex-shrink: 0; padding: 11px 18px; font-size: 15px; }
+.add-chips-inner .btn-small { color: #64748b; }
+
+/* ==========================================
    セッション収支モーダル (退室時)
    ========================================== */
 .session-result-overlay {
