@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=83">
+    <link rel="stylesheet" href="css/style.css?v=84">
     <link rel="stylesheet" href="css/sns.css?v=15">
 </head>
 <body>
@@ -336,7 +336,6 @@
                         <button id="btn-sound-toggle" class="menu-item" title="サウンドON/OFF">🔔 サウンド</button>
                         <button id="btn-menu-history" class="menu-item">📋 ハンド履歴</button>
                         <button id="btn-focus-mode" class="menu-item">🎯 フォーカス OFF</button>
-                        <button id="btn-theme-toggle" class="menu-item">🎨 テーマ</button>
                         <button id="btn-preset-settings" class="menu-item">🎚️ プリセット設定</button>
                         <div id="game-rules-btn" class="menu-item" title="ルール表示">❓ ルール</div>
                     </div>
@@ -378,6 +377,7 @@
             <div id="table-area">
                 <div id="table-container">
                     <div id="table-felt">
+                        <div id="next-game-info" class="hidden"></div>
                         <div id="pot-display"></div>
                         <div id="table-info"></div>
                         <div id="community-cards" class="card-row"></div>
@@ -517,11 +517,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=3"></script>
-    <script src="js/client.js?v=10"></script>
+    <script src="js/client.js?v=11"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=48"></script>
-    <script src="js/app.js?v=97"></script>
+    <script src="js/app.js?v=98"></script>
 
 </body>
 </html>

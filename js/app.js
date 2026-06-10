@@ -1706,26 +1706,9 @@ function setupGameScreen() {
     updateSoundBtn();
     soundBtn.addEventListener('click', () => { sound.toggle(); updateSoundBtn(); });
 
-    // Theme toggle button
-    const THEMES = ['light', 'classic', 'midnight'];
-    const THEME_LABELS = { light: '🎨 ライト', classic: '🎨 クラシック', midnight: '🎨 ミッドナイト' };
-    // Migrate old 'dark' → 'light' (was the legacy default)
-    let savedTheme = localStorage.getItem('poker10mix_theme');
-    if (savedTheme === 'dark') savedTheme = 'light';
-    let currentThemeIdx = THEMES.indexOf(savedTheme || 'light');
-    if (currentThemeIdx < 0) currentThemeIdx = 0;
-    function applyTheme(idx) {
-        document.body.classList.remove('theme-dark', 'theme-light', 'theme-classic', 'theme-midnight');
-        document.body.classList.add('theme-' + THEMES[idx]);
-        localStorage.setItem('poker10mix_theme', THEMES[idx]);
-        const btn = document.getElementById('btn-theme-toggle');
-        if (btn) btn.textContent = THEME_LABELS[THEMES[idx]];
-    }
-    applyTheme(currentThemeIdx);
-    document.getElementById('btn-theme-toggle').addEventListener('click', () => {
-        currentThemeIdx = (currentThemeIdx + 1) % THEMES.length;
-        applyTheme(currentThemeIdx);
-    });
+    // テーマはライト基調1本に統一。旧ダークテーマ(classic/midnight)のクラスが
+    // 残っていれば除去して、常に :root のライトテーマを適用する。
+    document.body.classList.remove('theme-dark', 'theme-light', 'theme-classic', 'theme-midnight');
 
     // Hamburger menu toggle
     const hamburgerBtn = document.getElementById('btn-hamburger');
@@ -1963,6 +1946,18 @@ function onHandResult(data) {
     showReactionBar();
 }
 
+// 次ゲーム予告バッジの更新 (ミックスの通常ローテーション時のみ表示)
+function updateNextGameInfo(nextGame) {
+    const el = document.getElementById('next-game-info');
+    if (!el) return;
+    if (nextGame && nextGame.name) {
+        el.textContent = `次: ${nextGame.name}（あと${nextGame.handsUntil}ハンド）`;
+        el.classList.remove('hidden');
+    } else {
+        el.classList.add('hidden');
+    }
+}
+
 function onGameState(state) {
     currentState = state;
     if (!currentHandGameName && state.gameName) currentHandGameName = state.gameName;
@@ -1974,6 +1969,9 @@ function onGameState(state) {
         sound.gameChange();
     }
     lastGameId = state.gameId;
+
+    // 次ゲーム予告 (ミックスの通常ローテーションのみ)
+    updateNextGameInfo(state.nextGame);
 
     if (state.zoom) {
         document.getElementById('zoom-waiting-overlay').classList.add('hidden');
@@ -3200,6 +3198,27 @@ function showActionButtons(actions, turnData) {
 
     if (hasVariable || allInAction) {
         renderBetPresets(turnData, varAction, varMin, varMax, allInAction);
+    }
+
+    // タイムバンク (+秒) ボタン: 残量があるときだけ表示
+    const tb = turnData ? turnData.timeBank : null;
+    if (tb && tb > 0) {
+        const add = Math.min(30, tb);
+        const tbBtn = document.createElement('button');
+        tbBtn.id = 'btn-time-bank';
+        tbBtn.className = 'btn-action btn-timebank';
+        tbBtn.textContent = `⏱ タイムバンク +${add}秒（残${tb}秒）`;
+        tbBtn.addEventListener('click', () => {
+            client.useTimeBank(activeTableId);
+            // ローカルのターン表示も延長 (startTurnTimer はバーを隠すので使わない)
+            const elapsed = (Date.now() - turnTimerStart) / 1000;
+            const remaining = Math.max(0, turnTimeLimit - elapsed);
+            turnTimeLimit = remaining + add;
+            turnTimerStart = Date.now();
+            tbBtn.disabled = true;
+            tbBtn.textContent = '⏱ 使用しました';
+        }, { once: true });
+        btnDiv.appendChild(tbBtn);
     }
 }
 

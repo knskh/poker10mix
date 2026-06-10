@@ -225,6 +225,7 @@ class PokerClient {
     sendReaction(emote, roomId) { this.send({ type: 'reaction', emote, roomId: roomId || this.roomId }); }
     rebuyChips(amount, roomId) { this.send({ type: 'rebuy_chips', amount, roomId: roomId || this.roomId }); }
     addChips(amount, roomId) { this.send({ type: 'add_chips', amount, roomId: roomId || this.roomId }); }
+    useTimeBank(roomId) { this.send({ type: 'use_time_bank', roomId: roomId || this.roomId }); }
     refillChips(target, roomId) { this.send({ type: 'add_chips', target, roomId: roomId || this.roomId }); }
     rebuyFromBust(roomId) { this.send({ type: 'rebuy_from_bust', roomId: roomId || this.roomId }); }
     leaveFromBust(roomId) { this.send({ type: 'leave_from_bust', roomId: roomId || this.roomId }); }

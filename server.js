@@ -1079,6 +1079,17 @@ function getStateForPlayer(game, room, playerSeat) {
             ? Math.max(0, room.turnTimeLimit - (Date.now() - room.turnStartTime) / 1000)
             : null,
         turnTimeLimit: room.turnTimeLimit || null,
+        // 自分のタイムバンク残量(秒)。クライアントの「+秒」ボタン表示に使う。
+        myTimeBank: (room.timeBank && room.timeBank[playerSeat] != null) ? room.timeBank[playerSeat] : null,
+        // 次ゲーム予告 (ミックス・通常ローテーションのみ。zoom はランダムで予測不可)
+        nextGame: (() => {
+            if (!game || game.zoomMode) return null;
+            const fg = game.filteredGames;
+            if (!fg || fg.length <= 1) return null;
+            const remaining = Math.max(1, (game.playerCount || 1) - (game.handsInCurrentGame || 0));
+            const nextIdx = (game.currentGameIndex + 1) % fg.length;
+            return { name: fg[nextIdx] ? fg[nextIdx].name : '', handsUntil: remaining };
+        })(),
     };
 }
 
@@ -1100,6 +1111,10 @@ wss.on('connection', (ws) => {
     const client = { id: clientId, name: 'Player' + clientId, roomId: null, roomIds: [], inZoom: false, ws };
     clients.set(ws, client);
 
+    // ハートビート: pong 受信で生存フラグを立てる。死んだ接続を早期検知する。
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     send(ws, { type: 'welcome', clientId });
     broadcastRoomList();
     broadcastOnlineUsers();
@@ -1107,6 +1122,9 @@ wss.on('connection', (ws) => {
     ws.on('message', (raw) => {
         let msg;
         try { msg = JSON.parse(raw.toString()); } catch (e) { return; }
+        // クライアント側ハートビート(任意): ping メッセージには即応する。
+        if (msg && msg.type === 'ping') { try { send(ws, { type: 'pong' }); } catch {} return; }
+        ws.isAlive = true; // メッセージが届いている＝生存
         handleMessage(ws, client, msg);
     });
 
@@ -1116,7 +1134,26 @@ wss.on('connection', (ws) => {
         broadcastRoomList();
         broadcastOnlineUsers();
     });
+    ws.on('error', () => { try { ws.terminate(); } catch {} });
 });
+
+// ハートビート巡回: HEARTBEAT_INTERVAL ごとに全接続へ ping を送り、前回の
+// ping に pong を返さなかった接続は死んでいるとみなして terminate する。
+// terminate() は 'close' を発火させるので、既存の切断処理(離席化/オールイン
+// 保護/再接続待ち)がそのまま走る。これにより「相手の回線が静かに死んだ」
+// 場合でも最大 45 秒待たずに数秒で検知・処理できる。
+const HEARTBEAT_INTERVAL = 15000; // 15秒
+const heartbeatTimer = setInterval(() => {
+    for (const ws of wss.clients) {
+        if (ws.isAlive === false) {
+            try { ws.terminate(); } catch {}
+            continue;
+        }
+        ws.isAlive = false;
+        try { ws.ping(); } catch {}
+    }
+}, HEARTBEAT_INTERVAL);
+wss.on('close', () => clearInterval(heartbeatTimer));
 
 // ============================================
 // Message Handlers
@@ -1548,6 +1585,30 @@ function handleMessage(ws, client, msg) {
             const p = room.pending;
             room.pending = null;
             p.resolve(msg.action);
+            break;
+        }
+
+        case 'use_time_bank': {
+            // 自分の番でのみ。残りタイムバンクから TIME_BANK_CHUNK 秒を現在の
+            // ターンに加算してタイマーを延長する。
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room || !room.pending || !room.pending.arm) break;
+            const seat = room.seatMap[client.id];
+            if (room.pending.playerId !== seat) break;
+            if (!room.timeBank) room.timeBank = {};
+            const bank = room.timeBank[seat] || 0;
+            if (bank <= 0) { send(ws, { type: 'error', message: 'タイムバンクが残っていません' }); break; }
+            const add = Math.min(TIME_BANK_CHUNK, bank);
+            room.timeBank[seat] = bank - add;
+            // 現在の残り時間 + 追加分でタイマーを張り直す
+            const remainingMs = Math.max(0, (room.turnTimeLimit || 0) * 1000 - (Date.now() - (room.turnStartTime || Date.now())));
+            const newMs = remainingMs + add * 1000;
+            clearTimeout(room.pending.timer);
+            room.turnStartTime = Date.now();
+            room.turnTimeLimit = Math.ceil(newMs / 1000);
+            room.pending.timer = room.pending.arm(newMs);
+            broadcastLog(room, `${client.name} がタイムバンクを使用 (+${add}秒 / 残り${room.timeBank[seat]}秒)`, 'important');
+            broadcastGameState(room);
             break;
         }
 
@@ -2130,6 +2191,9 @@ function applyAddChips(room, seat, opts) {
 // in this window, runGameLoop pauses instead of ending the game, so HU-bust
 // doesn't instantly close the table.
 const BUST_WINDOW_MS = 10 * 60 * 1000;
+// タイムバンク: セッション毎の持ち時間(秒)と1回の使用で加算する秒数。
+const TIME_BANK_INIT = 60;   // 初期60秒
+const TIME_BANK_CHUNK = 30;  // 1回 +30秒 (= 2回使える)
 function detectBust(room) {
     if (!room || !room.game || !rooms.has(room.id)) return;
     const game = room.game;
@@ -2509,6 +2573,7 @@ function startGame(room) {
 
     // Track consecutive timeouts per seat (for auto-sitout)
     room.consecutiveTimeouts = {};
+    room.timeBank = {};      // seat -> 残りタイムバンク秒 (TIME_BANK_INIT で初期化)
     room.sitout = {};        // seat -> true if sitting out
     room.sitoutTime = {};    // seat -> timestamp when sitout started
     // Busted: a player whose chips reached 0. They enter sitout and get a
@@ -2553,6 +2618,10 @@ function startGame(room) {
                 return;
             }
 
+            // タイムバンク初期化 (セッション毎に startGame でリセット)
+            if (!room.timeBank) room.timeBank = {};
+            if (room.timeBank[seatIdx] == null) room.timeBank[seatIdx] = TIME_BANK_INIT;
+
             // Send action request
             const _gc = game.gameConfig;
             send(member.ws, {
@@ -2561,15 +2630,15 @@ function startGame(room) {
                 currentBet: game.currentBet,
                 isFirstRound: game.isFirstRound,
                 bigBlind: _gc.bigBlind || _gc.bigBet || 100,
+                timeBank: room.timeBank[seatIdx],
                 roomId: room.id,
             });
 
-            // Timer: 45 seconds
-            const timer = setTimeout(() => {
+            // タイムアウト処理 (通常45秒。タイムバンク使用で arm() し直して延長)
+            const onTimeout = () => {
                 room.pending = null;
                 const auto = actions.find(a => a.type === 'check') || actions.find(a => a.type === 'fold') || actions[0];
                 broadcastLog(room, `${player.name}: タイムアウト`, 'action');
-                // Track consecutive timeouts
                 room.consecutiveTimeouts[seatIdx] = (room.consecutiveTimeouts[seatIdx] || 0) + 1;
                 if (room.consecutiveTimeouts[seatIdx] >= 2 && !room.sitout[seatIdx]) {
                     room.sitout[seatIdx] = true;
@@ -2577,9 +2646,11 @@ function startGame(room) {
                     broadcastLog(room, `${player.name} が2回連続タイムアウトのため離席状態になりました`, 'important');
                 }
                 resolve(auto);
-            }, 45000);
+            };
+            const arm = (ms) => setTimeout(onTimeout, ms);
+            const timer = arm(45000);
 
-            room.pending = { type: 'action', playerId: seatIdx, resolve, timer };
+            room.pending = { type: 'action', playerId: seatIdx, resolve, timer, arm, onTimeout };
         });
     };
 

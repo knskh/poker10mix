@@ -826,6 +826,19 @@ body {
 }
 
 /* Pot display */
+/* 次ゲーム予告バッジ (テーブル上部中央) */
+#next-game-info {
+    position: absolute; top: 3%; left: 50%; transform: translateX(-50%);
+    z-index: 15; white-space: nowrap;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(124, 92, 255, 0.5);
+    color: #d6c8ff; font-size: 11px; font-weight: 700;
+    padding: 3px 12px; border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#next-game-info.hidden { display: none; }
+@media (max-width: 600px) { #next-game-info { font-size: 9px; padding: 2px 9px; } }
+
 #pot-display {
     position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; display: flex; align-items: baseline; gap: 6px;
@@ -1349,6 +1362,12 @@ body {
     width: 100%; text-align: center; letter-spacing: 0.3px;
     -webkit-user-select: none; user-select: none; touch-action: manipulation;
 }
+/* タイムバンク (+秒) ボタン */
+.btn-timebank {
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    font-size: 12px; padding: 9px 12px; margin-top: 4px;
+}
+.btn-timebank:disabled { background: #94a3b8; cursor: default; opacity: 0.7; }
 .btn-action:hover { filter: brightness(1.12); }
 .btn-action:active { transform: scale(0.98); }
 /* Fold long-press visual feedback */
