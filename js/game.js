@@ -118,6 +118,7 @@ class GameState {
         this.onShowdown = null;
         this.onHandEnd = null;
         this.onPlayerFold = null;
+        this.onAllInEquity = null;   // (equityArray) => void  オールイン時の勝率表示
 
         // Filtered games
         this.filteredGames = GAME_LIST;
@@ -272,6 +273,8 @@ class GameState {
 
         if (this.onFirstRoundEnd) this.onFirstRoundEnd();
 
+        await this.maybeAllInEquity();
+
         // Flop
         this.communityCards.push(...this.deck.deal(3));
         this.log('--- フロップ ---', 'action');
@@ -282,6 +285,8 @@ class GameState {
         this.resetRoundBets();
         if (await this.bettingRound(postFlopStart, false, gc.betting === 'limit' ? gc.smallBet : null)) return;
 
+        await this.maybeAllInEquity();
+
         // Turn
         this.communityCards.push(this.deck.deal());
         this.log('--- ターン ---', 'action');
@@ -290,6 +295,8 @@ class GameState {
 
         this.resetRoundBets();
         if (await this.bettingRound(postFlopStart, false, gc.betting === 'limit' ? gc.bigBet : null)) return;
+
+        await this.maybeAllInEquity();
 
         // River
         this.communityCards.push(this.deck.deal());
@@ -354,6 +361,8 @@ class GameState {
         for (let s = 0; s < 4; s++) {
             this.resetRoundBets();
             const betSize = s >= 1 ? gc.bigBet : gc.smallBet;
+
+            await this.maybeAllInEquity();
 
             for (const p of this.players) {
                 if (!p.folded) {
@@ -988,6 +997,109 @@ class GameState {
             }
         }
         return [...allWinnerIds];
+    }
+
+    // ==========================================
+    // All-in equity (Monte Carlo)
+    // ==========================================
+
+    // ベッティングが完了し、これ以上アクションが起きない（=実質オールイン対決）
+    // 場合に各プレイヤーの勝率（ポット獲得期待値）を計算してブロードキャストする。
+    async maybeAllInEquity() {
+        if (!this.onAllInEquity || this.fastFoldActive) return;
+        const inHand = this.players.filter(p => !p.folded);
+        if (inHand.length < 2) return;
+        // まだアクションできるプレイヤーが2人以上いるなら対決確定ではない
+        if (this.countActivePlayers() > 1) return;
+        const gc = this.gameConfig;
+        if (gc.type === 'draw') return; // ドローは未対応（残り交換が読めないため）
+        const eq = this.computeEquity(gc, inHand, 1500);
+        if (eq) {
+            this.onAllInEquity(eq);
+            await this.delay(2200);
+        }
+    }
+
+    computeEquity(gc, inHand, iterations = 1500) {
+        if (gc.type === 'draw') return null;
+        const used = [];
+        for (const p of inHand) used.push(...p.hand);
+        used.push(...this.communityCards);
+        const usedKeys = new Set(used.map(c => cardKey(c)));
+        const pool = createFullDeck().filter(c => !usedKeys.has(cardKey(c)));
+
+        const boardNeed = gc.type === 'community' ? Math.max(0, 5 - this.communityCards.length) : 0;
+        const studNeed = {};
+        let anyNeed = boardNeed;
+        if (gc.type === 'stud') {
+            for (const p of inHand) { studNeed[p.id] = Math.max(0, 7 - p.hand.length); anyNeed += studNeed[p.id]; }
+        }
+        // 既に全カードが確定しているなら1回で十分（リバーでのオールイン等）
+        if (anyNeed === 0) iterations = 1;
+
+        const totals = {};
+        for (const p of inHand) totals[p.id] = 0;
+
+        for (let iter = 0; iter < iterations; iter++) {
+            const deck = anyNeed ? shuffleArray(pool) : pool;
+            let di = 0;
+            let board = this.communityCards;
+            if (boardNeed) { board = this.communityCards.concat(deck.slice(di, di + boardNeed)); di += boardNeed; }
+            const results = [];
+            for (const p of inHand) {
+                let hand = p.hand;
+                if (gc.type === 'stud' && studNeed[p.id] > 0) { hand = p.hand.concat(deck.slice(di, di + studNeed[p.id])); di += studNeed[p.id]; }
+                const ev = evaluateHand(gc, hand, board);
+                results.push({ id: p.id, high: ev.high, low: ev.low });
+            }
+            const shares = this._potShares(results, gc);
+            for (const id in shares) totals[id] += shares[id];
+        }
+
+        return inHand.map(p => ({
+            id: p.id,
+            name: p.name,
+            equity: Math.round((totals[p.id] / iterations) * 1000) / 10,
+        }));
+    }
+
+    // 1ハンド分のポット配分（フラクション）を求める純粋関数版
+    _potShares(results, gc) {
+        const shares = {};
+        for (const r of results) shares[r.id] = 0;
+
+        let highWinners = [];
+        let bestHigh = null;
+        for (const r of results) {
+            if (!r.high) continue;
+            if (!bestHigh) { bestHigh = r.high; highWinners = [r]; }
+            else {
+                const cmp = compareHands(gc, r.high, bestHigh);
+                if (cmp > 0) { bestHigh = r.high; highWinners = [r]; }
+                else if (cmp === 0) highWinners.push(r);
+            }
+        }
+
+        if (gc.hasLow) {
+            let lowWinners = [];
+            let bestLow = null;
+            for (const r of results) {
+                if (!r.low) continue;
+                if (!bestLow) { bestLow = r.low; lowWinners = [r]; }
+                else {
+                    const cmp = compareArrays(r.low.value, bestLow.value);
+                    if (cmp < 0) { bestLow = r.low; lowWinners = [r]; }
+                    else if (cmp === 0) lowWinners.push(r);
+                }
+            }
+            if (lowWinners.length) {
+                for (const r of highWinners) shares[r.id] += 0.5 / highWinners.length;
+                for (const r of lowWinners) shares[r.id] += 0.5 / lowWinners.length;
+                return shares;
+            }
+        }
+        for (const r of highWinners) shares[r.id] += 1 / highWinners.length;
+        return shares;
     }
 
     delay(ms) {

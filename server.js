@@ -17,6 +17,9 @@ global.evaluateHand = _evalMod.evaluateHand;
 global.compareHands = _evalMod.compareHands;
 global.compareArrays = _evalMod.compareArrays;
 global.bestHighHand = _evalMod.bestHighHand;
+global.createFullDeck = _deckMod.createFullDeck;
+global.shuffleArray = _deckMod.shuffleArray;
+global.cardKey = _deckMod.cardKey;
 
 const { GAME_LIST, GameState } = require('./js/game');
 const { StatsTracker } = require('./js/stats');
@@ -1589,6 +1592,25 @@ function handleMessage(ws, client, msg) {
         }
 
         case 'use_time_bank': {
+            // Zoom卓の場合: zoomPlayers[clientId].timeBank を使い table.pending を延長
+            if (client.inZoom) {
+                const pd = zoomPlayers.get(client.id);
+                if (!pd || !pd.tableId) break;
+                const table = zoomTables.get(pd.tableId);
+                if (!table || !table.pending || !table.pending.arm || table.pending.clientId !== client.id) break;
+                const bank = pd.timeBank || 0;
+                if (bank <= 0) { send(ws, { type: 'error', message: 'タイムバンクが残っていません' }); break; }
+                const add = Math.min(TIME_BANK_CHUNK, bank);
+                pd.timeBank = bank - add;
+                const remMs = Math.max(0, (table.turnTimeLimit || 0) * 1000 - (Date.now() - (table.turnStartTime || Date.now())));
+                const newMs = remMs + add * 1000;
+                clearTimeout(table.pending.timer);
+                table.turnStartTime = Date.now();
+                table.turnTimeLimit = Math.ceil(newMs / 1000);
+                table.pending.timer = table.pending.arm(newMs);
+                broadcastZoomTableState(table);
+                break;
+            }
             // 自分の番でのみ。残りタイムバンクから TIME_BANK_CHUNK 秒を現在の
             // ターンに加算してタイマーを延長する。
             const room = rooms.get(msg.roomId || client.roomId);
@@ -2676,12 +2698,14 @@ function startGame(room) {
                 return;
             }
 
-            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 45, roomId: room.id });
+            if (!room.timeBank) room.timeBank = {};
+            if (room.timeBank[seatIdx] == null) room.timeBank[seatIdx] = TIME_BANK_INIT;
 
-            const timer = setTimeout(() => {
+            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 45, timeBank: room.timeBank[seatIdx], roomId: room.id });
+
+            const onTimeout = () => {
                 room.pending = null;
                 broadcastLog(room, `${player.name}: タイムアウト（スタンドパット）`, 'action');
-                // Track consecutive timeouts
                 room.consecutiveTimeouts[seatIdx] = (room.consecutiveTimeouts[seatIdx] || 0) + 1;
                 if (room.consecutiveTimeouts[seatIdx] >= 2 && !room.sitout[seatIdx]) {
                     room.sitout[seatIdx] = true;
@@ -2689,9 +2713,11 @@ function startGame(room) {
                     broadcastLog(room, `${player.name} が2回連続タイムアウトのため離席状態になりました`, 'important');
                 }
                 resolve([]);
-            }, 45000);
+            };
+            const arm = (ms) => setTimeout(onTimeout, ms);
+            const timer = arm(45000);
 
-            room.pending = { type: 'draw', playerId: seatIdx, resolve, timer };
+            room.pending = { type: 'draw', playerId: seatIdx, resolve, timer, arm, onTimeout };
         });
     };
 
@@ -2788,6 +2814,13 @@ function startGame(room) {
         room.stats.recordAction(player, action, isBlinds);
     };
     game.onShowdown = (winnerIds) => room.stats.recordShowdown(winnerIds);
+    game.onAllInEquity = (entries) => {
+        broadcastToRoom(room, {
+            type: 'allin_equity',
+            roomId: room.id,
+            entries: entries.map(e => ({ seat: e.id, name: e.name, equity: e.equity })),
+        });
+    };
     game.onHandEnd = (hadShowdown) => {
         // Broadcast hand result with all players' cards
         const gc = game.gameConfig;
@@ -3203,6 +3236,15 @@ function createZoomTable(members) {
         stats.recordAction(player, action, isBlinds);
     };
     game.onShowdown = (winnerIds) => stats.recordShowdown(winnerIds);
+    game.onAllInEquity = (entries) => {
+        for (const m of table.members) {
+            if (table.activeMemberIds.has(m.clientId))
+                send(m.ws, {
+                    type: 'allin_equity',
+                    entries: entries.map(e => ({ seat: e.id, name: e.name, equity: e.equity })),
+                });
+        }
+    };
     game.onHandEnd = (hadShowdown) => {
         const gc = game.gameConfig;
         const activeCount = game.players.filter(p => p.name).length;
@@ -3295,15 +3337,18 @@ function createZoomTable(members) {
             }
 
             const gc = game.gameConfig;
+            const pd = zoomPlayers.get(member.clientId);
+            if (pd && pd.timeBank == null) pd.timeBank = TIME_BANK_INIT;
             send(member.ws, {
                 type: 'your_turn', actions, timeLimit,
                 pot: game.pot,
                 currentBet: game.currentBet,
                 isFirstRound: game.isFirstRound,
                 bigBlind: gc.bigBlind || gc.bigBet || 100,
+                timeBank: pd ? pd.timeBank : null,
             });
 
-            const timer = setTimeout(() => {
+            const onTimeout = () => {
                 table.pending = null;
                 const auto = actions.find(a => a.type === 'check')
                           || actions.find(a => a.type === 'fold') || actions[0];
@@ -3312,9 +3357,11 @@ function createZoomTable(members) {
                         send(m2.ws, { type: 'log', message: `${player.name}: タイムアウト`, cls: 'action' });
                 }
                 resolve(auto);
-            }, timeLimit * 1000);
+            };
+            const arm = (ms) => setTimeout(onTimeout, ms);
+            const timer = arm(timeLimit * 1000);
 
-            table.pending = { type: 'action', playerId: seatIdx, resolve, timer };
+            table.pending = { type: 'action', playerId: seatIdx, resolve, timer, arm, clientId: member.clientId };
         });
     };
 
@@ -3335,14 +3382,15 @@ function createZoomTable(members) {
                 return;
             }
 
-            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 30 });
+            const pd = zoomPlayers.get(member.clientId);
+            if (pd && pd.timeBank == null) pd.timeBank = TIME_BANK_INIT;
+            send(member.ws, { type: 'your_draw', hand: player.hand, timeLimit: 30, timeBank: pd ? pd.timeBank : null });
 
-            const timer = setTimeout(() => {
-                table.pending = null;
-                resolve([]);
-            }, 30000);
+            const onTimeout = () => { table.pending = null; resolve([]); };
+            const arm = (ms) => setTimeout(onTimeout, ms);
+            const timer = arm(30000);
 
-            table.pending = { type: 'draw', playerId: seatIdx, resolve, timer };
+            table.pending = { type: 'draw', playerId: seatIdx, resolve, timer, arm, clientId: member.clientId };
         });
     };
 

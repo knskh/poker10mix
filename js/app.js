@@ -712,7 +712,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Client events
     client.on('connected', () => {
+        if (window._wakeTimer) { clearTimeout(window._wakeTimer); window._wakeTimer = null; }
         document.getElementById('connection-status').textContent = '';
+        document.getElementById('connection-status').classList.remove('waking');
         document.getElementById('connection-status').classList.add('hidden');
         // On reconnect (not the first open), if we're still logged in the
         // server has forgotten our auth state — re-attach it silently.
@@ -724,8 +726,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     client.on('disconnected', () => {
-        document.getElementById('connection-status').textContent = '接続中...';
-        document.getElementById('connection-status').classList.remove('hidden');
+        const el = document.getElementById('connection-status');
+        el.textContent = '接続中...';
+        el.classList.remove('hidden', 'waking');
+        // Render の無料プランはスリープ復帰に30秒〜1分かかる。すぐ繋がらない場合は
+        // 「壊れている」と誤解されやすいので、数秒待っても繋がらなければ起動中の案内を出す。
+        if (window._wakeTimer) clearTimeout(window._wakeTimer);
+        window._wakeTimer = setTimeout(() => {
+            el.classList.add('waking');
+            el.innerHTML = '🌙 サーバーを起動しています…<br><span class="ws-sub">無料プランのため最大1分ほどかかります。そのままお待ちください。</span>';
+        }, 4000);
     });
     client.on('room_list', (data) => {
         // Cache for main screen rail and add-table modal
@@ -872,7 +882,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             myTurnOnActiveTable = true;
         }
-        if (rid === activeTableId || !rid) onYourDraw({ hand: msg.hand, timeLimit: msg.timeLimit });
+        if (rid === activeTableId || !rid) onYourDraw({ hand: msg.hand, timeLimit: msg.timeLimit, timeBank: msg.timeBank });
     });
     client.on('log', (d) => {
         const rid = d.roomId;
@@ -916,6 +926,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         onHandResult(msg);
+    });
+    client.on('allin_equity', (msg) => {
+        if (msg.roomId && msg.roomId !== activeTableId) return;
+        showAllInEquity(msg.entries || []);
     });
     client.on('stats_update', onStatsUpdate);
     client.on('auth_result', onAuthResult);
@@ -1922,6 +1936,7 @@ function onGameStarted(data) {
 
 function onHandStart() {
     saveCurrentHand();
+    clearAllInEquity();
     document.getElementById('game-log').innerHTML = '';
     currentHandLogs = [];
     startingHandCards = [];
@@ -1942,8 +1957,30 @@ function onHandStart() {
 
 function onHandResult(data) {
     lastHandResult = data;
+    clearAllInEquity();
     detectWinAnimation(data);
     showReactionBar();
+}
+
+// オールイン対決時の勝率（エクイティ）を各シートに表示する。
+// entries: [{ seat, name, equity }]  seat = エンジン上のプレイヤーID = DOM の seat-${id}
+function showAllInEquity(entries) {
+    clearAllInEquity();
+    for (const e of entries) {
+        const seatEl = document.getElementById(`seat-${e.seat}`);
+        if (!seatEl) continue;
+        const badge = document.createElement('div');
+        badge.className = 'equity-badge';
+        const pct = (e.equity != null) ? e.equity : 0;
+        if (pct >= 60) badge.classList.add('equity-ahead');
+        else if (pct < 25) badge.classList.add('equity-behind');
+        badge.textContent = `${pct}%`;
+        seatEl.appendChild(badge);
+    }
+}
+
+function clearAllInEquity() {
+    document.querySelectorAll('.equity-badge').forEach(el => el.remove());
 }
 
 // 次ゲーム予告バッジの更新 (ミックスの通常ローテーション時のみ表示)
@@ -2996,7 +3033,11 @@ function onYourDraw(data) {
     startTurnTimer(data.timeLimit || 45);
     ui.pendingDraw = true;
     ui.selectedCards.clear();
-    document.getElementById('draw-action-bar').classList.remove('hidden');
+    const drawBar = document.getElementById('draw-action-bar');
+    drawBar.classList.remove('hidden');
+    // 既存のタイムバンクボタンがあれば消してから再追加
+    drawBar.querySelector('#btn-time-bank')?.remove();
+    appendTimeBankButton(drawBar, data.timeBank);
     // Re-render hand for selection
     if (currentState) ui.renderPlayerHand(currentState);
 }
@@ -3201,25 +3242,28 @@ function showActionButtons(actions, turnData) {
     }
 
     // タイムバンク (+秒) ボタン: 残量があるときだけ表示
-    const tb = turnData ? turnData.timeBank : null;
-    if (tb && tb > 0) {
-        const add = Math.min(30, tb);
-        const tbBtn = document.createElement('button');
-        tbBtn.id = 'btn-time-bank';
-        tbBtn.className = 'btn-action btn-timebank';
-        tbBtn.textContent = `⏱ タイムバンク +${add}秒（残${tb}秒）`;
-        tbBtn.addEventListener('click', () => {
-            client.useTimeBank(activeTableId);
-            // ローカルのターン表示も延長 (startTurnTimer はバーを隠すので使わない)
-            const elapsed = (Date.now() - turnTimerStart) / 1000;
-            const remaining = Math.max(0, turnTimeLimit - elapsed);
-            turnTimeLimit = remaining + add;
-            turnTimerStart = Date.now();
-            tbBtn.disabled = true;
-            tbBtn.textContent = '⏱ 使用しました';
-        }, { once: true });
-        btnDiv.appendChild(tbBtn);
-    }
+    appendTimeBankButton(btnDiv, turnData ? turnData.timeBank : null);
+}
+
+// タイムバンクボタンを生成して container に追加する (アクション/ドロー共通)。
+function appendTimeBankButton(container, timeBank) {
+    if (!container || !timeBank || timeBank <= 0) return;
+    const add = Math.min(30, timeBank);
+    const btn = document.createElement('button');
+    btn.id = 'btn-time-bank';
+    btn.className = 'btn-action btn-timebank';
+    btn.textContent = `⏱ タイムバンク +${add}秒（残${timeBank}秒）`;
+    btn.addEventListener('click', () => {
+        client.useTimeBank(activeTableId);
+        // ローカルのターン表示も延長 (startTurnTimer はバーを隠すので使わない)
+        const elapsed = (Date.now() - turnTimerStart) / 1000;
+        const remaining = Math.max(0, turnTimeLimit - elapsed);
+        turnTimeLimit = remaining + add;
+        turnTimerStart = Date.now();
+        btn.disabled = true;
+        btn.textContent = '⏱ 使用しました';
+    }, { once: true });
+    container.appendChild(btn);
 }
 
 

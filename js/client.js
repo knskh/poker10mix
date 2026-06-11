@@ -140,6 +140,9 @@ class PokerClient {
             case 'hand_result':
                 this.emit('hand_result', msg);
                 break;
+            case 'allin_equity':
+                this.emit('allin_equity', msg);
+                break;
             case 'stats_update':
                 this.emit('stats_update', msg);
                 break;

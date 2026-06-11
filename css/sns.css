@@ -432,95 +432,95 @@
 /* ==========================================
    Login Screen light-blue overrides
    ========================================== */
-body:not(.theme-classic):not(.theme-midnight) #login-screen {
+body #login-screen {
     background: linear-gradient(180deg, #F5FAFF 0%, #DBE9FA 100%);
     color: #17202E;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .site-logo {
+body #login-screen .site-logo {
     max-width: 220px; border-radius: 16px;
     filter: drop-shadow(0 6px 24px rgba(30,82,163,0.25));
     background: linear-gradient(135deg, #0E2238, #1A3558);
     padding: 8px;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-box {
+body #login-screen .login-box {
     background: #fff;
     border: 1px solid #DBE9FA;
     box-shadow: 0 6px 24px rgba(30,82,163,0.12);
     color: #17202E;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-hint {
+body #login-screen .login-hint {
     color: #566579;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-box input[type="text"],
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-box input[type="email"],
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-box input[type="password"] {
+body #login-screen .login-box input[type="text"],
+body #login-screen .login-box input[type="email"],
+body #login-screen .login-box input[type="password"] {
     background: #F5FAFF;
     border: 1px solid #DBE9FA;
     color: #17202E;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-box input:focus {
+body #login-screen .login-box input:focus {
     border-color: #5B9BF0;
     box-shadow: 0 0 0 3px rgba(91,155,240,0.15);
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .btn-primary {
+body #login-screen .btn-primary {
     background: linear-gradient(180deg, #5B9BF0, #2A6BC9);
     color: #fff;
     border: 1px solid #2A6BC9;
     box-shadow: 0 3px 10px rgba(42,107,201,0.3);
     backdrop-filter: none;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .btn-primary:hover {
+body #login-screen .btn-primary:hover {
     background: linear-gradient(180deg, #6AA8F0, #1E52A3);
     box-shadow: 0 4px 14px rgba(42,107,201,0.4);
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-tabs {
+body #login-screen .login-tabs {
     border-color: #DBE9FA;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-tab {
+body #login-screen .login-tab {
     background: #F5FAFF; color: #566579;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-tab.active {
+body #login-screen .login-tab.active {
     background: linear-gradient(180deg, #5B9BF0, #2A6BC9);
     color: #fff;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-tab:hover:not(.active) {
+body #login-screen .login-tab:hover:not(.active) {
     background: #EEF5FF;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .account-mode-tabs {
+body #login-screen .account-mode-tabs {
     border-color: #DBE9FA;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .account-tab {
+body #login-screen .account-tab {
     background: #F5FAFF; color: #566579;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .account-tab.active {
+body #login-screen .account-tab.active {
     background: #DBE9FA; color: #1E52A3;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-picker-label {
+body #login-screen .avatar-picker-label {
     color: #566579;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-picker-tabs {
+body #login-screen .avatar-picker-tabs {
     border-color: #DBE9FA;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-tab {
+body #login-screen .avatar-tab {
     background: #F5FAFF; color: #566579;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-tab.active {
+body #login-screen .avatar-tab.active {
     background: #DBE9FA; color: #1E52A3;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-tab:hover:not(.active) {
+body #login-screen .avatar-tab:hover:not(.active) {
     background: #EEF5FF;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-option {
+body #login-screen .avatar-option {
     background: #F5FAFF;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-option:hover {
+body #login-screen .avatar-option:hover {
     border-color: #6AA8F0; background: #EEF5FF;
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .avatar-option.selected {
+body #login-screen .avatar-option.selected {
     border-color: #2A6BC9; background: #DBE9FA;
     box-shadow: 0 0 8px rgba(91,155,240,0.3);
 }
-body:not(.theme-classic):not(.theme-midnight) #login-screen .login-error {
+body #login-screen .login-error {
     background: #FCE8E8; border-color: #F5BDBD; color: #B72424;
 }
 

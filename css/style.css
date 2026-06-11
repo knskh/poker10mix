@@ -32,81 +32,7 @@
     --shadow: 0 4px 16px rgba(16, 24, 40, 0.08), 0 1px 3px rgba(16, 24, 40, 0.04);
 }
 
-/* Theme: Classic (casino green + warm tones) */
-body.theme-classic {
-    --bg-grad: radial-gradient(circle at top, #1a2e1a 0%, #0a120a 100%);
-    --bg: #0a120a;
-    --felt: #1a5c2a;
-    --felt-light: #237a36;
-    --felt-border: #0d2d14;
-    --rail: #3e2723;
-    --rail-inner: #5d4037;
-    --gold: #ffd54f;
-    --accent: #ffb300;
-    --green: #66bb6a;
-    --red: #ef5350;
-    --btn-primary: #ffd54f;
-    --btn-fold: rgba(255,255,255,0.1);
-    --btn-check: #43a047;
-    --btn-bet: #ffd54f;
-    --btn-raise: #ffb300;
-    --seat-bg: rgba(10, 18, 10, 0.7);
-    --seat-active: rgba(255,213,79,0.15);
-    --seat-border: rgba(255,213,79,0.4);
-    --glass-bg: rgba(255,255,255,0.04);
-    --glass-border: rgba(255,213,79,0.2);
-    --text: #f5f5dc;
-    --text-dim: #c9c2a3;
-}
-body.theme-classic #table-felt {
-    background: radial-gradient(ellipse at 50% 40%, #2e7d32 0%, #1b5e20 50%, #145218 80%, #0d3b10 100%) !important;
-    border-color: #5d4037 !important;
-    box-shadow: 0 0 0 4px #3e2723, 0 0 0 12px #6d4c41, 0 0 0 14px #3e2723, inset 0 0 40px rgba(0,0,0,0.4), 0 8px 32px rgba(93,64,55,0.3) !important;
-}
-body.theme-classic .site-logo {
-    filter: drop-shadow(0 0 10px rgba(255,213,79,0.3));
-}
-body.theme-classic .btn-primary {
-    color: #1a1a00;
-}
-
-/* Theme: Midnight (deep navy + purple) */
-body.theme-midnight {
-    --bg-grad: radial-gradient(circle at top, #1a1040 0%, #0a0618 100%);
-    --bg: #0a0618;
-    --felt: #1a1050;
-    --felt-light: #2a1870;
-    --felt-border: #0d0830;
-    --rail: #1a1040;
-    --rail-inner: #2a1860;
-    --gold: #b388ff;
-    --accent: #7c4dff;
-    --green: #69f0ae;
-    --red: #ff5252;
-    --btn-primary: #b388ff;
-    --btn-fold: rgba(255,255,255,0.1);
-    --btn-check: #5c6bc0;
-    --btn-bet: #b388ff;
-    --btn-raise: #7c4dff;
-    --seat-bg: rgba(10, 6, 24, 0.7);
-    --seat-active: rgba(179,136,255,0.15);
-    --seat-border: rgba(179,136,255,0.4);
-    --glass-bg: rgba(255,255,255,0.03);
-    --glass-border: rgba(179,136,255,0.2);
-    --text: #e8e0ff;
-    --text-dim: #bdb3d4;
-}
-body.theme-midnight #table-felt {
-    background: radial-gradient(ellipse at 50% 40%, #2a1870 0%, #1a1050 50%, #120a40 80%, #0a0630 100%) !important;
-    border-color: #3a2880 !important;
-    box-shadow: 0 0 0 4px #1a1040, 0 0 0 12px #4a30a0, 0 0 0 14px #1a1040, inset 0 0 40px rgba(0,0,0,0.5), 0 8px 32px rgba(124,77,255,0.2) !important;
-}
-body.theme-midnight .site-logo {
-    filter: drop-shadow(0 0 10px rgba(179,136,255,0.3));
-}
-body.theme-midnight .btn-primary {
-    color: #1a0a30;
-}
+/* テーマはライト基調1本に統一 (旧 Classic/Midnight ダークテーマは廃止) */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -138,6 +64,30 @@ body {
     animation: pulse 1.5s infinite;
 }
 @keyframes pulse { 50% { opacity: 0.6; } }
+.connection-status.waking {
+    background: #303f9f; padding: 10px 12px; font-size: 14px; line-height: 1.5;
+    animation: pulse 2.5s infinite;
+}
+.connection-status .ws-sub { font-size: 12px; opacity: 0.85; }
+
+/* === オールイン エクイティ（勝率）バッジ === */
+.equity-badge {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    background: rgba(20, 24, 48, 0.92); color: #fff;
+    font-size: 13px; font-weight: 800; letter-spacing: 0.3px;
+    padding: 2px 9px; border-radius: 11px; z-index: 30;
+    border: 1.5px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    white-space: nowrap; pointer-events: none;
+    animation: equityPop 0.35s ease-out;
+}
+.equity-badge.equity-ahead  { background: #1b5e20; border-color: #66bb6a; }
+.equity-badge.equity-behind { background: #5d1a1a; border-color: #ef9a9a; }
+@keyframes equityPop {
+    0%   { transform: translateX(-50%) scale(0.4); opacity: 0; }
+    70%  { transform: translateX(-50%) scale(1.15); }
+    100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
 
 /* === Logos === */
 .site-logo { max-width: 240px; margin-bottom: -10px; filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.3)); }
@@ -2474,15 +2424,15 @@ body {
 .ps-name-row.ps-me { color: var(--gold); }
 .ps-arrow { font-size: 18px; color: var(--text-dim); }
 /* ライトテーマ: 白モーダル上で読みやすく */
-body:not(.theme-classic):not(.theme-midnight) .ps-name-row {
+body .ps-name-row {
     background: #f1f5f9; color: #17202E; border: 1px solid #d1d8e0;
 }
-body:not(.theme-classic):not(.theme-midnight) .ps-name-row:hover {
+body .ps-name-row:hover {
     background: #e2eaf3; border-color: #2A6BC9;
 }
-body:not(.theme-classic):not(.theme-midnight) .ps-name-row.ps-me { color: #1d4ed8; }
-body:not(.theme-classic):not(.theme-midnight) .ps-arrow { color: #64748b; }
-body:not(.theme-classic):not(.theme-midnight) .ps-hint { color: #64748b; }
+body .ps-name-row.ps-me { color: #1d4ed8; }
+body .ps-arrow { color: #64748b; }
+body .ps-hint { color: #64748b; }
 
 /* ==========================================
    現在収支モーダル (in-game)
@@ -2935,112 +2885,112 @@ body:not(.theme-classic):not(.theme-midnight) .ps-hint { color: #64748b; }
 /* Google fonts are loaded via <link>; fallback to system if missing */
 
 /* --- Base elements --- */
-body:not(.theme-classic):not(.theme-midnight) {
+body {
     color: var(--text);
 }
 
 /* --- Logos: no neon glow on light bg --- */
-body:not(.theme-classic):not(.theme-midnight) .site-logo {
+body .site-logo {
     filter: drop-shadow(0 2px 6px rgba(124, 92, 255, 0.25));
 }
 
 /* --- Login screen: clean panel (no dark glass) --- */
-body:not(.theme-classic):not(.theme-midnight) #login-screen {
+body #login-screen {
     background: var(--bg-grad);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-box {
+body .login-box {
     background: var(--panel);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-hint {
+body .login-hint {
     color: var(--text-dim);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-box input[type="text"],
-body:not(.theme-classic):not(.theme-midnight) .login-box input[type="email"],
-body:not(.theme-classic):not(.theme-midnight) .login-box input[type="password"] {
+body .login-box input[type="text"],
+body .login-box input[type="email"],
+body .login-box input[type="password"] {
     background: #f5f6f8;
     border: 1px solid var(--border);
     color: var(--text);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-box input:focus {
+body .login-box input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(124,92,255,0.15);
     background: #fff;
 }
 
 /* --- Tabs (login/account/avatar) --- */
-body:not(.theme-classic):not(.theme-midnight) .login-tabs,
-body:not(.theme-classic):not(.theme-midnight) .account-mode-tabs,
-body:not(.theme-classic):not(.theme-midnight) .avatar-picker-tabs {
+body .login-tabs,
+body .account-mode-tabs,
+body .avatar-picker-tabs {
     border: 1px solid var(--border);
     background: var(--panel-2);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-tab,
-body:not(.theme-classic):not(.theme-midnight) .account-tab,
-body:not(.theme-classic):not(.theme-midnight) .avatar-tab {
+body .login-tab,
+body .account-tab,
+body .avatar-tab {
     background: transparent;
     color: var(--text-dim);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-tab.active {
+body .login-tab.active {
     background: var(--accent);
     color: #fff;
 }
-body:not(.theme-classic):not(.theme-midnight) .account-tab.active {
+body .account-tab.active {
     background: #fff;
     color: var(--text);
     box-shadow: 0 1px 2px rgba(16,24,40,0.05);
 }
-body:not(.theme-classic):not(.theme-midnight) .avatar-tab.active {
+body .avatar-tab.active {
     background: rgba(124, 92, 255, 0.12);
     color: var(--accent);
 }
-body:not(.theme-classic):not(.theme-midnight) .login-tab:hover:not(.active),
-body:not(.theme-classic):not(.theme-midnight) .avatar-tab:hover:not(.active) {
+body .login-tab:hover:not(.active),
+body .avatar-tab:hover:not(.active) {
     background: rgba(0,0,0,0.04);
 }
 
 /* --- Room panels: light cards --- */
-body:not(.theme-classic):not(.theme-midnight) .room-chat,
-body:not(.theme-classic):not(.theme-midnight) .room-settings,
-body:not(.theme-classic):not(.theme-midnight) .room-players,
-body:not(.theme-classic):not(.theme-midnight) .room-chat-log,
-body:not(.theme-classic):not(.theme-midnight) .room-header {
+body .room-chat,
+body .room-settings,
+body .room-players,
+body .room-chat-log,
+body .room-header {
     background: var(--panel) !important;
     color: var(--text);
     border-color: var(--border);
 }
 
 /* Chat messages background */
-body:not(.theme-classic):not(.theme-midnight) .chat-msg,
-body:not(.theme-classic):not(.theme-midnight) .game-log > div {
+body .chat-msg,
+body .game-log > div {
     color: var(--text);
 }
-body:not(.theme-classic):not(.theme-midnight) input[type="text"]:not(.login-box input) {
+body input[type="text"]:not(.login-box input) {
     background: #f5f6f8;
     color: var(--text);
     border: 1px solid var(--border);
 }
-body:not(.theme-classic):not(.theme-midnight) input[type="text"]:focus {
+body input[type="text"]:focus {
     border-color: var(--accent);
     outline: none;
     background: #fff;
 }
 
 /* --- Online user list on light bg --- */
-body:not(.theme-classic):not(.theme-midnight) .online-user-item {
+body .online-user-item {
     background: var(--panel-2);
     border: 1px solid var(--border);
     color: var(--text);
 }
-body:not(.theme-classic):not(.theme-midnight) .online-user-item:hover {
+body .online-user-item:hover {
     background: #fff;
 }
 
 /* --- Table felt: minty green on wood rail --- */
-body:not(.theme-classic):not(.theme-midnight) #table-felt {
+body #table-felt {
     background: radial-gradient(ellipse at 50% 40%, var(--felt-light) 0%, var(--felt) 55%, #3e9a62 85%, #2e7a4b 100%);
     border: 8px solid var(--rail);
     box-shadow:
@@ -3052,18 +3002,18 @@ body:not(.theme-classic):not(.theme-midnight) #table-felt {
 }
 
 /* --- Seats: white glass on light bg --- */
-body:not(.theme-classic):not(.theme-midnight) .seat {
+body .seat {
     background: rgba(255,255,255,0.95);
     backdrop-filter: none;
     border: 1px solid var(--border);
     box-shadow: 0 3px 10px rgba(16,24,40,0.08);
 }
-body:not(.theme-classic):not(.theme-midnight) .seat.active-turn {
+body .seat.active-turn {
     background: rgba(255,255,255,1);
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(124,92,255,0.25), 0 4px 14px rgba(16,24,40,0.12);
 }
-body:not(.theme-classic):not(.theme-midnight) .seat-name {
+body .seat-name {
     color: var(--text);
     text-shadow: none;
 }
@@ -3073,9 +3023,9 @@ body:not(.theme-classic):not(.theme-midnight) .seat-name {
    ======================================================= */
 
 /* Shared arcade button base (applied to all primary/small/action buttons on light theme) */
-body:not(.theme-classic):not(.theme-midnight) .btn-primary,
-body:not(.theme-classic):not(.theme-midnight) .btn-small,
-body:not(.theme-classic):not(.theme-midnight) .btn-action {
+body .btn-primary,
+body .btn-small,
+body .btn-action {
     font-family: 'Fredoka', 'Inter', 'Noto Sans JP', sans-serif;
     font-weight: 700;
     letter-spacing: 0.3px;
@@ -3086,7 +3036,7 @@ body:not(.theme-classic):not(.theme-midnight) .btn-action {
 }
 
 /* Primary button — purple arcade stack */
-body:not(.theme-classic):not(.theme-midnight) .btn-primary {
+body .btn-primary {
     padding: 12px 32px; font-size: 17px;
     background: linear-gradient(180deg, #8a6bff 0%, #7c5cff 100%);
     color: #fff;
@@ -3097,26 +3047,26 @@ body:not(.theme-classic):not(.theme-midnight) .btn-primary {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-primary:hover {
+body .btn-primary:hover {
     transform: translateY(-1px);
     box-shadow:
         0 6px 0 0 #4f32d4,
         0 9px 20px rgba(79, 50, 212, 0.35);
     background: linear-gradient(180deg, #9a7dff 0%, #8a6bff 100%);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-primary:active {
+body .btn-primary:active {
     transform: translateY(4px);
     box-shadow:
         0 1px 0 0 #4f32d4,
         0 2px 6px rgba(79, 50, 212, 0.3);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-large {
+body .btn-large {
     padding: 14px 40px; font-size: 19px;
     border-radius: 16px;
 }
 
 /* Small button — light gray arcade chip */
-body:not(.theme-classic):not(.theme-midnight) .btn-small {
+body .btn-small {
     padding: 6px 14px; font-size: 13px;
     background: linear-gradient(180deg, #fff 0%, #eef0f5 100%);
     color: var(--text);
@@ -3124,75 +3074,75 @@ body:not(.theme-classic):not(.theme-midnight) .btn-small {
     border-radius: 10px;
     box-shadow: 0 3px 0 0 #d1d5db, 0 4px 10px rgba(16,24,40,0.05);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-small:hover {
+body .btn-small:hover {
     filter: brightness(1.02);
     transform: translateY(-1px);
     box-shadow: 0 4px 0 0 #d1d5db, 0 6px 12px rgba(16,24,40,0.08);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-small:active {
+body .btn-small:active {
     transform: translateY(2px);
     box-shadow: 0 1px 0 0 #d1d5db, 0 2px 4px rgba(16,24,40,0.08);
 }
 
 /* Danger button variant — red arcade stack */
-body:not(.theme-classic):not(.theme-midnight) .btn-danger,
-body:not(.theme-classic):not(.theme-midnight) .btn-small.btn-danger {
+body .btn-danger,
+body .btn-small.btn-danger {
     background: linear-gradient(180deg, #ff6060 0%, #ef4444 100%) !important;
     color: #fff !important;
     border-color: transparent !important;
     box-shadow: 0 4px 0 0 #b91c1c, 0 5px 12px rgba(185,28,28,0.2) !important;
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-danger:hover {
+body .btn-danger:hover {
     transform: translateY(-1px);
     box-shadow: 0 5px 0 0 #b91c1c, 0 7px 14px rgba(185,28,28,0.3) !important;
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-danger:active {
+body .btn-danger:active {
     transform: translateY(3px);
     box-shadow: 0 1px 0 0 #b91c1c, 0 2px 4px rgba(185,28,28,0.3) !important;
 }
 
 /* Tiny button — flat pill */
-body:not(.theme-classic):not(.theme-midnight) .btn-tiny {
+body .btn-tiny {
     background: rgba(0,0,0,0.05);
     color: var(--text-dim);
     border-radius: 6px;
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-tiny:hover {
+body .btn-tiny:hover {
     background: rgba(0,0,0,0.1);
     color: var(--text);
 }
 
 /* Action buttons (fold / check / call / bet / raise / all-in) — arcade 3D */
-body:not(.theme-classic):not(.theme-midnight) .btn-action {
+body .btn-action {
     padding: 12px 14px;
     font-size: 14px;
     color: #fff;
     border-radius: 10px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-fold {
+body .btn-fold {
     background: linear-gradient(180deg, #9ca3af 0%, #6b7280 100%);
     box-shadow: 0 4px 0 0 #4b5563, 0 5px 10px rgba(75,85,99,0.2);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-check,
-body:not(.theme-classic):not(.theme-midnight) .btn-call {
+body .btn-check,
+body .btn-call {
     background: linear-gradient(180deg, #34d399 0%, #22c55e 100%);
     box-shadow: 0 4px 0 0 #15803d, 0 5px 10px rgba(21,128,61,0.2);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-bet,
-body:not(.theme-classic):not(.theme-midnight) .btn-raise {
+body .btn-bet,
+body .btn-raise {
     background: linear-gradient(180deg, #ff6060 0%, #ef4444 100%);
     box-shadow: 0 4px 0 0 #b91c1c, 0 5px 10px rgba(185,28,28,0.2);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-allin {
+body .btn-allin {
     background: linear-gradient(180deg, #a855f7 0%, #8b5cf6 100%);
     box-shadow: 0 4px 0 0 #6d28d9, 0 5px 10px rgba(109,40,217,0.25);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-action:hover {
+body .btn-action:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
 }
-body:not(.theme-classic):not(.theme-midnight) .btn-action:active {
+body .btn-action:active {
     transform: translateY(3px);
     box-shadow: 0 1px 0 0 rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.15) !important;
 }
@@ -3201,7 +3151,7 @@ body:not(.theme-classic):not(.theme-midnight) .btn-action:active {
    === Vivid Arcade Chips ===
    mix-1 ロゴに合わせた青系チップ (元は赤系)
    ======================================================= */
-body:not(.theme-classic):not(.theme-midnight) .chip-icon {
+body .chip-icon {
     width: 12px; height: 12px;
     border-radius: 50%;
     background:
@@ -3211,7 +3161,7 @@ body:not(.theme-classic):not(.theme-midnight) .chip-icon {
 }
 
 /* Floating bet chip: light pill with vivid chip */
-body:not(.theme-classic):not(.theme-midnight) .table-bet-chip {
+body .table-bet-chip {
     background: #fff;
     border: 2px solid #1a1d23;
     border-radius: 14px;
@@ -3224,86 +3174,86 @@ body:not(.theme-classic):not(.theme-midnight) .table-bet-chip {
 }
 
 /* Chip color variations (by amount — applied dynamically via JS classes if present) */
-body:not(.theme-classic):not(.theme-midnight) .chip-icon.chip-red {
+body .chip-icon.chip-red {
     background: radial-gradient(circle at 35% 30%, #ff9696, #ef4444 55%, #b91c1c 100%);
 }
-body:not(.theme-classic):not(.theme-midnight) .chip-icon.chip-blue {
+body .chip-icon.chip-blue {
     background: radial-gradient(circle at 35% 30%, #93c5fd, #2563eb 55%, #1e40af 100%);
 }
-body:not(.theme-classic):not(.theme-midnight) .chip-icon.chip-green {
+body .chip-icon.chip-green {
     background: radial-gradient(circle at 35% 30%, #86efac, #16a34a 55%, #14532d 100%);
 }
-body:not(.theme-classic):not(.theme-midnight) .chip-icon.chip-yellow {
+body .chip-icon.chip-yellow {
     background: radial-gradient(circle at 35% 30%, #fde68a, #f59e0b 55%, #b45309 100%);
 }
-body:not(.theme-classic):not(.theme-midnight) .chip-icon.chip-purple {
+body .chip-icon.chip-purple {
     background: radial-gradient(circle at 35% 30%, #d8b4fe, #8b5cf6 55%, #6d28d9 100%);
 }
 
 /* =======================================================
    === Misc light-theme readability fixes ===
    ======================================================= */
-body:not(.theme-classic):not(.theme-midnight) .muted,
-body:not(.theme-classic):not(.theme-midnight) .hint,
-body:not(.theme-classic):not(.theme-midnight) .text-dim {
+body .muted,
+body .hint,
+body .text-dim {
     color: var(--text-dim);
 }
-body:not(.theme-classic):not(.theme-midnight) h1,
-body:not(.theme-classic):not(.theme-midnight) h2,
-body:not(.theme-classic):not(.theme-midnight) h3 {
+body h1,
+body h2,
+body h3 {
     color: var(--text);
 }
-body:not(.theme-classic):not(.theme-midnight) .room-empty {
+body .room-empty {
     color: var(--text-dim);
 }
 
 /* Game checkbox item on light bg */
-body:not(.theme-classic):not(.theme-midnight) .game-checkbox-item {
+body .game-checkbox-item {
     background: var(--panel-2);
     border: 1px solid var(--border);
     color: var(--text);
 }
-body:not(.theme-classic):not(.theme-midnight) .game-checkbox-item.game-all-selected {
+body .game-checkbox-item.game-all-selected {
     background: rgba(124,92,255,0.1);
     border-color: var(--accent);
 }
-body:not(.theme-classic):not(.theme-midnight) .game-checkbox-item.game-some-selected {
+body .game-checkbox-item.game-some-selected {
     background: rgba(124,92,255,0.05);
 }
 
 /* Stats modal etc: keep readable */
-body:not(.theme-classic):not(.theme-midnight) .modal-content,
-body:not(.theme-classic):not(.theme-midnight) #stats-modal .modal-content,
-body:not(.theme-classic):not(.theme-midnight) .session-summary-modal {
+body .modal-content,
+body #stats-modal .modal-content,
+body .session-summary-modal {
     background: var(--panel) !important;
     color: var(--text) !important;
     border: 1px solid var(--border);
 }
 
 /* Avatar grid on light bg */
-body:not(.theme-classic):not(.theme-midnight) .avatar-option {
+body .avatar-option {
     background: var(--panel-2);
     border: 1px solid var(--border);
 }
-body:not(.theme-classic):not(.theme-midnight) .avatar-option:hover {
+body .avatar-option:hover {
     border-color: var(--accent);
     background: #fff;
 }
-body:not(.theme-classic):not(.theme-midnight) .avatar-option.selected {
+body .avatar-option.selected {
     border-color: var(--accent);
     background: rgba(124,92,255,0.1);
     box-shadow: 0 0 0 2px rgba(124,92,255,0.3);
 }
 
 /* Lock toggle visibility */
-body:not(.theme-classic):not(.theme-midnight) .lock-toggle-text {
+body .lock-toggle-text {
     color: var(--text);
 }
-body:not(.theme-classic):not(.theme-midnight) .pending-joins {
+body .pending-joins {
     background: rgba(245, 158, 11, 0.1);
     border: 1px solid rgba(245, 158, 11, 0.4);
 }
-body:not(.theme-classic):not(.theme-midnight) .pending-join-name {
+body .pending-join-name {
     color: var(--text);
 }
 
@@ -3320,8 +3270,8 @@ input::placeholder, textarea::placeholder {
     color: rgba(255, 255, 255, 0.55);
     opacity: 1;
 }
-body:not(.theme-classic):not(.theme-midnight) input::placeholder,
-body:not(.theme-classic):not(.theme-midnight) textarea::placeholder {
+body input::placeholder,
+body textarea::placeholder {
     color: #6b7280;
 }
 
@@ -3371,7 +3321,7 @@ body:not(.theme-classic):not(.theme-midnight) textarea::placeholder {
      いる場合は適用しない
    ========================================== */
 
-body:not(.theme-classic):not(.theme-midnight) {
+body {
 
     /* ---- モーダルのオーバーレイ＆コンテナ ---- */
     #stats-modal,
