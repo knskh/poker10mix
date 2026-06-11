@@ -1983,6 +1983,15 @@ function clearAllInEquity() {
     document.querySelectorAll('.equity-badge').forEach(el => el.remove());
 }
 
+// 空状態（データなし）の共通表示。アイコン＋一言＋次のアクション(任意)で統一。
+function emptyState(icon, title, hint) {
+    return `<div class="empty-state">`
+        + `<div class="empty-state-icon">${icon}</div>`
+        + `<div class="empty-state-title">${title}</div>`
+        + (hint ? `<div class="empty-state-hint">${hint}</div>` : '')
+        + `</div>`;
+}
+
 // 次ゲーム予告バッジの更新 (ミックスの通常ローテーション時のみ表示)
 function updateNextGameInfo(nextGame) {
     const el = document.getElementById('next-game-info');
@@ -2420,7 +2429,7 @@ function renderHandHistory(containerId) {
         persistHandHistory();
     }
     if (visibleHands.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-dim);padding:8px;">まだ履歴がありません</p>';
+        container.innerHTML = emptyState('🃏', 'まだ履歴がありません', 'ハンドをプレイすると、ここに履歴が表示されます。');
         return;
     }
     // Compact list of starting hands with win/loss badges
@@ -4008,7 +4017,7 @@ function renderResultsTab(tab) {
 
 function _renderOverallTab() {
     const entries = _myHandResults();
-    if (entries.length === 0) return '<div class="results-empty">まだ記録がありません</div>';
+    if (entries.length === 0) return emptyState('📊', 'まだ記録がありません', 'ハンドをプレイすると、収支が集計されます。');
     const total = entries.reduce((s, e) => s + e.profit, 0);
     const wins  = entries.filter(e => e.profit > 0).length;
     const losses = entries.filter(e => e.profit < 0).length;
@@ -4038,7 +4047,7 @@ function _renderOverallTab() {
 
 function _renderGroupedTab(mode) {
     const entries = _myHandResults().filter(e => e.t);
-    if (entries.length === 0) return '<div class="results-empty">日付付きの記録がまだありません</div>';
+    if (entries.length === 0) return emptyState('📅', '日付付きの記録がまだありません', 'プレイした日ごとに収支がまとまります。');
     const groups = new Map();
     for (const e of entries) {
         const d = new Date(e.t);
@@ -4094,7 +4103,7 @@ function _renderTableTab() {
         return ephemeralNotice + '<div class="results-empty">サーバーから取得中...</div>';
     }
     if (resultsServerSessions.length === 0) {
-        return ephemeralNotice + '<div class="results-empty">テーブル別の記録はまだありません。<br>テーブルが閉じられたタイミングで記録されます。</div>';
+        return ephemeralNotice + emptyState('🪑', 'テーブル別の記録はまだありません', 'テーブルが閉じられたタイミングで記録されます。');
     }
     const myName = (typeof client !== 'undefined' && client.name) ? client.name : '';
     // Group by roomId. For each roomId, aggregate per-name profit across all
@@ -4147,7 +4156,7 @@ function _renderTableTab() {
 function renderStats(data) {
     const container = document.getElementById('stats-table-container');
     if (!data.stats || Object.keys(data.stats).length === 0) {
-        container.innerHTML = '<p style="color:var(--text-dim);padding:16px;">データなし</p>';
+        container.innerHTML = emptyState('📊', 'データがありません', 'ハンドが進むと、スタッツが集計されます。');
         return;
     }
     let html = '';
@@ -4230,7 +4239,7 @@ function renderParticipantStat(name) {
     } else {
         html += `<div class="stats-player-panel">`;
         html += `<h3${nameStyle}>${escapeHtml(name)} — ${escapeHtml(gameLabel)}</h3>`;
-        html += `<p style="color:var(--text-dim);padding:16px;">このゲームのスタッツはまだありません（同卓したハンドが記録されると表示されます）。</p>`;
+        html += emptyState('📊', 'このゲームのスタッツはまだありません', '同卓したハンドが記録されると表示されます。');
         html += `</div>`;
     }
     container.innerHTML = html;
@@ -4291,7 +4300,7 @@ function renderRanking() {
     const entries = Object.entries(saved).filter(([, c]) => c.hands > 0);
 
     if (entries.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-dim);padding:16px;">データなし</p>';
+        container.innerHTML = emptyState('🏆', 'データがありません', 'Zoomをプレイすると、ランキングに反映されます。');
         return;
     }
 
@@ -4320,7 +4329,7 @@ function showPlayerStats(playerName) {
     const stats = saved[playerName];
     const container = document.getElementById('stats-table-container');
     if (!stats || !stats.hands) {
-        container.innerHTML = `<h3 style="color:var(--gold)">${escapeHtml(playerName)}</h3><p style="color:var(--text-dim);padding:16px;">データなし</p>`;
+        container.innerHTML = `<h3 style="color:var(--gold)">${escapeHtml(playerName)}</h3>` + emptyState('📊', 'データがありません', 'このプレイヤーと同卓したハンドがまだありません。');
     } else {
         const isMeFlag = playerName === client.name;
         container.innerHTML = renderPlayerStatsWithTabs(playerName, stats, ' style="color:var(--gold)"', isMeFlag);
@@ -4393,7 +4402,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr, isMe) {
     const safeName = escapeHtml(pName);
     let html = `<div class="stats-player-panel">`;
     html += `<h3${extraAttr || ''}>${safeName} (${c.hands}ハンド)</h3>`;
-    if (!c.hands || c.hands === 0) { html += '<p style="color:var(--text-dim)">データなし</p></div>'; return html; }
+    if (!c.hands || c.hands === 0) { html += emptyState('📊', 'データがありません') + '</div>'; return html; }
 
     // Tabs
     html += `<div class="stats-tabs-bar">`;
@@ -4420,7 +4429,7 @@ function renderPlayerStatsWithTabs(pName, c, extraAttr, isMe) {
             html += `</div>`;
         }
     } else {
-        html += '<p style="color:var(--text-dim)">データなし</p>';
+        html += emptyState('📊', 'ゲーム別データがありません');
     }
     html += `</div>`;
 
@@ -5874,7 +5883,7 @@ function renderCurrentStandings(data) {
     const myName = data.myName || (client && client.name) || '';
     if (sub) sub.textContent = `テーブル ${data.roomId || ''} ・ ${data.handsPlayed || 0} ハンド`;
     if (standings.length === 0) {
-        list.innerHTML = '<div class="results-empty">まだ記録がありません</div>';
+        list.innerHTML = emptyState('📋', 'まだ記録がありません', 'ハンドが終わると、順位が表示されます。');
     } else {
         let html = '';
         for (const s of standings) {
