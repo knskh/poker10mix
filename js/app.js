@@ -692,6 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupGameScreen();
     setupStatsModal();
     setupResultsModal();
+    setupTeamsModal();
     setupChat();
     setupPreActions();
     setupPresetSettingsModal();
@@ -1328,6 +1329,8 @@ function onAuthResult(data) {
         if (data.token) {
             saveAuthSession({ token: data.token, name: data.name, email: data.email });
         }
+        // 所属チームを取得（部屋設定のチーム限定トグルやチームモーダルで使用）
+        if (client.getTeams) client.getTeams();
         // Remember the last successful account so we can offer a one-tap re-login
         // on future visits (Netflix/GitHub style). Kept even after logout *unless*
         // the user explicitly switches via "他のアカウントでログイン".
@@ -1499,6 +1502,31 @@ function setupRoomScreen() {
     document.getElementById('room-lock-toggle').addEventListener('change', (e) => {
         client.toggleLock(e.target.checked, activeTableId);
     });
+
+    // Team-only toggle (チームメンバー限定)
+    const teamToggle = document.getElementById('room-team-toggle');
+    const teamSelect = document.getElementById('room-team-select');
+    if (teamToggle) teamToggle.addEventListener('change', (e) => {
+        const on = e.target.checked;
+        if (teamSelect) teamSelect.classList.toggle('hidden', !on);
+        const teamId = teamSelect ? teamSelect.value : '';
+        if (on && !teamId) { showToast && showToast('先にチームを作成してください'); e.target.checked = false; teamSelect && teamSelect.classList.add('hidden'); return; }
+        client.setTeamOnly(on, teamId, activeTableId);
+    });
+    if (teamSelect) teamSelect.addEventListener('change', () => {
+        if (teamToggle && teamToggle.checked) client.setTeamOnly(true, teamSelect.value, activeTableId);
+    });
+}
+
+// 部屋設定のチーム選択セレクトを myTeams から更新し、現在のルーム状態を反映。
+function updateRoomTeamSelect(room) {
+    const select = document.getElementById('room-team-select');
+    if (!select) return;
+    if (!room) room = currentRoom;
+    const cur = (room && room.teamId) || select.value || '';
+    select.innerHTML = myTeams.map(t =>
+        `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+    if (cur && myTeams.some(t => t.id === cur)) select.value = cur;
 }
 
 function onRoomJoined(room, roomId) {
@@ -1604,6 +1632,23 @@ function renderRoom(room) {
         }
     } else {
         lockLabel.classList.add('hidden');
+    }
+
+    // チームメンバー限定トグル: ホスト かつ ログイン済み かつ 所属チームがある場合に表示。
+    const teamLabel = document.getElementById('team-toggle-label');
+    const teamToggle = document.getElementById('room-team-toggle');
+    const teamSelect = document.getElementById('room-team-select');
+    if (teamLabel && teamToggle && teamSelect) {
+        if (isHost && loggedInAccount && myTeams.length > 0) {
+            teamLabel.classList.remove('hidden');
+            teamToggle.checked = !!room.teamOnly;
+            updateRoomTeamSelect(room);
+            teamSelect.classList.toggle('hidden', !room.teamOnly);
+        } else {
+            teamLabel.classList.add('hidden');
+            teamSelect.classList.add('hidden');
+            // 未ログイン/非所属でもホストには一言案内したいが、UIを増やしすぎない
+        }
     }
 
     // Render pending join requests (host only)
@@ -3975,6 +4020,192 @@ function setupResultsModal() {
     }
 }
 
+// ==========================================
+// チーム (Teams) Modal
+// ==========================================
+let myTeams = [];
+let teamRecordsData = null;   // { teamId, teamName, records }
+let teamRecordsActiveTab = 'board';
+
+function setupTeamsModal() {
+    const modal = document.getElementById('teams-modal');
+    if (!modal) return;
+
+    const openBtn = document.getElementById('sns-header-teams');
+    if (openBtn) openBtn.addEventListener('click', openTeamsModal);
+    document.getElementById('btn-teams-close')?.addEventListener('click', () => modal.classList.add('hidden'));
+
+    document.getElementById('btn-team-create')?.addEventListener('click', () => {
+        const input = document.getElementById('team-create-name');
+        const name = (input.value || '').trim();
+        if (!name) { showTeamsMsg('チーム名を入力してください'); return; }
+        client.createTeam(name);
+        input.value = '';
+    });
+    document.getElementById('btn-team-join')?.addEventListener('click', () => {
+        const input = document.getElementById('team-join-code');
+        const code = (input.value || '').trim();
+        if (!code) { showTeamsMsg('チームコードを入力してください'); return; }
+        client.joinTeam(code);
+        input.value = '';
+    });
+
+    // チーム一覧のボタン（委譲）
+    document.getElementById('teams-list')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const teamId = btn.dataset.teamId;
+        if (btn.classList.contains('team-records-btn')) {
+            const t = myTeams.find(x => x.id === teamId);
+            showTeamRecords(teamId, t ? t.name : '');
+        } else if (btn.classList.contains('team-leave-btn')) {
+            const t = myTeams.find(x => x.id === teamId);
+            const isOwner = t && t.isOwner;
+            const msg = isOwner ? 'あなたはオーナーです。脱退するとチームは解散されます。よろしいですか？'
+                                : 'このチームから脱退しますか？';
+            if (confirm(msg)) client.leaveTeam(teamId);
+        } else if (btn.classList.contains('team-copy-btn')) {
+            const code = btn.dataset.code || '';
+            if (navigator.clipboard) navigator.clipboard.writeText(code).then(
+                () => showTeamsMsg(`コード ${code} をコピーしました`), () => {});
+        }
+    });
+
+    document.getElementById('btn-team-records-back')?.addEventListener('click', () => {
+        document.getElementById('team-records-view').classList.add('hidden');
+        document.getElementById('teams-main').classList.remove('hidden');
+    });
+    modal.querySelectorAll('.team-rec-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            teamRecordsActiveTab = btn.dataset.trtab;
+            modal.querySelectorAll('.team-rec-tab').forEach(b =>
+                b.classList.toggle('active', b.dataset.trtab === teamRecordsActiveTab));
+            renderTeamRecords();
+        });
+    });
+
+    // WSイベント
+    client.on('teams_data', (teams) => {
+        myTeams = teams || [];
+        if (!modal.classList.contains('hidden')) renderTeamsList();
+        updateRoomTeamSelect();
+    });
+    client.on('team_created', (team) => { showTeamsMsg(`チーム「${team.name}」を作成しました（コード: ${team.code}）`); });
+    client.on('team_joined', (team) => { showTeamsMsg(`チーム「${team.name}」に参加しました`); });
+    client.on('team_error', (m) => showTeamsMsg(m, true));
+    client.on('team_records', (msg) => {
+        teamRecordsData = { teamId: msg.teamId, teamName: msg.teamName, records: msg.records || [] };
+        renderTeamRecords();
+    });
+}
+
+function openTeamsModal() {
+    const modal = document.getElementById('teams-modal');
+    if (!modal) return;
+    const guest = !loggedInAccount;
+    document.getElementById('teams-guest-note').classList.toggle('hidden', !guest);
+    document.getElementById('teams-main').classList.toggle('hidden', guest);
+    document.getElementById('team-records-view').classList.add('hidden');
+    modal.classList.remove('hidden');
+    if (!guest) { client.getTeams(); renderTeamsList(); }
+}
+
+function showTeamsMsg(text, isError) {
+    const el = document.getElementById('teams-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('teams-msg-error', !!isError);
+    el.classList.add('show');
+    clearTimeout(showTeamsMsg._t);
+    showTeamsMsg._t = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function renderTeamsList() {
+    const list = document.getElementById('teams-list');
+    if (!list) return;
+    if (!myTeams.length) {
+        list.innerHTML = emptyState('👥', 'まだチームがありません', 'チームを作成するか、コードで参加しましょう。');
+        return;
+    }
+    list.innerHTML = myTeams.map(t => {
+        const names = (t.members || []).map(m => escapeHtml(m.name)).join('、');
+        return `<div class="team-card">
+            <div class="team-card-head">
+                <span class="team-card-name">${escapeHtml(t.name)}</span>
+                ${t.isOwner ? '<span class="team-owner-badge">オーナー</span>' : ''}
+            </div>
+            <div class="team-card-code">
+                コード: <b>${escapeHtml(t.code)}</b>
+                <button class="btn-tiny team-copy-btn" data-code="${escapeHtml(t.code)}">コピー</button>
+            </div>
+            <div class="team-card-members">${t.memberCount}人: ${names}</div>
+            <div class="team-card-actions">
+                <button class="btn-tiny btn-primary team-records-btn" data-team-id="${t.id}">💰 収支</button>
+                <button class="btn-tiny btn-danger team-leave-btn" data-team-id="${t.id}">脱退</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function showTeamRecords(teamId, teamName) {
+    document.getElementById('teams-main').classList.add('hidden');
+    const view = document.getElementById('team-records-view');
+    view.classList.remove('hidden');
+    document.getElementById('team-records-title').textContent = `💰 ${teamName} の収支`;
+    document.getElementById('team-records-body').innerHTML = '<div class="results-empty">読み込み中...</div>';
+    teamRecordsActiveTab = 'board';
+    document.querySelectorAll('.team-rec-tab').forEach(b =>
+        b.classList.toggle('active', b.dataset.trtab === 'board'));
+    client.getTeamRecords(teamId);
+}
+
+function renderTeamRecords() {
+    const body = document.getElementById('team-records-body');
+    if (!body || !teamRecordsData) return;
+    const records = teamRecordsData.records || [];
+    if (!records.length) {
+        body.innerHTML = emptyState('💰', 'まだ収支記録がありません', 'チーム限定テーブルが終了すると記録されます。');
+        return;
+    }
+    if (teamRecordsActiveTab === 'board') {
+        // メンバー別 累計収支ランキング
+        const totals = {};
+        for (const r of records) {
+            for (const p of (r.participants || [])) {
+                if (!totals[p.name]) totals[p.name] = { name: p.name, profit: 0, sessions: 0 };
+                totals[p.name].profit += (p.profit || 0);
+                totals[p.name].sessions += 1;
+            }
+        }
+        const rows = Object.values(totals).sort((a, b) => b.profit - a.profit);
+        body.innerHTML = '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>卓数</th><th>累計収支</th></tr></thead><tbody>'
+            + rows.map((r, i) => {
+                const cls = r.profit > 0 ? 'plus' : r.profit < 0 ? 'minus' : 'zero';
+                const sign = r.profit > 0 ? '+' : '';
+                const me = r.name === client.name ? ' class="ranking-me"' : '';
+                return `<tr${me}><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${r.sessions}</td>`
+                     + `<td class="results-row-val ${cls}">${sign}${r.profit.toLocaleString()}</td></tr>`;
+            }).join('')
+            + '</tbody></table>';
+    } else {
+        // 卓（セッション）別履歴
+        const sorted = [...records].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        body.innerHTML = sorted.map(r => {
+            const d = new Date(r.timestamp);
+            const date = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            const parts = [...(r.participants || [])].sort((a, b) => b.profit - a.profit).map(p => {
+                const cls = p.profit > 0 ? 'plus' : p.profit < 0 ? 'minus' : 'zero';
+                const sign = p.profit > 0 ? '+' : '';
+                return `<span class="team-rec-part"><span>${escapeHtml(p.name)}</span><span class="${cls}">${sign}${p.profit.toLocaleString()}</span></span>`;
+            }).join('');
+            return `<div class="team-rec-session">
+                <div class="team-rec-session-head">卓 ${escapeHtml(r.roomId)} ・ ${r.handsPlayed} ハンド ・ ${date}</div>
+                <div class="team-rec-parts">${parts}</div>
+            </div>`;
+        }).join('');
+    }
+}
+
 // Aggregate the local hand history into per-hand profit entries we can group.
 function _myHandResults() {
     const myName = (typeof client !== 'undefined' && client.name) ? client.name : '';
@@ -5712,7 +5943,7 @@ function renderRailRooms(rooms) {
         card.className = 'mx-rail-card' + (canJoin ? '' : ' is-full');
         let statusCls = 'waiting', statusText = '● 待機中';
         if (r.playing) { statusCls = 'playing'; statusText = '● プレイ中'; }
-        const lockPrefix = r.locked ? '🔒 ' : '';
+        const lockPrefix = (r.teamOnly ? '👥 ' : '') + (r.locked ? '🔒 ' : '');
         const gameName = r.gameName || (r.mergedGames && r.mergedGames[0] != null && GAME_LIST && GAME_LIST[r.mergedGames[0]] ? GAME_LIST[r.mergedGames[0]].shortName : '') || '—';
         card.innerHTML = `
             <div class="mx-rail-id">${lockPrefix}${escapeHtml(r.id)}</div>

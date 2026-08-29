@@ -197,6 +197,21 @@ class PokerClient {
             case 'current_standings':
                 this.emit('current_standings', msg);
                 break;
+            case 'teams_data':
+                this.emit('teams_data', msg.teams || []);
+                break;
+            case 'team_created':
+                this.emit('team_created', msg.team);
+                break;
+            case 'team_joined':
+                this.emit('team_joined', msg.team);
+                break;
+            case 'team_records':
+                this.emit('team_records', msg);
+                break;
+            case 'team_error':
+                this.emit('team_error', msg.message);
+                break;
             case 'lobby_chat_history':
                 this.emit('lobby_chat_history', msg.messages || []);
                 break;
@@ -251,4 +266,11 @@ class PokerClient {
     cancelJoin(roomId) { this.send({ type: 'cancel_join', roomId }); }
     viewProfile(target) { this.send({ type: 'view_profile', target }); }
     getFootprints() { this.send({ type: 'get_footprints' }); }
+    // Teams
+    getTeams() { this.send({ type: 'get_teams' }); }
+    createTeam(name) { this.send({ type: 'create_team', name }); }
+    joinTeam(code) { this.send({ type: 'join_team', code }); }
+    leaveTeam(teamId) { this.send({ type: 'leave_team', teamId }); }
+    getTeamRecords(teamId) { this.send({ type: 'get_team_records', teamId }); }
+    setTeamOnly(teamOnly, teamId, roomId) { this.send({ type: 'set_team_only', teamOnly, teamId, roomId: roomId || this.roomId }); }
 }

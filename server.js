@@ -240,6 +240,7 @@ async function loadSessionRecordsFromSupabase() {
                     handsPlayed: row.hands_played,
                     gameTypes: row.game_types || [],
                     participants: row.participants || [],
+                    teamId: row.team_id || null,
                 });
             }
             console.log(`session_records loaded from Supabase: ${data.length} records`);
@@ -281,13 +282,16 @@ async function persistSessionRecord(record) {
     saveSessionRecordsDebounced();
     if (supabase) {
         try {
-            await supabase.from('session_records').insert({
+            const row = {
                 room_id: record.roomId,
                 timestamp: record.timestamp,
                 hands_played: record.handsPlayed,
                 game_types: record.gameTypes,
                 participants: record.participants,
-            });
+            };
+            // team_id 列がある環境でのみ付与（無い環境で insert 全体を壊さないため）
+            if (sessionRecordsHasTeamId && record.teamId) row.team_id = record.teamId;
+            await supabase.from('session_records').insert(row);
             // 一定件数ごとに古い行を間引く (毎回ではなく低頻度で実行)
             sessionRecordInsertCount++;
             if (sessionRecordInsertCount % SESSION_RECORDS_PRUNE_EVERY === 0) {
@@ -303,6 +307,141 @@ loadLocalSessionRecords();
 loadSessionRecordsFromSupabase();
 // 起動時に一度だけ既存のバックログを間引く (過去に溜まった分の掃除)
 if (supabase) setTimeout(() => pruneSupabaseSessionRecords().catch(() => {}), 8000);
+
+// session_records に team_id 列があるか (チーム限定卓の収支をSupabaseに残せるか)。
+// 列が無い環境でも通常の収支記録が壊れないよう、insert時に条件付きで含める。
+let sessionRecordsHasTeamId = false;
+async function detectSessionRecordsTeamIdColumn() {
+    if (!supabase) return;
+    try {
+        const { error } = await supabase.from('session_records').select('team_id').limit(1);
+        sessionRecordsHasTeamId = !error;
+        if (error) console.warn('session_records.team_id 列が未作成のため、チーム収支はローカルのみ保存します。ALTER TABLE session_records ADD COLUMN team_id text; を実行すると永続化されます。');
+    } catch (e) { sessionRecordsHasTeamId = false; }
+}
+detectSessionRecordsTeamIdColumn();
+
+// ============================================
+// Teams (チーム) — 登録アカウント専用。ローカルJSON + Supabase ミラー。
+//   team = { id, name, code, owner(email), members:[{email,name}], createdAt }
+//   Supabase table `teams`(id text pk, name text, code text, owner_email text,
+//                          members jsonb, created_at timestamptz)
+// ============================================
+const TEAMS_FILE = path.join(__dirname, 'teams.json');
+const teams = {}; // id -> team
+let teamsSupabaseOk = false;
+
+function loadLocalTeams() {
+    try {
+        if (!fs.existsSync(TEAMS_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8'));
+        if (data && typeof data === 'object') {
+            for (const [id, t] of Object.entries(data)) teams[id] = t;
+            console.log(`teams loaded from local JSON: ${Object.keys(teams).length}`);
+        }
+    } catch (e) { console.warn('Failed to load teams.json:', e && e.message); }
+}
+
+let saveTeamsTimer = null;
+function saveTeamsDebounced() {
+    if (saveTeamsTimer) return;
+    saveTeamsTimer = setTimeout(() => {
+        saveTeamsTimer = null;
+        try { fs.writeFileSync(TEAMS_FILE, JSON.stringify(teams, null, 2), 'utf8'); }
+        catch (e) { console.warn('Failed to save teams.json:', e && e.message); }
+    }, 500);
+}
+
+async function loadTeamsFromSupabase() {
+    if (!supabase) return;
+    try {
+        const { data, error } = await supabase.from('teams').select('*');
+        if (error) { console.warn('teams load error (using local only):', error.message); return; }
+        teamsSupabaseOk = true;
+        if (Array.isArray(data)) {
+            for (const row of data) {
+                teams[row.id] = {
+                    id: row.id, name: row.name, code: row.code,
+                    owner: row.owner_email,
+                    members: Array.isArray(row.members) ? row.members : (row.members || []),
+                    createdAt: row.created_at,
+                };
+            }
+            console.log(`teams loaded from Supabase: ${data.length}`);
+        }
+    } catch (e) { console.warn('teams load exception:', e && e.message); }
+}
+
+async function persistTeam(team) {
+    teams[team.id] = team;
+    saveTeamsDebounced();
+    if (supabase && teamsSupabaseOk) {
+        try {
+            await supabase.from('teams').upsert({
+                id: team.id, name: team.name, code: team.code,
+                owner_email: team.owner, members: team.members, created_at: team.createdAt,
+            }, { onConflict: 'id' });
+        } catch (e) { console.warn('team upsert error:', e && e.message); }
+    }
+}
+
+async function deleteTeamPersist(id) {
+    delete teams[id];
+    saveTeamsDebounced();
+    if (supabase && teamsSupabaseOk) {
+        try { await supabase.from('teams').delete().eq('id', id); }
+        catch (e) { console.warn('team delete error:', e && e.message); }
+    }
+}
+
+function genTeamId() {
+    let id;
+    do { id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    while (teams[id]);
+    return id;
+}
+function genTeamCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code;
+    do {
+        code = '';
+        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    } while (Object.values(teams).some(t => t.code === code));
+    return code;
+}
+function getTeamsForEmail(email) {
+    if (!email) return [];
+    const e = email.toLowerCase();
+    return Object.values(teams).filter(t => (t.members || []).some(m => (m.email || '').toLowerCase() === e));
+}
+function findTeamByCode(code) {
+    if (!code) return null;
+    const c = code.trim().toUpperCase();
+    return Object.values(teams).find(t => (t.code || '').toUpperCase() === c) || null;
+}
+function isTeamMember(teamId, email) {
+    const t = teams[teamId];
+    if (!t || !email) return false;
+    const e = email.toLowerCase();
+    return (t.members || []).some(m => (m.email || '').toLowerCase() === e);
+}
+// クライアントに返すチーム表現。email は伏せ、自分がオーナーかだけ伝える。
+function teamForClient(t, client) {
+    const myEmail = (client && client.email || '').toLowerCase();
+    return {
+        id: t.id, name: t.name, code: t.code,
+        isOwner: (t.owner || '').toLowerCase() === myEmail,
+        memberCount: (t.members || []).length,
+        members: (t.members || []).map(m => ({ name: m.name })),
+    };
+}
+function sendTeamsToClient(ws, client) {
+    const list = client && client.email ? getTeamsForEmail(client.email).map(t => teamForClient(t, client)) : [];
+    send(ws, { type: 'teams_data', teams: list });
+}
+
+loadLocalTeams();
+loadTeamsFromSupabase();
 
 // ============================================
 // Lobby Chat (永続的なロビーチャットと、卓終了時の自動投稿)
@@ -835,6 +974,8 @@ class Room {
         this.stats = new StatsTracker();
         this.locked = false; // 承認制テーブル
         this.pendingJoins = []; // [{ clientId, name, avatar, ws }]
+        this.teamOnly = false;  // チームメンバー限定テーブル
+        this.teamId = null;     // 対象チームID
     }
 
     // Intersection of all members' selected games (only games everyone wants)
@@ -877,6 +1018,9 @@ class Room {
             playerCount: this.members.length,
             locked: this.locked,
             pendingJoins: this.pendingJoins.map(p => ({ clientId: p.clientId, name: p.name, avatar: p.avatar })),
+            teamOnly: this.teamOnly,
+            teamId: this.teamId,
+            teamName: this.teamId && teams[this.teamId] ? teams[this.teamId].name : '',
         };
     }
 }
@@ -916,7 +1060,7 @@ function broadcastRoomList() {
     queueMicrotask(() => { _roomListScheduled = false; _broadcastRoomListNow(); });
 }
 function _broadcastRoomListNow() {
-    const list = [...rooms.values()].map(r => ({
+    const full = [...rooms.values()].map(r => ({
         id: r.id,
         hostName: r.members[0]?.name || r.hostName || '???',
         hostAvatar: r.members[0]?.avatar || null,
@@ -925,11 +1069,25 @@ function _broadcastRoomListNow() {
         mergedGames: r.getMergedGames(),
         locked: r.locked,
         pendingCount: r.pendingJoins.length,
+        teamOnly: r.teamOnly,
+        teamId: r.teamId,
+        teamName: r.teamId && teams[r.teamId] ? teams[r.teamId].name : '',
         // Small member preview — avatars/names only, capped by table size.
         members: r.members.slice(0, 6).map(m => ({ name: m.name, avatar: m.avatar || null }))
     }));
-    const payload = { type: 'room_list', rooms: list, zoomCount: zoomPlayers.size };
-    for (const [ws] of clients) send(ws, payload);
+    const hasTeamOnly = full.some(r => r.teamOnly);
+    // チーム限定卓が無ければ全員同じリストで一斉送信（従来通り・最速）。
+    if (!hasTeamOnly) {
+        const payload = { type: 'room_list', rooms: full, zoomCount: zoomPlayers.size };
+        for (const [ws] of clients) send(ws, payload);
+        return;
+    }
+    // チーム限定卓があるときだけクライアントごとにフィルタ。
+    for (const [ws, c] of clients) {
+        const email = c && c.email;
+        const visible = full.filter(r => !r.teamOnly || (email && isTeamMember(r.teamId, email)));
+        send(ws, { type: 'room_list', rooms: visible, zoomCount: zoomPlayers.size });
+    }
 }
 
 let _onlineUsersScheduled = false;
@@ -1257,6 +1415,13 @@ function handleMessage(ws, client, msg) {
             if (!room) { send(ws, { type: 'error', message: 'ルームが見つかりません' }); return; }
             if (room.members.length >= 6) { send(ws, { type: 'error', message: 'ルームが満員です' }); return; }
 
+            // チーム限定テーブル: メンバー以外は参加不可
+            if (room.teamOnly && room.teamId) {
+                if (!client.email || !isTeamMember(room.teamId, client.email)) {
+                    send(ws, { type: 'error', message: 'このテーブルはチームメンバー限定です' }); return;
+                }
+            }
+
             // 承認制テーブル: ホスト承認待ちキューに追加
             if (room.locked && room.hostId !== client.id) {
                 // Already pending?
@@ -1441,6 +1606,27 @@ function handleMessage(ws, client, msg) {
                     send(pj.ws, { type: 'join_rejected', roomId: room.id, reason: 'ロックが解除されました。再度参加してください。' });
                 }
                 room.pendingJoins = [];
+            }
+            broadcastRoomUpdate(room);
+            broadcastRoomList();
+            break;
+        }
+
+        case 'set_team_only': {
+            const room = rooms.get(msg.roomId || client.roomId);
+            if (!room) return;
+            if (room.hostId !== client.id) { send(ws, { type: 'error', message: 'ホストのみ変更できます' }); return; }
+            if (client.isGuest || !client.email) { send(ws, { type: 'error', message: 'チーム限定はログインが必要です' }); return; }
+            if (msg.teamOnly) {
+                const team = teams[msg.teamId];
+                if (!team || !isTeamMember(team.id, client.email)) {
+                    send(ws, { type: 'error', message: '対象チームを選択してください' }); return;
+                }
+                room.teamOnly = true;
+                room.teamId = team.id;
+            } else {
+                room.teamOnly = false;
+                room.teamId = null;
             }
             broadcastRoomUpdate(room);
             broadcastRoomList();
@@ -2002,6 +2188,72 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
+        // ===== チーム =====
+        case 'get_teams': {
+            sendTeamsToClient(ws, client);
+            break;
+        }
+        case 'create_team': {
+            if (client.isGuest || !client.email) {
+                send(ws, { type: 'team_error', message: 'チーム機能はログインが必要です' }); break;
+            }
+            const name = (msg.name || '').trim().slice(0, 24);
+            if (!name) { send(ws, { type: 'team_error', message: 'チーム名を入力してください' }); break; }
+            const team = {
+                id: genTeamId(), name, code: genTeamCode(),
+                owner: client.email,
+                members: [{ email: client.email, name: client.name }],
+                createdAt: new Date().toISOString(),
+            };
+            persistTeam(team);
+            sendTeamsToClient(ws, client);
+            send(ws, { type: 'team_created', team: teamForClient(team, client) });
+            break;
+        }
+        case 'join_team': {
+            if (client.isGuest || !client.email) {
+                send(ws, { type: 'team_error', message: 'チーム機能はログインが必要です' }); break;
+            }
+            const team = findTeamByCode(msg.code);
+            if (!team) { send(ws, { type: 'team_error', message: 'チームコードが見つかりません' }); break; }
+            if (isTeamMember(team.id, client.email)) {
+                send(ws, { type: 'team_error', message: 'すでにこのチームのメンバーです' }); break;
+            }
+            team.members.push({ email: client.email, name: client.name });
+            persistTeam(team);
+            sendTeamsToClient(ws, client);
+            send(ws, { type: 'team_joined', team: teamForClient(team, client) });
+            // 既存メンバーのオンラインクライアントにルーム一覧を更新させる（新メンバーに卓が見えるように）
+            broadcastRoomList();
+            break;
+        }
+        case 'leave_team': {
+            if (!client.email) break;
+            const team = teams[msg.teamId];
+            if (!team) { send(ws, { type: 'team_error', message: 'チームが見つかりません' }); break; }
+            if ((team.owner || '').toLowerCase() === client.email.toLowerCase()) {
+                // オーナーが抜ける = チーム解散
+                deleteTeamPersist(team.id);
+            } else {
+                team.members = team.members.filter(m => (m.email || '').toLowerCase() !== client.email.toLowerCase());
+                persistTeam(team);
+            }
+            sendTeamsToClient(ws, client);
+            broadcastRoomList();
+            break;
+        }
+        case 'get_team_records': {
+            if (!client.email) { send(ws, { type: 'team_records', teamId: msg.teamId, records: [] }); break; }
+            if (!isTeamMember(msg.teamId, client.email)) {
+                send(ws, { type: 'team_error', message: 'このチームのメンバーではありません' }); break;
+            }
+            const recs = sessionRecords.filter(r => r.teamId === msg.teamId);
+            const team = teams[msg.teamId];
+            send(ws, { type: 'team_records', teamId: msg.teamId,
+                       teamName: team ? team.name : '', records: recs.slice(0, 500) });
+            break;
+        }
+
         case 'get_player_stats': {
             // Build a roster of REGISTERED accounts only (guests excluded).
             // Players who registered but never played are included with zero
@@ -2067,6 +2319,7 @@ function recordSessionStats(room) {
         handsPlayed,
         gameTypes: room.sessionGameIds ? Array.from(room.sessionGameIds) : [],
         participants: [],
+        teamId: room.teamOnly ? (room.teamId || null) : null,
     };
     const finalSnapshot = room.finalChipsByName || {};
     for (const name of Object.keys(participants)) {

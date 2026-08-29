@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mix-1</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=86">
+    <link rel="stylesheet" href="css/style.css?v=87">
     <link rel="stylesheet" href="css/sns.css?v=16">
 </head>
 <body>
@@ -81,6 +81,7 @@
                         <button id="sns-header-stats" class="menu-item">スタッツ</button>
                         <button id="sns-header-history" class="menu-item">ハンド履歴</button>
                         <button id="sns-header-results" class="menu-item">成績</button>
+                        <button id="sns-header-teams" class="menu-item">👥 チーム</button>
                         <button id="sns-header-online" class="menu-item">オンラインユーザーリスト</button>
                         <button id="sns-header-logout" class="menu-item">ログアウト</button>
                     </div>
@@ -216,6 +217,11 @@
                             <input type="checkbox" id="room-lock-toggle">
                             <span class="lock-toggle-text">🔓 承認制テーブル</span>
                         </label>
+                        <label id="team-toggle-label" class="lock-toggle-label hidden">
+                            <input type="checkbox" id="room-team-toggle">
+                            <span class="lock-toggle-text">👥 チームメンバー限定</span>
+                        </label>
+                        <select id="room-team-select" class="room-team-select hidden"></select>
                     </div>
                     <h3>プレイしたいゲームを選択</h3>
                     <div id="room-game-checkboxes"></div>
@@ -315,6 +321,43 @@
                     <button class="results-tab" data-rtab="table">テーブル別</button>
                 </div>
                 <div id="results-body" class="results-body"></div>
+            </div>
+        </div>
+
+        <!-- Teams modal (チーム) -->
+        <div id="teams-modal" class="zoom-sitout-overlay hidden">
+            <div class="zoom-sitout-inner results-modal-inner">
+                <h2>👥 チーム</h2>
+                <div class="zoom-sitout-buttons" style="margin-bottom:12px;">
+                    <button id="btn-teams-close" class="btn-small btn-danger">閉じる</button>
+                </div>
+                <div id="teams-guest-note" class="teams-guest-note hidden">
+                    チーム機能はログインが必要です。
+                </div>
+                <div id="teams-main" class="teams-main">
+                    <div class="teams-actions">
+                        <div class="teams-action-row">
+                            <input type="text" id="team-create-name" maxlength="24" placeholder="新しいチーム名">
+                            <button id="btn-team-create" class="btn-small btn-primary">作成</button>
+                        </div>
+                        <div class="teams-action-row">
+                            <input type="text" id="team-join-code" maxlength="6" placeholder="チームコードで参加">
+                            <button id="btn-team-join" class="btn-small">参加</button>
+                        </div>
+                        <div id="teams-msg" class="teams-msg"></div>
+                    </div>
+                    <div id="teams-list" class="teams-list"></div>
+                </div>
+                <!-- チーム収支ビュー -->
+                <div id="team-records-view" class="team-records-view hidden">
+                    <button id="btn-team-records-back" class="btn-small" style="margin-bottom:10px;">← チーム一覧へ</button>
+                    <h3 id="team-records-title"></h3>
+                    <div class="results-tabs">
+                        <button class="team-rec-tab active" data-trtab="board">メンバー別</button>
+                        <button class="team-rec-tab" data-trtab="tables">卓別履歴</button>
+                    </div>
+                    <div id="team-records-body" class="results-body"></div>
+                </div>
             </div>
         </div>
 
@@ -517,11 +560,11 @@
     <script src="js/deck.js"></script>
     <script src="js/evaluator.js"></script>
     <script src="js/game.js?v=4"></script>
-    <script src="js/client.js?v=12"></script>
+    <script src="js/client.js?v=13"></script>
     <script src="js/constants.js?v=1"></script>
     <script src="js/utils.js?v=1"></script>
     <script src="js/ui.js?v=48"></script>
-    <script src="js/app.js?v=100"></script>
+    <script src="js/app.js?v=101"></script>
 
 </body>
 </html>

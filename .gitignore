@@ -10,4 +10,5 @@ player_stats.json
 player_stats.json.tmp
 session_records.json
 lobby_chat.json
+teams.json
 server.log
