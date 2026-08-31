@@ -4094,7 +4094,15 @@ function setupTeamsModal() {
     client.on('team_joined', (team) => { showTeamsMsg(`チーム「${team.name}」に参加しました`); });
     client.on('team_error', (m) => showTeamsMsg(m, true));
     client.on('team_records', (msg) => {
-        teamRecordsData = { teamId: msg.teamId, teamName: msg.teamName, records: msg.records || [] };
+        teamRecordsData = { teamId: msg.teamId, teamName: msg.teamName, records: msg.records || [], isOwner: !!msg.isOwner };
+        // メンバー別リーダーボードはオーナー限定。非オーナーはタブを隠し卓別履歴のみ。
+        const boardTab = document.querySelector('.team-rec-tab[data-trtab="board"]');
+        if (boardTab) boardTab.classList.toggle('hidden', !teamRecordsData.isOwner);
+        if (!teamRecordsData.isOwner && teamRecordsActiveTab === 'board') {
+            teamRecordsActiveTab = 'tables';
+            document.querySelectorAll('.team-rec-tab').forEach(b =>
+                b.classList.toggle('active', b.dataset.trtab === 'tables'));
+        }
         renderTeamRecords();
     });
 }
@@ -4167,7 +4175,8 @@ function renderTeamRecords() {
         body.innerHTML = emptyState('💰', 'まだ収支記録がありません', 'チーム限定テーブルが終了すると記録されます。');
         return;
     }
-    if (teamRecordsActiveTab === 'board') {
+    const canSeeBoard = teamRecordsData.isOwner;
+    if (teamRecordsActiveTab === 'board' && canSeeBoard) {
         // メンバー別 累計収支ランキング
         const totals = {};
         for (const r of records) {

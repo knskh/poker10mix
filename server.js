@@ -2249,8 +2249,9 @@ function handleMessage(ws, client, msg) {
             }
             const recs = sessionRecords.filter(r => r.teamId === msg.teamId);
             const team = teams[msg.teamId];
+            const isOwner = !!(team && (team.owner || '').toLowerCase() === client.email.toLowerCase());
             send(ws, { type: 'team_records', teamId: msg.teamId,
-                       teamName: team ? team.name : '', records: recs.slice(0, 500) });
+                       teamName: team ? team.name : '', isOwner, records: recs.slice(0, 500) });
             break;
         }
 
