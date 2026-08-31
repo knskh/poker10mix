@@ -4041,8 +4041,8 @@ function setupTeamsModal() {
         const name = (nameInput.value || '').trim();
         const code = (codeInput.value || '').trim();
         if (!name) { showTeamsMsg('チーム名を入力してください', true); return; }
-        if (!/^[ぁ-ゖA-Za-z0-9]{2,20}$/.test(code)) {
-            showTeamsMsg('相言葉はひらがな・英数字で2〜20文字にしてください', true); return;
+        if (!/^[ぁ-ゖァ-ヶーA-Za-z0-9]{2,20}$/.test(code)) {
+            showTeamsMsg('相言葉はひらがな・カタカナ・英数字で2〜20文字にしてください', true); return;
         }
         client.createTeam(name, code);
         nameInput.value = ''; codeInput.value = '';

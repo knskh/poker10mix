@@ -420,9 +420,9 @@ function findTeamByCode(code) {
     const c = code.trim().toLowerCase();
     return Object.values(teams).find(t => (t.code || '').toLowerCase() === c) || null;
 }
-// 相言葉(チーム参加コード)のバリデーション: ひらがな + 英数字のみ、2〜20文字。
+// 相言葉(チーム参加コード)のバリデーション: ひらがな + カタカナ + 英数字のみ、2〜20文字。
 function isValidTeamCode(code) {
-    return typeof code === 'string' && /^[ぁ-ゖA-Za-z0-9]{2,20}$/.test(code.trim());
+    return typeof code === 'string' && /^[ぁ-ゖァ-ヶーA-Za-z0-9]{2,20}$/.test(code.trim());
 }
 function isTeamMember(teamId, email) {
     const t = teams[teamId];
@@ -2206,7 +2206,7 @@ function handleMessage(ws, client, msg) {
             if (!name) { send(ws, { type: 'team_error', message: 'チーム名を入力してください' }); break; }
             const code = (msg.code || '').trim();
             if (!isValidTeamCode(code)) {
-                send(ws, { type: 'team_error', message: '相言葉はひらがな・英数字で2〜20文字にしてください' }); break;
+                send(ws, { type: 'team_error', message: '相言葉はひらがな・カタカナ・英数字で2〜20文字にしてください' }); break;
             }
             if (findTeamByCode(code)) {
                 send(ws, { type: 'team_error', message: 'その相言葉は既に使われています。別のものにしてください' }); break;
