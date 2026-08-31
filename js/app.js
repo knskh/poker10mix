@@ -4036,16 +4036,21 @@ function setupTeamsModal() {
     document.getElementById('btn-teams-close')?.addEventListener('click', () => modal.classList.add('hidden'));
 
     document.getElementById('btn-team-create')?.addEventListener('click', () => {
-        const input = document.getElementById('team-create-name');
-        const name = (input.value || '').trim();
-        if (!name) { showTeamsMsg('チーム名を入力してください'); return; }
-        client.createTeam(name);
-        input.value = '';
+        const nameInput = document.getElementById('team-create-name');
+        const codeInput = document.getElementById('team-create-code');
+        const name = (nameInput.value || '').trim();
+        const code = (codeInput.value || '').trim();
+        if (!name) { showTeamsMsg('チーム名を入力してください', true); return; }
+        if (!/^[ぁ-ゖA-Za-z0-9]{2,20}$/.test(code)) {
+            showTeamsMsg('相言葉はひらがな・英数字で2〜20文字にしてください', true); return;
+        }
+        client.createTeam(name, code);
+        nameInput.value = ''; codeInput.value = '';
     });
     document.getElementById('btn-team-join')?.addEventListener('click', () => {
         const input = document.getElementById('team-join-code');
         const code = (input.value || '').trim();
-        if (!code) { showTeamsMsg('チームコードを入力してください'); return; }
+        if (!code) { showTeamsMsg('相言葉を入力してください', true); return; }
         client.joinTeam(code);
         input.value = '';
     });
@@ -4128,7 +4133,7 @@ function renderTeamsList() {
     const list = document.getElementById('teams-list');
     if (!list) return;
     if (!myTeams.length) {
-        list.innerHTML = emptyState('👥', 'まだチームがありません', 'チームを作成するか、コードで参加しましょう。');
+        list.innerHTML = emptyState('👥', 'まだチームがありません', 'チームを作成するか、相言葉で参加しましょう。');
         return;
     }
     list.innerHTML = myTeams.map(t => {
@@ -4139,7 +4144,7 @@ function renderTeamsList() {
                 ${t.isOwner ? '<span class="team-owner-badge">オーナー</span>' : ''}
             </div>
             <div class="team-card-code">
-                コード: <b>${escapeHtml(t.code)}</b>
+                相言葉: <b>${escapeHtml(t.code)}</b>
                 <button class="btn-tiny team-copy-btn" data-code="${escapeHtml(t.code)}">コピー</button>
             </div>
             <div class="team-card-members">${t.memberCount}人: ${names}</div>

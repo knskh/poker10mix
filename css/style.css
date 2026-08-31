@@ -1863,10 +1863,18 @@ body {
 .teams-guest-note { padding: 20px; text-align: center; color: var(--text-dim); }
 .teams-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .teams-action-row { display: flex; gap: 6px; }
-.teams-action-row input {
+.teams-action-row input,
+.teams-create-box input {
     flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--glass-border);
-    background: var(--panel); color: var(--text); font-size: 14px;
+    background: var(--panel); color: var(--text); font-size: 14px; width: 100%;
 }
+.teams-create-box {
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--panel-2); border: 1px solid var(--glass-border);
+    border-radius: 10px; padding: 10px;
+}
+.teams-create-title { font-size: 13px; font-weight: 800; color: var(--text); }
+.teams-create-box .btn-small { align-self: flex-end; }
 .teams-msg { font-size: 12px; color: var(--text-dim); min-height: 16px; opacity: 0; transition: opacity .2s; }
 .teams-msg.show { opacity: 1; }
 .teams-msg.teams-msg-error { color: #e63946; }

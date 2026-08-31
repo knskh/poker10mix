@@ -416,8 +416,13 @@ function getTeamsForEmail(email) {
 }
 function findTeamByCode(code) {
     if (!code) return null;
-    const c = code.trim().toUpperCase();
-    return Object.values(teams).find(t => (t.code || '').toUpperCase() === c) || null;
+    // 相言葉はひらがな＋英数字。英数字は大小無視、ひらがなはそのまま比較。
+    const c = code.trim().toLowerCase();
+    return Object.values(teams).find(t => (t.code || '').toLowerCase() === c) || null;
+}
+// 相言葉(チーム参加コード)のバリデーション: ひらがな + 英数字のみ、2〜20文字。
+function isValidTeamCode(code) {
+    return typeof code === 'string' && /^[ぁ-ゖA-Za-z0-9]{2,20}$/.test(code.trim());
 }
 function isTeamMember(teamId, email) {
     const t = teams[teamId];
@@ -2199,8 +2204,15 @@ function handleMessage(ws, client, msg) {
             }
             const name = (msg.name || '').trim().slice(0, 24);
             if (!name) { send(ws, { type: 'team_error', message: 'チーム名を入力してください' }); break; }
+            const code = (msg.code || '').trim();
+            if (!isValidTeamCode(code)) {
+                send(ws, { type: 'team_error', message: '相言葉はひらがな・英数字で2〜20文字にしてください' }); break;
+            }
+            if (findTeamByCode(code)) {
+                send(ws, { type: 'team_error', message: 'その相言葉は既に使われています。別のものにしてください' }); break;
+            }
             const team = {
-                id: genTeamId(), name, code: genTeamCode(),
+                id: genTeamId(), name, code,
                 owner: client.email,
                 members: [{ email: client.email, name: client.name }],
                 createdAt: new Date().toISOString(),
@@ -2215,7 +2227,7 @@ function handleMessage(ws, client, msg) {
                 send(ws, { type: 'team_error', message: 'チーム機能はログインが必要です' }); break;
             }
             const team = findTeamByCode(msg.code);
-            if (!team) { send(ws, { type: 'team_error', message: 'チームコードが見つかりません' }); break; }
+            if (!team) { send(ws, { type: 'team_error', message: '相言葉が見つかりません' }); break; }
             if (isTeamMember(team.id, client.email)) {
                 send(ws, { type: 'team_error', message: 'すでにこのチームのメンバーです' }); break;
             }

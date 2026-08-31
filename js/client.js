@@ -268,7 +268,7 @@ class PokerClient {
     getFootprints() { this.send({ type: 'get_footprints' }); }
     // Teams
     getTeams() { this.send({ type: 'get_teams' }); }
-    createTeam(name) { this.send({ type: 'create_team', name }); }
+    createTeam(name, code) { this.send({ type: 'create_team', name, code }); }
     joinTeam(code) { this.send({ type: 'join_team', code }); }
     leaveTeam(teamId) { this.send({ type: 'leave_team', teamId }); }
     getTeamRecords(teamId) { this.send({ type: 'get_team_records', teamId }); }
