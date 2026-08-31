@@ -1905,6 +1905,19 @@ body {
 .team-rec-part .minus { color: #e63946; font-weight: 700; }
 .team-rec-part .zero { color: var(--text-dim); }
 .results-row-val.plus { color: #2a9d5c; } .results-row-val.minus { color: #e63946; } .results-row-val.zero { color: var(--text-dim); }
+/* 非オーナーには他メンバーの名前・収支をモザイク表示 */
+.mosaic {
+    filter: blur(5px);
+    user-select: none; -webkit-user-select: none;
+    pointer-events: none;
+    letter-spacing: 1px;
+    opacity: 0.85;
+}
+.team-board-hint {
+    font-size: 12px; color: var(--text-dim);
+    background: var(--panel-2); border: 1px solid var(--glass-border);
+    border-radius: 8px; padding: 7px 10px; margin-bottom: 10px; line-height: 1.5;
+}
 .results-summary {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
     margin-bottom: 12px;

@@ -4095,14 +4095,10 @@ function setupTeamsModal() {
     client.on('team_error', (m) => showTeamsMsg(m, true));
     client.on('team_records', (msg) => {
         teamRecordsData = { teamId: msg.teamId, teamName: msg.teamName, records: msg.records || [], isOwner: !!msg.isOwner };
-        // メンバー別リーダーボードはオーナー限定。非オーナーはタブを隠し卓別履歴のみ。
+        // メンバー別リーダーボードは全メンバーが閲覧可。ただし非オーナーは
+        // 自分の行のみ表示し、他プレイヤーの名前・収支はモザイクを掛ける。
         const boardTab = document.querySelector('.team-rec-tab[data-trtab="board"]');
-        if (boardTab) boardTab.classList.toggle('hidden', !teamRecordsData.isOwner);
-        if (!teamRecordsData.isOwner && teamRecordsActiveTab === 'board') {
-            teamRecordsActiveTab = 'tables';
-            document.querySelectorAll('.team-rec-tab').forEach(b =>
-                b.classList.toggle('active', b.dataset.trtab === 'tables'));
-        }
+        if (boardTab) boardTab.classList.remove('hidden');
         renderTeamRecords();
     });
 }
@@ -4175,9 +4171,9 @@ function renderTeamRecords() {
         body.innerHTML = emptyState('💰', 'まだ収支記録がありません', 'チーム限定テーブルが終了すると記録されます。');
         return;
     }
-    const canSeeBoard = teamRecordsData.isOwner;
-    if (teamRecordsActiveTab === 'board' && canSeeBoard) {
+    if (teamRecordsActiveTab === 'board') {
         // メンバー別 累計収支ランキング
+        const isOwner = teamRecordsData.isOwner;
         const totals = {};
         for (const r of records) {
             for (const p of (r.participants || [])) {
@@ -4187,13 +4183,22 @@ function renderTeamRecords() {
             }
         }
         const rows = Object.values(totals).sort((a, b) => b.profit - a.profit);
-        body.innerHTML = '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>卓数</th><th>累計収支</th></tr></thead><tbody>'
+        const hint = isOwner ? '' :
+            '<div class="team-board-hint">他のメンバーの名前・収支はオーナーのみ表示できます（順位のみ公開）。</div>';
+        body.innerHTML = hint
+            + '<table class="ranking-table"><thead><tr><th>#</th><th>プレイヤー</th><th>卓数</th><th>累計収支</th></tr></thead><tbody>'
             + rows.map((r, i) => {
-                const cls = r.profit > 0 ? 'plus' : r.profit < 0 ? 'minus' : 'zero';
+                const isMe = r.name === client.name;
+                const reveal = isOwner || isMe;
                 const sign = r.profit > 0 ? '+' : '';
-                const me = r.name === client.name ? ' class="ranking-me"' : '';
-                return `<tr${me}><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${r.sessions}</td>`
-                     + `<td class="results-row-val ${cls}">${sign}${r.profit.toLocaleString()}</td></tr>`;
+                const cls = reveal ? (r.profit > 0 ? 'plus' : r.profit < 0 ? 'minus' : 'zero') : '';
+                const me = isMe ? ' class="ranking-me"' : '';
+                const nameCell = reveal ? escapeHtml(r.name)
+                    : `<span class="mosaic">${escapeHtml(r.name)}</span>`;
+                const profitCell = reveal ? `${sign}${r.profit.toLocaleString()}`
+                    : `<span class="mosaic">${sign}${r.profit.toLocaleString()}</span>`;
+                return `<tr${me}><td>${i + 1}</td><td>${nameCell}</td><td>${r.sessions}</td>`
+                     + `<td class="results-row-val ${cls}">${profitCell}</td></tr>`;
             }).join('')
             + '</tbody></table>';
     } else {
