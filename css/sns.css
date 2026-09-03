@@ -307,31 +307,6 @@
     background: #94a3b8; border-color: #94a3b8; cursor: not-allowed;
 }
 
-/* ---- Player Cloud (main screen) ---- */
-#sns-screen .mx-cloud-wrap {
-    max-width: 640px; margin: 0 auto;
-    padding: 14px 16px 80px;
-}
-#sns-screen .mx-cloud-head {
-    display: flex; align-items: baseline; gap: 8px;
-    margin: 6px 2px 10px;
-}
-#sns-screen .mx-cloud-head h2 {
-    margin: 0; font-size: 16px; color: #17202E; font-weight: 700;
-}
-#sns-screen .mx-cloud-wrap .cp-cloud-legend {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 10px;
-}
-#sns-screen .mx-cloud-wrap .cp-cloud-svg {
-    width: 100%; height: clamp(260px, 50vw, 380px);
-    background: #0d1420; border-radius: 12px;
-    border: 1px solid #1e2d40;
-}
-@media (max-width: 720px) {
-    #sns-screen .mx-cloud-wrap { padding: 10px 10px 80px; }
-}
-
 /* ---- Modal overrides (light blue theme) ---- */
 .rp-modal {
     position: fixed; inset: 0; z-index: 400;
@@ -572,31 +547,6 @@ body #login-screen .login-error {
 #chat-picker-modal .online-status-dot.lobby { background: #4CAF50; }
 #chat-picker-modal .online-status-dot.playing { background: #FF9800; }
 #chat-picker-modal .online-status-dot.zoom { background: #5B9BF0; }
-
-
-/* ==========================================
-   プレイヤークラウド（メイン画面）
-   ========================================== */
-.pc-tooltip {
-    position: fixed;
-    background: #1a2235; border: 1px solid #2e4060;
-    border-radius: 8px; padding: 8px 12px;
-    font-size: 11px; color: #c8d8f0;
-    pointer-events: none; opacity: 0;
-    transition: opacity 0.15s; z-index: 9999;
-    min-width: 160px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-}
-.pc-tooltip.show { opacity: 1; }
-.pc-tooltip .pct-name { font-size: 13px; font-weight: 700; color: #7eb8f7; margin-bottom: 5px; }
-.pc-tooltip .pct-row { display: flex; justify-content: space-between; gap: 12px; margin: 2px 0; }
-.pc-tooltip .pct-val { font-weight: 600; color: #e0e6f0; }
-.pc-tooltip .pct-online  { font-size: 10px; font-weight: 600; color: #4ade80; margin-left: 6px; }
-.pc-tooltip .pct-offline { font-size: 10px; font-weight: 500; color: #6b7280; margin-left: 6px; }
-.pc-no-data {
-    display: flex; align-items: center; justify-content: center;
-    height: 100%; color: #3a5070; font-size: 13px;
-}
 
 
 

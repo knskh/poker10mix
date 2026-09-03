@@ -38,7 +38,6 @@
 //  28. Lobby Chat .................. ロビーチャット
 //  29. Table preview popover ....... 卓プレビュー
 //  30. セッション収支モーダル ...... 退室時の自分の収支表示
-//  31. Player Cloud ................ プレイヤークラウド描画
 // ==========================================================================
 
 const client = new PokerClient();
@@ -5766,19 +5765,12 @@ function initSNSScreen() {
     client.getRooms();
     updateSNSCTACounts();
     renderRailRooms(window.lastRoomList || []);
-    // 登録プレイヤー全員のスタッツを取得（プレイヤークラウド用）
-    if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
-        client.send({ type: 'get_player_stats' });
-    }
     // ロビーチャットの履歴を取得
     if (typeof client !== 'undefined' && client.getLobbyChat) {
         client.getLobbyChat();
     }
     // 登録ユーザーのみ入力可能にする
     refreshLobbyChatInputState();
-    // Render the main-screen Player Cloud with whatever we currently have.
-    // It will be re-rendered when the player_stats response arrives.
-    if (typeof renderPlayerCloud === 'function') renderPlayerCloud(lastOnlineUsers || []);
 }
 
 // ==========================================
@@ -6395,209 +6387,8 @@ function closeOnlineUsersModal() {
 function openChatModal()   { openOnlineUsersModal(); }
 function switchChatTab()   { /* no-op */ }
 
-// ==========================================
-// Player Cloud (プレイヤークラウド描画)
-// ==========================================
-function renderPlayerCloud(users) {
-    const svg = document.getElementById('player-cloud-main-svg');
-    if (!svg) return;
-    _renderPlayerCloudToSvg(svg, users);
-}
-
-function _renderPlayerCloudToSvg(svg, users) {
-    if (!svg) return;
-
-    // Build the master roster: use the full server-side player list
-    // (every registered account) when available, falling back to the
-    // online-users list otherwise. Online users contribute their live
-    // avatar info.
-    const onlineByName = {};
-    for (const u of (users || [])) {
-        if (u && u.name) onlineByName[u.name] = u.avatar || null;
-    }
-
-    const cache = window.playerStatsCache || {};
-    let targets;
-    if (Object.keys(cache).length > 0) {
-        // 全登録プレイヤーを表示（オンラインユーザーのアバター情報があれば反映）
-        targets = Object.values(cache).map(s => ({
-            name: s.name,
-            avatar: onlineByName[s.name] || s.avatar || null,
-            isOnline: s.name in onlineByName,
-        }));
-    } else {
-        targets = (users || []).filter(u => u && u.name).map(u => ({ ...u, isOnline: true }));
-    }
-
-    if (targets.length === 0) {
-        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#3a5070" font-size="13" dominant-baseline="middle">データがありません</text>';
-        return;
-    }
-
-    // 名前ハッシュで再現性のある仮スタッツ生成（実データ未取得時）
-    function nameHash(str) {
-        let h = 0;
-        for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-        return Math.abs(h);
-    }
-    function pseudo(name, offset, min, max) {
-        const v = ((nameHash(name + offset) % 1000) / 1000);
-        return min + v * (max - min);
-    }
-
-    // player_stats があれば使用、なければ仮データ
-    const stats = targets.map(u => {
-        const ps = cache[u.name];
-        return {
-            name: u.name,
-            avatar: u.avatar,
-            isOnline: !!u.isOnline,
-            profit:       ps ? ps.total_profit    : Math.round(pseudo(u.name, 'p', -50000, 100000)),
-            avgDiversity: ps ? (ps.session_count > 0 ? ps.total_diversity / ps.session_count : 1) : pseudo(u.name, 'd', 1, 10),
-            handCount:    ps ? ps.total_hands      : Math.round(pseudo(u.name, 'l', 0, 200)),
-        };
-    });
-
-    // 相対スケール
-    const maxDiv   = Math.max(...stats.map(s => s.avgDiversity), 1);
-    const maxLikes = Math.max(...stats.map(s => s.handCount), 1);
-    const maxProfit = Math.max(...stats.map(s => Math.abs(s.profit)), 1);
-    const MIN_FONT = 10, MAX_FONT = 36;
-
-    const W = svg.clientWidth  || 360;
-    const H = svg.clientHeight || 380;
-    const PAD = { top: 24, right: 20, bottom: 28, left: 36 };
-    const plotW = W - PAD.left - PAD.right;
-    const plotH = H - PAD.top  - PAD.bottom;
-
-    // SVG クリア
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-
-    // グリッド
-    for (let i = 0; i <= 4; i++) {
-        const x = PAD.left + plotW * i / 4;
-        const y = PAD.top  + plotH * i / 4;
-        const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        vl.setAttribute('x1', x); vl.setAttribute('y1', PAD.top);
-        vl.setAttribute('x2', x); vl.setAttribute('y2', PAD.top + plotH);
-        vl.setAttribute('stroke', '#1e2d40'); vl.setAttribute('stroke-width', '1');
-        svg.appendChild(vl);
-        const hl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        hl.setAttribute('x1', PAD.left); hl.setAttribute('y1', y);
-        hl.setAttribute('x2', PAD.left + plotW); hl.setAttribute('y2', y);
-        hl.setAttribute('stroke', '#1e2d40'); hl.setAttribute('stroke-width', '1');
-        svg.appendChild(hl);
-    }
-
-    // Y軸ラベル
-    const yLbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    yLbl.setAttribute('x', 10); yLbl.setAttribute('y', PAD.top + plotH / 2);
-    yLbl.setAttribute('text-anchor', 'middle'); yLbl.setAttribute('fill', '#2a3a50');
-    yLbl.setAttribute('font-size', '9');
-    yLbl.setAttribute('transform', `rotate(-90, 10, ${PAD.top + plotH / 2})`);
-    yLbl.textContent = 'ハンド↑'; svg.appendChild(yLbl);
-
-    // プレイヤー配置（重なり回避）
-    const placed = [];
-    function overlaps(nx, ny, nw, nh) {
-        for (const b of placed) {
-            if (nx < b.x + b.w && nx + nw > b.x && ny < b.y + b.h && ny + nh > b.y) return true;
-        }
-        return false;
-    }
-    function tryPlace(cx, cy, nw, nh) {
-        const tries = [[0,0],[0,-nh],[0,nh],[-nw,0],[nw,0],[-nw,-nh],[nw,-nh],[-nw,nh],[nw,nh],[0,-nh*1.8],[0,nh*1.8]];
-        for (const [dx, dy] of tries) {
-            const tx = cx - nw / 2 + dx, ty = cy - nh / 2 + dy;
-            if (!overlaps(tx, ty, nw, nh)) { placed.push({x:tx, y:ty, w:nw, h:nh}); return [tx + nw/2, ty + nh/2]; }
-        }
-        placed.push({x: cx - nw/2, y: cy - nh/2, w: nw, h: nh});
-        return [cx, cy];
-    }
-
-    stats.forEach((s, idx) => {
-        const relX = s.avgDiversity / maxDiv;
-        const relY = s.handCount / maxLikes;
-        const bx = PAD.left + relX * plotW;
-        const by = PAD.top  + (1 - relY) * plotH;
-        const absP = Math.abs(s.profit);
-        const fs = MIN_FONT + (absP / maxProfit) * (MAX_FONT - MIN_FONT);
-        const color = `hsl(${200 + relX * 40}, 80%, ${55 + relY * 20}%)`;
-        const estW = s.name.length * fs * 0.62;
-        const estH = fs * 1.2;
-        const [px, py] = tryPlace(bx, by, estW, estH);
-
-        // オフラインプレイヤーは少し透過させて、オンラインと区別
-        const finalOpacity = s.isOnline ? 1 : 0.55;
-
-        // ドット
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', bx); dot.setAttribute('cy', by);
-        dot.setAttribute('r', 2.5); dot.setAttribute('fill', color);
-        dot.setAttribute('opacity', s.isOnline ? '0.5' : '0.25');
-        svg.appendChild(dot);
-
-        // 引き線
-        if (Math.abs(px - bx) > 4 || Math.abs(py - by) > 4) {
-            const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            ln.setAttribute('x1', bx); ln.setAttribute('y1', by);
-            ln.setAttribute('x2', px); ln.setAttribute('y2', py);
-            ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', '0.7');
-            ln.setAttribute('opacity', s.isOnline ? '0.3' : '0.15');
-            svg.appendChild(ln);
-        }
-
-        // テキスト
-        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        txt.setAttribute('x', px); txt.setAttribute('y', py + fs * 0.35);
-        txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('font-size', fs);
-        txt.setAttribute('fill', color); txt.setAttribute('stroke', '#0d1420');
-        txt.setAttribute('stroke-width', fs * 0.18);
-        txt.setAttribute('font-weight', '700'); txt.setAttribute('cursor', 'pointer');
-        txt.setAttribute('paint-order', 'stroke fill');
-        txt.style.opacity = '0';
-        txt.dataset.finalOpacity = String(finalOpacity);
-        txt.textContent = s.name;
-
-        // ツールチップ
-        txt.addEventListener('mouseenter', e => {
-            let tt = document.getElementById('pc-tooltip-el');
-            if (!tt) { tt = document.createElement('div'); tt.id = 'pc-tooltip-el'; tt.className = 'pc-tooltip'; document.body.appendChild(tt); }
-            const onlineBadge = s.isOnline ? '<span class="pct-online">● オンライン</span>' : '<span class="pct-offline">○ オフライン</span>';
-            // 収支の具体的な数字は非公表 (文字サイズで相対的に示すのみ)。
-            tt.innerHTML = `<div class="pct-name">${escapeHtml(s.name)} ${onlineBadge}</div>
-                <div class="pct-row"><span>ゲーム多様性</span><span class="pct-val">${s.avgDiversity.toFixed(1)}</span></div>
-                <div class="pct-row"><span>ハンド数</span><span class="pct-val">${s.handCount}</span></div>`;
-            tt.classList.add('show');
-            tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 180) + 'px';
-            tt.style.top  = Math.min(e.clientY - 8,  window.innerHeight - 130) + 'px';
-        });
-        txt.addEventListener('mousemove', e => {
-            const tt = document.getElementById('pc-tooltip-el');
-            if (tt) { tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 180) + 'px'; tt.style.top = Math.min(e.clientY - 8, window.innerHeight - 130) + 'px'; }
-        });
-        txt.addEventListener('mouseleave', () => {
-            const tt = document.getElementById('pc-tooltip-el');
-            if (tt) tt.classList.remove('show');
-        });
-        svg.appendChild(txt);
-        setTimeout(() => { txt.style.transition = 'opacity 0.4s'; txt.style.opacity = txt.dataset.finalOpacity || '1'; }, idx * 40);
-    });
-}
-
 // footprints / new_footprint: UI removed — handler no longer needed
 // profile_data: UI removed — no handler needed
-
-// player_stats: Player Cloud visualization data
-client.on('player_stats', ({ stats }) => {
-    if (!stats) return;
-    // { [name]: { name, avatar, total_profit, session_count, total_diversity, total_hands } }
-    window.playerStatsCache = Object.fromEntries(
-        stats.map(s => [s.name, s])
-    );
-    // メイン画面のプレイヤークラウドを再描画。
-    renderPlayerCloud(lastOnlineUsers || []);
-});
 
 // Init
 setupActionRipple();

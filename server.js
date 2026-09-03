@@ -111,79 +111,6 @@ function makeSupabaseClient(url, key) {
 const supabase = makeSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================
-// Player Stats (for Player Cloud visualization)
-// ============================================
-// In-memory cache: { [name]: { total_profit, session_count, total_diversity, total_hands } }
-// Note: total_hands is stored in the comment_likes column of player_stats (repurposed)
-const playerStatsMap = {};
-
-// Local JSON persistence — works without Supabase, and acts as a safety net
-// when Supabase IS configured (so a Supabase outage doesn't lose data).
-const PLAYER_STATS_FILE = path.join(__dirname, 'player_stats.json');
-
-function loadLocalPlayerStats() {
-    try {
-        if (!fs.existsSync(PLAYER_STATS_FILE)) return;
-        const data = JSON.parse(fs.readFileSync(PLAYER_STATS_FILE, 'utf8')) || {};
-        for (const [name, s] of Object.entries(data)) {
-            playerStatsMap[name] = {
-                total_profit:    (s && s.total_profit)    || 0,
-                session_count:   (s && s.session_count)   || 0,
-                total_diversity: (s && s.total_diversity) || 0,
-                total_hands:     (s && s.total_hands)     || 0,
-            };
-        }
-        console.log(`player_stats loaded from local JSON: ${Object.keys(data).length} records`);
-    } catch (e) {
-        console.warn('Failed to load player_stats.json:', e && e.message);
-    }
-}
-
-let savePlayerStatsTimer = null;
-function savePlayerStatsDebounced() {
-    if (savePlayerStatsTimer) return;
-    savePlayerStatsTimer = setTimeout(() => {
-        savePlayerStatsTimer = null;
-        try {
-            fs.writeFileSync(PLAYER_STATS_FILE, JSON.stringify(playerStatsMap, null, 2), 'utf8');
-        } catch (e) {
-            console.warn('Failed to save player_stats.json:', e && e.message);
-        }
-    }, 500);
-}
-
-async function upsertPlayerStats(name, delta) {
-    if (!name) return;
-    if (!playerStatsMap[name]) {
-        playerStatsMap[name] = { total_profit: 0, session_count: 0, total_diversity: 0, total_hands: 0 };
-    }
-    const s = playerStatsMap[name];
-    if (delta.profitDelta    !== undefined) s.total_profit    += delta.profitDelta;
-    if (delta.sessionDelta   !== undefined) s.session_count   += delta.sessionDelta;
-    if (delta.diversityDelta !== undefined) s.total_diversity += delta.diversityDelta;
-    if (delta.handsDelta     !== undefined) s.total_hands     += delta.handsDelta;
-
-    // Always persist locally — works without Supabase and protects against
-    // a Supabase outage. Debounced so rapid updates batch into one write.
-    savePlayerStatsDebounced();
-
-    if (supabase) {
-        try {
-            await supabase.from('player_stats').upsert({
-                name,
-                total_profit:    s.total_profit,
-                session_count:   s.session_count,
-                total_diversity: s.total_diversity,
-                comment_likes:   s.total_hands,   // reuse comment_likes column for total_hands
-                updated_at: new Date().toISOString(),
-            }, { onConflict: 'name' });
-        } catch (e) {
-            console.warn('player_stats upsert error:', e && e.message);
-        }
-    }
-}
-
-// ============================================
 // Session Records (per-table, per-session profit log used by 成績 modal)
 // In-memory: array of records sorted newest-first.
 //   { roomId, timestamp(ISO), handsPlayed, gameTypes, participants:[{name, profit, invested, endChips, handsPlayed}] }
@@ -508,34 +435,6 @@ function broadcastLobbyChat(entry) {
 }
 
 loadLocalLobbyChat();
-
-async function loadAllPlayerStats() {
-    // Always load local JSON first as the baseline.
-    loadLocalPlayerStats();
-
-    // If Supabase is configured, overlay its data (it's the source of truth
-    // when present). Local entries that don't exist in Supabase are kept.
-    if (!supabase) return;
-    try {
-        const { data, error } = await supabase.from('player_stats').select('*');
-        if (!error && data) {
-            for (const row of data) {
-                playerStatsMap[row.name] = {
-                    total_profit:    row.total_profit    || 0,
-                    session_count:   row.session_count   || 0,
-                    total_diversity: row.total_diversity || 0,
-                    total_hands:     row.comment_likes   || 0,  // stored in comment_likes column
-                };
-            }
-            // Re-save the merged view to local JSON for safety.
-            savePlayerStatsDebounced();
-            console.log(`player_stats loaded from Supabase: ${data.length} records`);
-        }
-    } catch (e) {
-        console.warn('player_stats load error:', e && e.message);
-    }
-}
-loadAllPlayerStats();
 
 // Local JSON fallback (used when Supabase is not configured). This restores
 // login on local / unconfigured deployments where the env vars are missing,
@@ -2267,37 +2166,6 @@ function handleMessage(ws, client, msg) {
             break;
         }
 
-        case 'get_player_stats': {
-            // Build a roster of REGISTERED accounts only (guests excluded).
-            // Players who registered but never played are included with zero
-            // stats so the Player Cloud still shows their name.
-            const registeredNames = new Set();
-            for (const acc of Object.values(localAccounts)) {
-                if (acc && acc.name) registeredNames.add(acc.name);
-            }
-            // 登録ユーザーのアバター情報 (オンラインクライアントから取得)
-            const avatarByName = {};
-            for (const [, c] of clients) {
-                if (c && c.name && !c.isGuest && registeredNames.has(c.name)) {
-                    avatarByName[c.name] = c.avatar || null;
-                }
-            }
-
-            const statsArray = [];
-            for (const name of registeredNames) {
-                const s = playerStatsMap[name] || {};
-                statsArray.push({
-                    name,
-                    avatar: avatarByName[name] || null,
-                    total_profit:    s.total_profit    || 0,
-                    session_count:   s.session_count   || 0,
-                    total_diversity: s.total_diversity || 0,
-                    total_hands:     s.total_hands     || 0,
-                });
-            }
-            send(ws, { type: 'player_stats', stats: statsArray });
-            break;
-        }
     }
 }
 
@@ -2322,10 +2190,8 @@ function recordSessionStats(room) {
             if (p.name) finalByName[p.name] = p.chips;
         }
     }
-    const gameCount = room.sessionGameIds ? room.sessionGameIds.size : 1;
     const handsPlayed = room.handsPlayed || 0;
-    // Build a detailed session record for the 成績 (Results) modal, in
-    // addition to bumping each player's lifetime aggregate.
+    // Build a detailed session record for the 成績 (Results) modal.
     const sessionRecord = {
         roomId: room.id,
         timestamp: new Date().toISOString(),
@@ -2347,7 +2213,6 @@ function recordSessionStats(room) {
         sessionRecord.participants.push({
             name, profit: diff, invested, endChips, handsPlayed,
         });
-        upsertPlayerStats(name, { profitDelta: diff, sessionDelta: 1, diversityDelta: gameCount, handsDelta: handsPlayed });
     }
     if (sessionRecord.participants.length > 0) {
         persistSessionRecord(sessionRecord).catch(() => {});
@@ -3127,13 +2992,7 @@ function startGame(room) {
             }
         }
 
-        // player_stats: 収支を記録
-        for (const p of handResult.players) {
-            if (!p.name) continue;
-            const diff = p.chips - p.startChips;
-            upsertPlayerStats(p.name, { profitDelta: diff });
-        }
-        // player_stats: このセッションでプレイしたゲーム種類を記録
+        // このセッションでプレイしたゲーム種類を記録（セッション収支記録に使用）
         if (!room.sessionGameIds) room.sessionGameIds = new Set();
         if (gc && gc.id) room.sessionGameIds.add(gc.id);
 
